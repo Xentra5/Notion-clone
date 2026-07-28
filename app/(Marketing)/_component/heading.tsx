@@ -58,7 +58,7 @@ export const Heading = () => {
         </Button>
       </div>
 
-      <p className="mt-5 text-sm font-medium text-[#606060]">
+      <p className="mt-5 max-w-[450px] text-sm font-medium text-[#606060] sm:max-w-[600px]">
         Start with a workspace your team understands. Scale with AI, governance, and context built in.
       </p>
     </section>

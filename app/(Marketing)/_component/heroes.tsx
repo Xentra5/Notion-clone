@@ -29,17 +29,16 @@ export const Heroes = () => {
         })}
       </div>
 
-      <div className="pointer-events-none absolute bottom-5 left-[11%] hidden items-end gap-2 md:flex" aria-hidden="true">
+      <div className="pointer-events-none absolute bottom-5 left-4 lg:left-10 hidden items-end gap-2 md:flex" aria-hidden="true">
         <div className="relative flex h-14 w-14 rotate-12 items-center justify-center rounded-full bg-[#ffbf45] text-black shadow-sm">
           <BookOpen className="h-8 w-8 -rotate-12 fill-white stroke-[2.3]" />
           <span className="absolute -right-3 bottom-0 flex h-6 w-6 items-center justify-center rounded-full bg-white text-[#b5b5b5] shadow-sm">
             <Sparkle className="h-3.5 w-3.5 fill-current" />
           </span>
         </div>
-        <div className="mb-12 h-8 w-20 rounded-t-full border-t-2 border-black opacity-80" />
       </div>
 
-      <div className="pointer-events-none absolute bottom-5 right-[16%] hidden items-end gap-2 md:flex" aria-hidden="true">
+      <div className="pointer-events-none absolute bottom-5 right-4 lg:right-10 hidden items-end gap-2 md:flex" aria-hidden="true">
         <span className="mb-1 flex h-6 w-6 items-center justify-center rounded-full bg-white shadow-sm">
           <span className="h-4 w-4 rounded-full bg-black" />
         </span>
