@@ -10,7 +10,7 @@ const logos = [
   { name: "Vercel", logo: "Vercel" },
   { name: "NVIDIA", logo: "NVIDIA" },
   { name: "Volvo", logo: "VOLVO" },
-  { name: "L'Oreal", logo: "L'ORÉAL" },
+  { name: "L'Oreal", logo: "L'OREAL" },
   { name: "Discord", logo: "Discord" },
   { name: "Toyota", logo: "TOYOTA" },
   { name: "1Password", logo: "1Password" },
@@ -21,7 +21,7 @@ export const LogoBar = () => {
   return (
     <section className="mx-auto mt-24 max-w-[1120px] px-5 text-center">
       <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-        Trusted by teams at the world's most innovative companies
+        Trusted by teams at the world&apos;s most innovative companies
       </p>
       
       {/* Logos grid */}
@@ -33,12 +33,12 @@ export const LogoBar = () => {
           >
             {logo.logo === "OpenAI" && (
               <span className="flex items-center gap-1.5 text-[15px] font-semibold tracking-normal">
-                <span className="text-xl">❖</span> OpenAI
+                <span className="text-xl">OpenAI</span>
               </span>
             )}
             {logo.logo === "Figma" && (
               <span className="flex items-center gap-1 text-[15px] font-semibold tracking-normal">
-                <span className="text-red-500 text-lg">∫</span> Figma
+                <span className="text-red-500 text-lg">F</span> Figma
               </span>
             )}
             {logo.logo === "ramp" && <span className="lowercase font-serif tracking-tighter text-xl">ramp</span>}
@@ -50,7 +50,7 @@ export const LogoBar = () => {
             )}
             {logo.logo === "NVIDIA" && <span className="italic tracking-tighter text-lg font-extrabold">NVIDIA</span>}
             {logo.logo === "VOLVO" && <span className="tracking-[0.2em] font-serif text-[13px] font-normal uppercase">Volvo</span>}
-            {logo.logo === "L'ORÉAL" && <span className="tracking-[0.15em] text-[13px] font-light uppercase">L'ORÉAL</span>}
+            {logo.logo === "L'OREAL" && <span className="tracking-[0.15em] text-[13px] font-light uppercase">L&apos;OREAL</span>}
             {logo.logo === "Discord" && <span className="tracking-tight text-[16px] font-semibold">Discord</span>}
             {logo.logo === "TOYOTA" && <span className="tracking-[0.1em] text-[14px] font-bold uppercase">TOYOTA</span>}
             {logo.logo === "1Password" && <span className="tracking-tight text-[15px] font-medium">1Password</span>}

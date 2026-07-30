@@ -1,6 +1,7 @@
 import Image from "next/image";
 import { ChevronDown } from "lucide-react";
 
+import { AuthButton } from "@/components/auth/auth-button";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
@@ -37,9 +38,7 @@ export const Navbar = () => {
       </nav>
 
       <div className="flex items-center gap-4 text-[15px] font-semibold">
-        <a href="#" className="hidden text-[#262626] transition hover:text-black sm:inline">
-          Log in
-        </a>
+        <AuthButton />
         <Button className="h-9 rounded-lg bg-[#0078df] px-4 text-[15px] font-bold text-white hover:bg-[#006dcc]">
           Get Notion free
         </Button>

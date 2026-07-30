@@ -2,7 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
-import { ArrowRight, Globe } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Footer = () => {
@@ -76,7 +76,7 @@ export const Footer = () => {
               </a>
             </div>
             <p className="text-[12px] text-neutral-400 mt-4 leading-normal">
-              © {new Date().getFullYear()} Notion Labs, Inc. All rights reserved.
+              &copy; {new Date().getFullYear()} Notion Labs, Inc. All rights reserved.
             </p>
           </div>
 

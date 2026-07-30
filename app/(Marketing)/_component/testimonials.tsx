@@ -62,7 +62,7 @@ export const Testimonials = () => {
                 <Quote className="h-5 w-5 opacity-20" />
               </div>
               <p className="mt-6 text-[15px] font-medium leading-relaxed text-neutral-800 italic">
-                "{t.quote}"
+                &quot;{t.quote}&quot;
               </p>
             </div>
 

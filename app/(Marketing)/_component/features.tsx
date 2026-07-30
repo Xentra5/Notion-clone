@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArrowRight, Bot, BookOpen, CheckCircle, Database, HelpCircle, FileText, Search, Sparkle, Settings, Terminal, Zap, MessageSquare } from "lucide-react";
+import { ArrowRight, Bot, BookOpen, CheckCircle, Database, Search, Sparkle, Terminal } from "lucide-react";
 
 export const Features = () => {
   const [activePill, setActivePill] = useState(0);
@@ -45,15 +45,15 @@ export const Features = () => {
             </div>
             <div className="space-y-2">
               <div className="h-4 rounded bg-white px-2 py-0.5 flex justify-between items-center border border-neutral-100">
-                <span className="font-semibold text-black">✓ Code Review Process</span>
+                <span className="font-semibold text-black">Checked: Code Review Process</span>
                 <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1 rounded">Verified</span>
               </div>
               <div className="h-4 rounded bg-white px-2 py-0.5 flex justify-between items-center border border-neutral-100">
-                <span className="font-semibold text-black">✓ Onboarding Checklist</span>
+                <span className="font-semibold text-black">Checked: Onboarding Checklist</span>
                 <span className="text-[9px] bg-emerald-50 text-emerald-600 px-1 rounded">Verified</span>
               </div>
               <div className="h-4 rounded bg-white px-2 py-0.5 flex justify-between items-center border border-neutral-100">
-                <span className="font-semibold text-black">✓ Release Playbook</span>
+                <span className="font-semibold text-black">Checked: Release Playbook</span>
                 <span className="text-[9px] bg-amber-50 text-amber-600 px-1 rounded">Under Review</span>
               </div>
             </div>
@@ -71,7 +71,7 @@ export const Features = () => {
               <Search className="h-5 w-5" />
             </span>
             <h3 className="mt-4 text-xs font-bold uppercase tracking-wider text-neutral-400">Find answers</h3>
-            <p className="mt-2 text-xl font-bold text-neutral-900">Get answers, instantly—with citations.</p>
+            <p className="mt-2 text-xl font-bold text-neutral-900">Get answers, instantly - with citations.</p>
           </div>
 
           {/* AI Chat Visual */}
@@ -81,7 +81,7 @@ export const Features = () => {
               <div>
                 <p className="font-semibold text-purple-900 text-[11px]">Notion AI Assistant</p>
                 <p className="mt-1 text-neutral-700 leading-normal">
-                  "Based on the <span className="underline decoration-purple-400 font-medium">Q3 Roadmap</span>, our biggest opportunity is shifting developers to Custom Agents."
+                  &quot;Based on the <span className="underline decoration-purple-400 font-medium">Q3 Roadmap</span>, our biggest opportunity is shifting developers to Custom Agents.&quot;
                 </p>
               </div>
             </div>
@@ -110,7 +110,7 @@ export const Features = () => {
           {/* Large agent pipeline mockup */}
           <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 rounded-xl border border-neutral-100 bg-neutral-50 p-4 text-[11px] shadow-inner">
             <div className="rounded-lg bg-white p-3 border border-neutral-200">
-              <span className="font-semibold text-neutral-500">📥 INCOMING REQUESTS</span>
+              <span className="font-semibold text-neutral-500">INCOMING REQUESTS</span>
               <div className="mt-2 p-2 rounded bg-neutral-50 border border-neutral-100">
                 <p className="font-medium text-neutral-800">Support #1042: API Timeout</p>
                 <div className="mt-1.5 flex items-center gap-1 text-[9px] text-neutral-400">
@@ -132,7 +132,7 @@ export const Features = () => {
             </div>
 
             <div className="rounded-lg bg-white p-3 border border-neutral-200">
-              <span className="font-semibold text-neutral-500">📤 SHIPPED & RECONCILED</span>
+              <span className="font-semibold text-neutral-500">SHIPPED & RECONCILED</span>
               <div className="mt-2 p-2 rounded bg-neutral-50 border border-neutral-100">
                 <p className="font-medium text-neutral-800">Fix deployed & closed ticket</p>
                 <div className="mt-1.5 flex items-center gap-1 text-[9px] text-emerald-600 font-medium">
