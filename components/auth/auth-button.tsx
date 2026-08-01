@@ -1,6 +1,7 @@
 "use client";
 
-import { signIn, signOut, useSession } from "next-auth/react";
+import Link from "next/link";
+import { signOut, useSession } from "next-auth/react";
 
 import { Button } from "@/components/ui/button";
 
@@ -28,13 +29,12 @@ export function AuthButton() {
   }
 
   return (
-    <button
-      type="button"
-      disabled={isLoading}
-      onClick={() => signIn("github")}
-      className="hidden text-[#262626] transition hover:text-black disabled:opacity-60 sm:inline"
+    <Link
+      aria-disabled={isLoading}
+      href="/login"
+      className="hidden text-[#262626] transition hover:text-black aria-disabled:pointer-events-none aria-disabled:opacity-60 sm:inline"
     >
       Log in
-    </button>
+    </Link>
   );
 }

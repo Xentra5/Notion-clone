@@ -1,4 +1,5 @@
 import Image from "next/image";
+import Link from "next/link";
 import { ChevronDown } from "lucide-react";
 
 import { AuthButton } from "@/components/auth/auth-button";
@@ -39,9 +40,11 @@ export const Navbar = () => {
 
       <div className="flex items-center gap-4 text-[15px] font-semibold">
         <AuthButton />
-        <Button className="h-9 rounded-lg bg-[#0078df] px-4 text-[15px] font-bold text-white hover:bg-[#006dcc]">
-          Get Notion free
-        </Button>
+        <Link href="/signup">
+          <Button className="h-9 rounded-lg bg-[#0078df] px-4 text-[15px] font-bold text-white hover:bg-[#006dcc]">
+            Get Notion free
+          </Button>
+        </Link>
       </div>
     </header>
   );

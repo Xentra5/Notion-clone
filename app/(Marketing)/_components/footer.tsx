@@ -2,6 +2,7 @@
 
 import React from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -14,9 +15,11 @@ export const Footer = () => {
           Get started today.
         </h2>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button className="h-11 rounded-lg bg-[#0078df] px-6 text-[16px] font-bold text-white shadow-[0_1px_0_rgba(0,0,0,0.12)] hover:bg-[#006dcc]">
-            Get Notion free
-          </Button>
+          <Link href="/signup">
+            <Button className="h-11 rounded-lg bg-[#0078df] px-6 text-[16px] font-bold text-white shadow-[0_1px_0_rgba(0,0,0,0.12)] hover:bg-[#006dcc]">
+              Get Notion free
+            </Button>
+          </Link>
           <Button
             variant="secondary"
             className="h-11 rounded-lg bg-[#eaf4ff] px-6 text-[16px] font-bold text-[#005fad] hover:bg-[#dceeff]"

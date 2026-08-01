@@ -1,11 +1,11 @@
-import { Heading } from "./_component/heading";
-import { Heroes } from "./_component/heroes";
-import { Navbar } from "./_component/navbar";
-import { LogoBar } from "./_component/logo-bar";
-import { Features } from "./_component/features";
-import { Testimonials } from "./_component/testimonials";
-import { StatsBar } from "./_component/stats-bar";
-import { Footer } from "./_component/footer";
+import { Heading } from "./_components/heading";
+import { Heroes } from "./_components/heroes";
+import { Navbar } from "./_components/navbar";
+import { LogoBar } from "./_components/logo-bar";
+import { Features } from "./_components/features";
+import { Testimonials } from "./_components/testimonials";
+import { StatsBar } from "./_components/stats-bar";
+import { Footer } from "./_components/footer";
 
 const MarketingPage = () => {
   return (

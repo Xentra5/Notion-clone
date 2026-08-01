@@ -1,0 +1,39 @@
+.page { --text: #37352f; --muted: rgba(55,53,47,.58); --faint: rgba(55,53,47,.45); --border: rgba(55,53,47,.16); min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center; position: relative; padding: 32px 20px 84px; color: var(--text); font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+.content { width: min(100%, 380px); display: flex; flex-direction: column; align-items: center; }
+.logo { width: 35px; height: 35px; margin-bottom: 16px; }
+.logo svg { display: block; width: 100%; height: 100%; }
+.headings { width: 100%; margin-bottom: 32px; text-align: center; }
+.headings h1 { margin: 0 0 4px; font-size: 24px; line-height: 1.2; font-weight: 700; letter-spacing: -.01em; }
+.headings p { margin: 0; color: var(--muted); font-size: 23px; line-height: 1.2; font-weight: 500; letter-spacing: -.01em; }
+.form { width: 100%; }
+.inputGroup { display: flex; flex-direction: column; margin-bottom: 16px; }
+.inputGroup label { margin-bottom: 4px; color: var(--faint); font-size: 12px; }
+.inputGroup input { width: 100%; height: 36px; padding: 0 10px; border: 1px solid #2383e2; border-radius: 4px; outline: none; color: var(--text); background: white; box-shadow: 0 0 0 1px rgba(35,131,226,.28); font: inherit; font-size: 14px; }
+.inputGroup input::placeholder { color: var(--faint); opacity: 1; }
+.helperText { margin: 6px 0 0; color: var(--faint); font-size: 11px; line-height: 1.3; }
+.continueButton { width: 100%; height: 36px; border: 0; border-radius: 4px; color: white; background: #2383e2; font: inherit; font-size: 14px; font-weight: 500; cursor: pointer; transition: background .1s; }
+.continueButton:hover { background: #1e71c2; }
+.continueButton:disabled { cursor: wait; opacity: .7; }
+.divider { width: 100%; display: flex; align-items: center; margin: 24px 0; color: var(--faint); font-size: 12px; }
+.divider span:first-child, .divider span:last-child { flex: 1; height: 1px; background: rgba(55,53,47,.09); }
+.divider span:nth-child(2) { padding: 0 12px; }
+.socialLogins { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+.socialRow, .bottomRow { display: flex; gap: 12px; justify-content: center; }
+.socialButton { flex: 1; min-height: 64px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 10px 0; border: 1px solid var(--border); border-radius: 4px; color: var(--text); background: white; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; transition: background .1s; }
+.socialButton:hover { background: rgba(55,53,47,.08); }
+.socialIcon { height: 24px; display: flex; align-items: center; justify-content: center; }
+.socialIcon svg { width: 20px; height: 20px; }
+.bottomRow .socialButton { flex: 0 0 calc(50% - 6px); max-width: 140px; }
+.message { margin: -12px 0 16px; color: #b42318; text-align: center; font-size: 12px; }
+.footerLinks { width: 100%; text-align: center; }
+.signup, .terms { color: var(--faint); }
+.signup { margin: 0 0 16px; font-size: 12px; }
+.terms { margin: 0; font-size: 11px; line-height: 1.4; }
+.footerLinks a { color: inherit; text-decoration: underline; text-decoration-color: var(--border); text-underline-offset: 2px; }
+.footerLinks a:hover { color: var(--text); }
+.pageFooter { position: absolute; right: 0; bottom: 16px; left: 0; display: flex; align-items: center; justify-content: center; padding: 0 24px; }
+.language { display: inline-flex; align-items: center; gap: 6px; border: 0; color: var(--faint); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.language:hover, .help:hover { color: var(--text); }
+.help { position: absolute; right: 24px; bottom: 0; display: grid; width: 28px; height: 28px; place-items: center; border: 1px solid var(--border); border-radius: 50%; color: var(--faint); background: white; cursor: pointer; }
+@media (max-height: 700px) { .page { justify-content: flex-start; } }
+@media (max-width: 480px) { .page { padding-right: 16px; padding-left: 16px; } .headings p { font-size: 21px; } .socialButton { min-height: 60px; } }
