@@ -1,0 +1,30 @@
+import mongoose, { Schema, models, model } from "mongoose";
+
+// TODO: Define your User Schema fields (e.g. email, password, etc.)
+const UserSchema = new Schema(
+  {
+    name: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    email: {
+      type: String,
+      required: true,
+      unique: true,
+      trim: true,
+      lowercase: true,
+    },
+    password: {
+      type: String,
+      required: true,
+    },
+    // You can add more fields like name, image, etc. here
+  },
+  { timestamps: true }
+);
+
+// Prevent compiling model query helper redefinition in hot-reloading development server
+const User = models.User || model("User", UserSchema);
+
+export default User;

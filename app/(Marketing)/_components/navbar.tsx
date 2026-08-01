@@ -1,5 +1,8 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 import { ChevronDown } from "lucide-react";
 
 import { AuthButton } from "@/components/auth/auth-button";
@@ -16,9 +19,11 @@ const navItems = [
 ];
 
 export const Navbar = () => {
+  const { data: session } = useSession();
+
   return (
     <header className="flex h-20 w-full items-center justify-between px-5 sm:px-8 lg:px-10">
-      <a href="#" aria-label="Notion home" className="flex items-center">
+      <Link href="/" aria-label="Notion home" className="flex items-center">
         <Image
           src="/notion-svgrepo-com.svg"
           alt="Notion"
@@ -27,7 +32,7 @@ export const Navbar = () => {
           priority
           className="h-8 w-8"
         />
-      </a>
+      </Link>
 
       <nav className="hidden items-center gap-7 text-[15px] font-semibold text-[#262626] lg:flex">
         {navItems.map((item) => (
@@ -38,13 +43,15 @@ export const Navbar = () => {
         ))}
       </nav>
 
-      <div className="flex items-center gap-4 text-[15px] font-semibold">
+      <div className="flex items-center gap-3 sm:gap-4 text-[15px] font-semibold">
         <AuthButton />
-        <Link href="/signup">
-          <Button className="h-9 rounded-lg bg-[#0078df] px-4 text-[15px] font-bold text-white hover:bg-[#006dcc]">
-            Get Notion free
-          </Button>
-        </Link>
+        {!session ? (
+          <Link href="/signup">
+            <Button className="h-9 rounded-lg bg-[#0078df] px-4 text-[15px] font-bold text-white hover:bg-[#006dcc]">
+              Get Notion free
+            </Button>
+          </Link>
+        ) : null}
       </div>
     </header>
   );
