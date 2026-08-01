@@ -22,7 +22,12 @@ export function AuthButton() {
 
     return (
       <div className="flex items-center gap-2 sm:gap-3">
-        <div className="flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-[#262626]">
+        <Link href="/dashboard">
+          <Button className="h-9 rounded-lg bg-[#0078df] px-3.5 text-[14px] font-bold text-white hover:bg-[#0067c2]">
+            Enter Workspace
+          </Button>
+        </Link>
+        <div className="hidden sm:flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-[#262626]">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0078df] text-[10px] font-bold text-white">
             {initial}
           </span>

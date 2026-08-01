@@ -55,7 +55,7 @@ export default function SignupForm() {
         // Fallback to manual login redirect if credentials auto-login returns an issue
         window.location.href = "/login?signup=success";
       } else {
-        window.location.href = "/";
+        window.location.href = "/dashboard";
       }
     } catch {
       setMessage("We could not complete sign-up. Please try again.");
@@ -65,7 +65,7 @@ export default function SignupForm() {
 
   async function handleProviderSignIn(provider: SocialProvider) {
     setMessage("");
-    await signIn(provider, { callbackUrl: "/" });
+    await signIn(provider, { callbackUrl: "/dashboard" });
   }
 
   function showUnavailableMessage(providerName: string) {

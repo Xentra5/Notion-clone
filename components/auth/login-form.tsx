@@ -41,7 +41,7 @@ export default function LoginForm() {
         return;
       }
 
-      window.location.href = "/";
+      window.location.href = "/dashboard";
     } catch {
       setMessage("We could not sign you in. Please check your credentials and try again.");
       setIsSubmitting(false);
@@ -50,7 +50,7 @@ export default function LoginForm() {
 
   async function handleProviderSignIn(provider: SocialProvider) {
     setMessage("");
-    await signIn(provider, { callbackUrl: "/" });
+    await signIn(provider, { callbackUrl: "/dashboard" });
   }
 
   function showUnavailableMessage(providerName: string) {
