@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import {
   Home,
@@ -22,6 +22,7 @@ import {
   ChevronDown,
   ChevronRight,
   LogOut,
+  Mic,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -41,6 +42,8 @@ export function Sidebar({
 }: SidebarProps) {
   const { data: session } = useSession();
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
+  const [newMenuOpen, setNewMenuOpen] = useState(false);
+  const newMenuRef = useRef<HTMLDivElement>(null);
   const [expandedSections, setExpandedSections] = useState({
     meetings: true,
     recents: true,
@@ -56,6 +59,19 @@ export function Sidebar({
   function toggleSection(sec: keyof typeof expandedSections) {
     setExpandedSections((prev) => ({ ...prev, [sec]: !prev[sec] }));
   }
+
+  // Close the "New" popup when clicking outside of it
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (newMenuRef.current && !newMenuRef.current.contains(e.target as Node)) {
+        setNewMenuOpen(false);
+      }
+    }
+    if (newMenuOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [newMenuOpen]);
 
   return (
     <aside className="w-60 bg-[#191919] border-r border-[#262626] flex flex-col h-full text-[#9b9b9b] select-none text-xs font-sans shrink-0">
@@ -162,7 +178,9 @@ export function Sidebar({
               </div>
 
               <button
-                onClick={onToggleAi}
+                onClick={() => {
+                  onSelectPage("AI Meeting Note");
+                }}
                 className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[#252525] text-[#9b9b9b] hover:text-white transition text-left"
               >
                 <Plus className="h-3.5 w-3.5 text-[#737373]" />
@@ -266,8 +284,21 @@ export function Sidebar({
                 <span className="truncate">Personal Website</span>
               </button>
 
+              {/* Show dynamically created page in Private list */}
+              {activePage !== "Getting Started on Mobile" &&
+                activePage !== "Personal Website" &&
+                activePage !== "Home" && (
+                <button
+                  onClick={() => onSelectPage(activePage)}
+                  className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#2c2c2c] text-white shadow-sm text-left font-medium"
+                >
+                  <FileText className="h-3.5 w-3.5 shrink-0 text-[#888]" />
+                  <span className="truncate">{activePage}</span>
+                </button>
+              )}
+
               <button
-                onClick={() => onSelectPage("Getting Started on Mobile")}
+                onClick={() => onSelectPage("Untitled")}
                 className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-[#252525] text-[#9b9b9b] hover:text-white transition text-left"
               >
                 <Plus className="h-3.5 w-3.5 text-[#737373]" />
@@ -377,18 +408,63 @@ export function Sidebar({
       </div>
 
       {/* Fixed Bottom Action Bar */}
-      <div className="p-2.5 border-t border-[#222222] flex items-center justify-between gap-1.5">
+      <div ref={newMenuRef} className="relative p-2.5 border-t border-[#222222] flex items-center justify-between gap-1.5">
         <button
-          onClick={onToggleAi}
+          onClick={() => setNewMenuOpen(!newMenuOpen)}
           className="flex-1 flex items-center gap-2 bg-[#242424] hover:bg-[#2d2d2d] border border-[#333333] text-[#e0e0e0] px-3 py-2 rounded-xl text-xs font-semibold transition shadow-sm group"
         >
           <Sparkles className="h-3.5 w-3.5 text-purple-400 fill-purple-400/20 group-hover:rotate-12 transition-transform" />
-          <span className="truncate">New chat</span>
+          <span className="truncate">New</span>
           <span className="text-[10px] text-[#737373] ml-auto font-mono">ctrl+o</span>
         </button>
 
+        {/* New Item Popup Menu */}
+        {newMenuOpen && (
+          <div className="absolute bottom-14 left-2.5 right-2.5 bg-[#202020] border border-[#333333] rounded-xl shadow-2xl p-1.5 z-50 text-[#d4d4d4] animate-in fade-in slide-in-from-bottom-2 duration-150">
+            <button
+              onClick={() => {
+                setNewMenuOpen(false);
+                onSelectPage("Untitled");
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#2c2c2c] hover:text-white transition text-left font-medium"
+            >
+              <FileText className="h-4 w-4 text-[#888]" />
+              <div>
+                <div>Page</div>
+                <div className="text-[10px] text-[#666] font-normal">Create a new blank page</div>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setNewMenuOpen(false);
+                onToggleAi();
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#2c2c2c] hover:text-purple-300 transition text-left font-medium"
+            >
+              <Sparkles className="h-4 w-4 text-purple-400" />
+              <div>
+                <div>Chat</div>
+                <div className="text-[10px] text-[#666] font-normal">Open Notion AI assistant</div>
+              </div>
+            </button>
+            <button
+              onClick={() => {
+                setNewMenuOpen(false);
+                onSelectPage("AI Meeting Note");
+              }}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-[#2c2c2c] hover:text-blue-300 transition text-left font-medium"
+            >
+              <Mic className="h-4 w-4 text-blue-400" />
+              <div>
+                <div>AI Meeting Note</div>
+                <div className="text-[10px] text-[#666] font-normal">Record meeting with microphone</div>
+              </div>
+            </button>
+          </div>
+        )}
+
         <button
-          onClick={() => onSelectPage("Getting Started on Mobile")}
+          onClick={() => onSelectPage("Untitled")}
           className="h-9 w-9 rounded-xl bg-[#242424] hover:bg-[#2d2d2d] border border-[#333333] flex items-center justify-center text-[#d4d4d4] hover:text-white transition shrink-0 shadow-sm"
           title="New page"
         >

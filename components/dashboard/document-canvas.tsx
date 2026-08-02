@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import {
   FileText,
   Sparkles,
@@ -28,6 +28,47 @@ interface ChecklistItem {
   hasAiSparkle?: boolean;
 }
 
+const DEFAULT_ITEMS: ChecklistItem[] = [
+  {
+    id: "1",
+    type: "todo",
+    text: "Tap anywhere and start typing",
+    checked: false,
+  },
+  {
+    id: "2",
+    type: "todo",
+    text: "Tap the + above your keyboard to add content — headers, sub pages, etc.",
+    checked: false,
+    hasSubPage: true,
+  },
+  {
+    id: "3",
+    type: "todo",
+    text: "Highlight text and use the bar above your keyboard to format",
+    checked: false,
+  },
+  {
+    id: "4",
+    type: "todo",
+    text: "Tap and hold this line, then drag",
+    checked: false,
+  },
+  {
+    id: "5",
+    type: "todo",
+    text: "Tap the home tab button at the bottom left to see your pages",
+    checked: false,
+  },
+  {
+    id: "6",
+    type: "todo",
+    text: "Tap anywhere and select ✨ in the bar above your keyboard to check out Notion AI",
+    checked: false,
+    hasAiSparkle: true,
+  },
+];
+
 export function DocumentCanvas({
   activeTitle,
   onOpenAi,
@@ -35,49 +76,71 @@ export function DocumentCanvas({
 }: DocumentCanvasProps) {
   const [pageEmoji, setPageEmoji] = useState("📱");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [items, setItems] = useState<ChecklistItem[]>([
-    {
-      id: "1",
-      type: "todo",
-      text: "Tap anywhere and start typing",
-      checked: false,
-    },
-    {
-      id: "2",
-      type: "todo",
-      text: "Tap the + above your keyboard to add content — headers, sub pages, etc.",
-      checked: false,
-      hasSubPage: true,
-    },
-    {
-      id: "3",
-      type: "todo",
-      text: "Highlight text and use the bar above your keyboard to format",
-      checked: false,
-    },
-    {
-      id: "4",
-      type: "todo",
-      text: "Tap and hold this line, then drag",
-      checked: false,
-    },
-    {
-      id: "5",
-      type: "todo",
-      text: "Tap the home tab button at the bottom left to see your pages",
-      checked: false,
-    },
-    {
-      id: "6",
-      type: "todo",
-      text: "Tap anywhere and select ✨ in the bar above your keyboard to check out Notion AI",
-      checked: false,
-      hasAiSparkle: true,
-    },
-  ]);
-
+  const [currentTitle, setCurrentTitle] = useState(activeTitle);
+  const [items, setItems] = useState<ChecklistItem[]>(DEFAULT_ITEMS);
   const [newItemText, setNewItemText] = useState("");
   const [showSlashMenu, setShowSlashMenu] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
+
+  // Track whether the user has actually made edits (don't save on first render)
+  const hasMounted = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // When activeTitle changes from sidebar, reset the canvas to a fresh page
+  useEffect(() => {
+    setCurrentTitle(activeTitle);
+    setItems(DEFAULT_ITEMS);
+    setShowEmojiPicker(false);
+    setShowSlashMenu(false);
+    setNewItemText("");
+    hasMounted.current = false;
+  }, [activeTitle]);
+
+  // Debounced auto-save to MongoDB
+  const savePage = useCallback(async (title: string, blocks: ChecklistItem[]) => {
+    setSaveStatus("saving");
+    try {
+      await fetch("/api/pages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title,
+          category: "Private",
+          blocks: blocks.map((item) => ({
+            id: item.id,
+            type: item.type === "todo" ? "to_do" : item.type === "bullet" ? "bulleted_list_item" : item.type,
+            properties: { text: item.text, checked: !!item.checked },
+          })),
+        }),
+      });
+      setSaveStatus("saved");
+    } catch (err) {
+      console.error("Auto-save error:", err);
+      setSaveStatus("idle");
+    }
+  }, []);
+
+  useEffect(() => {
+    // Skip auto-save on the very first render / page switch
+    if (!hasMounted.current) {
+      hasMounted.current = true;
+      return;
+    }
+
+    // Clear any existing timer
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+    }
+
+    // Debounce: wait 2s of inactivity before saving
+    saveTimerRef.current = setTimeout(() => {
+      savePage(currentTitle, items);
+    }, 2000);
+
+    return () => {
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    };
+  }, [currentTitle, items, savePage]);
 
   const emojis = ["📱", "📄", "🚀", "⚡", "💡", "🎨", "📝", "✨", "📌", "🌐"];
 
@@ -135,10 +198,22 @@ export function DocumentCanvas({
           )}
         </div>
 
-        {/* Document Title Header */}
-        <h1 className="text-3xl sm:text-4xl font-bold tracking-tight text-[#ffffff] outline-none">
-          {activeTitle}
-        </h1>
+        {/* Document Title Header (Editable) */}
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={currentTitle}
+            onChange={(e) => setCurrentTitle(e.target.value)}
+            placeholder="Untitled Page"
+            className="flex-1 text-3xl sm:text-4xl font-bold tracking-tight text-[#ffffff] bg-transparent outline-none border-b border-transparent focus:border-[#333333] transition"
+          />
+          {saveStatus === "saving" && (
+            <span className="text-[10px] text-[#737373] animate-pulse shrink-0">Saving...</span>
+          )}
+          {saveStatus === "saved" && (
+            <span className="text-[10px] text-emerald-500 shrink-0">✓ Saved</span>
+          )}
+        </div>
 
         {/* Welcome Callout Banner */}
         <div className="flex items-center gap-2.5 p-3 rounded-xl bg-[#202020] border border-[#2c2c2c] text-sm text-[#e6e6e6]">
