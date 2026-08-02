@@ -19,10 +19,10 @@ export default function DashboardPage() {
 
   if (status === "loading") {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#191919] text-[#d4d4d4]">
+      <div className="flex min-h-screen items-center justify-center bg-background text-foreground animate-pulse">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 rounded-full border-2 border-[#0078df] border-t-transparent animate-spin" />
-          <span className="text-xs text-[#737373] font-medium tracking-wide">
+          <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+          <span className="text-xs text-muted-foreground font-medium tracking-wide">
             Loading Notion workspace...
           </span>
         </div>
@@ -31,7 +31,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-[#191919] font-sans antialiased text-[#d4d4d4] select-none">
+    <div className="flex h-screen w-screen overflow-hidden bg-background font-sans antialiased text-foreground select-none">
       {/* Left Sidebar */}
       <div
         className={`${
