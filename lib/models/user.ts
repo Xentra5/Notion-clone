@@ -19,7 +19,15 @@ const UserSchema = new Schema(
       type: String,
       required: true,
     },
-    // You can add more fields like name, image, etc. here
+    plan: {
+      type: String,
+      enum: ["free", "pro", "ultimate"],
+      default: "free",
+    },
+    aiUsageCount: {
+      type: Number,
+      default: 0,
+    },
   },
   { timestamps: true }
 );

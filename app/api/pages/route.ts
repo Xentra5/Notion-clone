@@ -24,7 +24,7 @@ export async function GET() {
   }
 }
 
-// POST /api/pages — create a new page OR upsert an existing one by title
+// POST /api/pages — create a new page (creation only — use PATCH /api/pages/[id] to update)
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions);
@@ -35,39 +35,27 @@ export async function POST(request: Request) {
     const { title, category, isAiMeetingNote, blocks } = await request.json();
     const pageTitle = (title || "Untitled").trim();
 
-    if (!pageTitle) {
-      return NextResponse.json({ error: "Title is required" }, { status: 400 });
-    }
-
     await connectToDatabase();
 
-    // Upsert: update if page with same title exists for user, else create
-    const page = await Page.findOneAndUpdate(
-      { userId: session.user.email, title: pageTitle },
-      {
-        $set: {
-          category: category || "Private",
-          isAiMeetingNote: !!isAiMeetingNote,
-          blocks: blocks || [
-            {
-              id: "block-1",
-              type: "paragraph",
-              properties: { text: "Start writing here..." },
-            },
-          ],
+    const page = await Page.create({
+      userId: session.user.email,
+      title: pageTitle,
+      icon: "📄",
+      category: category || "Private",
+      isAiMeetingNote: !!isAiMeetingNote,
+      blocks: blocks || [
+        {
+          id: "block-1",
+          type: "paragraph",
+          properties: { text: "Start writing here..." },
         },
-        $setOnInsert: {
-          userId: session.user.email,
-          title: pageTitle,
-          icon: "📄",
-        },
-      },
-      { upsert: true, new: true, lean: true }
-    );
+      ],
+    });
 
-    return NextResponse.json({ page }, { status: 200 });
+    return NextResponse.json({ page }, { status: 201 });
   } catch (error) {
-    console.error("Error saving page:", error);
-    return NextResponse.json({ error: "Failed to save page" }, { status: 500 });
+    console.error("Error creating page:", error);
+    return NextResponse.json({ error: "Failed to create page" }, { status: 500 });
   }
 }
+

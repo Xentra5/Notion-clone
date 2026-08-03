@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter, usePathname } from "next/navigation";
+import { PricingModal } from "./pricing-modal";
+import { getPages, createPage, type Page } from "@/lib/actions/pages";
 import {
   Home,
   Search,
@@ -10,7 +13,6 @@ import {
   Calendar,
   Sparkles,
   FileText,
-  User,
   Plus,
   Monitor,
   BookOpen,
@@ -40,10 +42,15 @@ export function Sidebar({
   onToggleAi,
   onOpenCalendar,
 }: SidebarProps) {
+  const router = useRouter();
+  const pathname = usePathname();
   const { data: session } = useSession();
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const newMenuRef = useRef<HTMLDivElement>(null);
+  const [showPricing, setShowPricing] = useState(false);
+  const [pages, setPages] = useState<Page[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
   const [expandedSections, setExpandedSections] = useState({
     meetings: true,
     recents: true,
@@ -53,8 +60,33 @@ export function Sidebar({
     apps: true,
   });
 
+  const loadPages = useCallback(async () => {
+    try {
+      const data = await getPages();
+      setPages(data);
+    } catch (e) {
+      console.error("Failed to load pages:", e);
+    }
+  }, []);
+
+  useEffect(() => { loadPages(); }, [loadPages]);
+
   const userName = session?.user?.name || "o";
   const userInitial = userName.charAt(0).toUpperCase();
+
+  async function handleNewPage() {
+    if (isCreating) return;
+    setIsCreating(true);
+    try {
+      const newPage = await createPage({ title: "Untitled" });
+      await loadPages();
+      router.push(`/dashboard/${newPage._id}`);
+    } catch (e) {
+      console.error("Failed to create page:", e);
+    } finally {
+      setIsCreating(false);
+    }
+  }
 
   function toggleSection(sec: keyof typeof expandedSections) {
     setExpandedSections((prev) => ({ ...prev, [sec]: !prev[sec] }));
@@ -205,16 +237,25 @@ export function Sidebar({
           </button>
 
           {expandedSections.recents && (
-            <button
-              onClick={() => onSelectPage("Getting Started on Mobile")}
-              className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition text-left font-medium ${activePage === "Getting Started on Mobile"
-                  ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
-                  : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
-                }`}
-            >
-              <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-              <span className="truncate">Getting Started on Mobile</span>
-            </button>
+            <div className="space-y-0.5">
+              {pages.slice(0, 3).map((page) => (
+                <button
+                  key={page._id}
+                  onClick={() => router.push(`/dashboard/${page._id}`)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition text-left font-medium ${
+                    pathname === `/dashboard/${page._id}`
+                      ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
+                      : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <span className="shrink-0 text-sm">{page.icon}</span>
+                  <span className="truncate text-[11px]">{page.title}</span>
+                </button>
+              ))}
+              {pages.length === 0 && (
+                <p className="px-2 py-1 text-[11px] text-muted-foreground">No recent pages</p>
+              )}
+            </div>
           )}
         </div>
 
@@ -259,47 +300,30 @@ export function Sidebar({
 
           {expandedSections.private && (
             <div className="space-y-0.5">
-              <button
-                onClick={() => onSelectPage("Getting Started on Mobile")}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition text-left font-medium ${activePage === "Getting Started on Mobile"
-                    ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
-                    : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
+              {pages.map((page) => (
+                <button
+                  key={page._id}
+                  onClick={() => router.push(`/dashboard/${page._id}`)}
+                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition text-left font-medium ${
+                    pathname === `/dashboard/${page._id}`
+                      ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
+                      : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
                   }`}
-              >
-                <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate">Getting Started on Mobile</span>
-              </button>
-
+                >
+                  <span className="shrink-0 text-sm">{page.icon}</span>
+                  <span className="truncate text-[11px]">{page.title}</span>
+                </button>
+              ))}
+              {pages.length === 0 && (
+                <p className="px-2 py-1 text-[11px] text-muted-foreground">No pages yet</p>
+              )}
               <button
-                onClick={() => onSelectPage("Personal Website")}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition text-left font-medium ${activePage === "Personal Website"
-                    ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
-                    : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
-                  }`}
-              >
-                <User className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <span className="truncate">Personal Website</span>
-              </button>
-
-              {/* Show dynamically created page in Private list */}
-              {activePage !== "Getting Started on Mobile" &&
-                activePage !== "Personal Website" &&
-                activePage !== "Home" && (
-                  <button
-                    onClick={() => onSelectPage(activePage)}
-                    className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg bg-neutral-200 dark:bg-[#2c2c2c] text-foreground shadow-sm text-left font-semibold"
-                  >
-                    <FileText className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <span className="truncate">{activePage}</span>
-                  </button>
-                )}
-
-              <button
-                onClick={() => onSelectPage("Untitled")}
-                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
+                onClick={handleNewPage}
+                disabled={isCreating}
+                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left disabled:opacity-50"
               >
                 <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px]">Add new</span>
+                <span className="text-[11px]">{isCreating ? "Creating..." : "Add new"}</span>
               </button>
             </div>
           )}
@@ -404,6 +428,25 @@ export function Sidebar({
         </div>
       </div>
 
+      {/* Upgrade Banner for Free Users */}
+      {session?.user?.plan !== "pro" && (
+        <div className="mx-2 mb-2 p-3 bg-purple-950/20 hover:bg-purple-950/30 border border-purple-900/30 rounded-xl text-xs text-purple-300 transition flex flex-col gap-2">
+          <div className="flex items-center gap-1.5 font-bold text-white">
+            <Sparkles className="h-3.5 w-3.5 fill-purple-400/20 text-purple-400" />
+            <span>Notion Pro Upgrade</span>
+          </div>
+          <p className="text-[10px] text-neutral-400 leading-normal">
+            Unlock unlimited AI capabilities, advanced document features, and priority support.
+          </p>
+          <button
+            onClick={() => setShowPricing(true)}
+            className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition active:scale-95 text-center block"
+          >
+            Upgrade Now
+          </button>
+        </div>
+      )}
+
       {/* Fixed Bottom Action Bar */}
       <div ref={newMenuRef} className="relative p-2.5 border-t border-sidebar-border flex items-center justify-between gap-1.5">
         <button
@@ -421,9 +464,10 @@ export function Sidebar({
             <button
               onClick={() => {
                 setNewMenuOpen(false);
-                onSelectPage("Untitled");
+                handleNewPage();
               }}
-              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition text-left font-medium"
+              disabled={isCreating}
+              className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-accent hover:text-accent-foreground transition text-left font-medium disabled:opacity-50"
             >
               <FileText className="h-4 w-4 text-muted-foreground" />
               <div>
@@ -461,13 +505,19 @@ export function Sidebar({
         )}
 
         <button
-          onClick={() => onSelectPage("Untitled")}
-          className="h-9 w-9 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-[#242424] dark:hover:bg-[#2d2d2d] border border-border flex items-center justify-center text-foreground transition shrink-0 shadow-sm"
+          onClick={handleNewPage}
+          disabled={isCreating}
+          className="h-9 w-9 rounded-xl bg-neutral-100 hover:bg-neutral-200 dark:bg-[#242424] dark:hover:bg-[#2d2d2d] border border-border flex items-center justify-center text-foreground transition shrink-0 shadow-sm disabled:opacity-50"
           title="New page"
         >
           <SquarePen className="h-4 w-4" />
         </button>
       </div>
+
+      <PricingModal
+        isOpen={showPricing}
+        onClose={() => setShowPricing(false)}
+      />
     </aside>
   );
 }

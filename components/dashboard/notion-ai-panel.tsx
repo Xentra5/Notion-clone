@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MoreHorizontal,
   ChevronDown,
@@ -16,8 +16,10 @@ import {
   Bot,
   User as UserIcon,
   Columns2,
+  Lock,
 } from "lucide-react";
 import { useSession } from "next-auth/react";
+import { PricingModal } from "./pricing-modal";
 
 interface NotionAiPanelProps {
   isOpen: boolean;
@@ -37,19 +39,29 @@ export function NotionAiPanel({
   onClose,
   currentPageTitle,
 }: NotionAiPanelProps) {
-  const { data: session } = useSession();
+  const { data: session, update } = useSession();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [isGenerating, setIsGenerating] = useState(false);
   const [contextTag, setContextTag] = useState<string | null>(currentPageTitle);
   const [modelMode, setModelMode] = useState("Auto");
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+
+  const plan = session?.user?.plan || "free";
+  const aiUsageCount = session?.user?.aiUsageCount || 0;
+  const isLimitReached = plan === "free" && aiUsageCount >= 3;
 
   if (!isOpen) return null;
 
-  function handleSend(promptText?: string) {
+  async function handleSend(promptText?: string) {
     const textToSend = (promptText || input).trim();
     if (!textToSend) return;
+
+    if (isLimitReached) {
+      setShowPricing(true);
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: Date.now().toString(),
@@ -61,30 +73,53 @@ export function NotionAiPanel({
     setInput("");
     setIsGenerating(true);
 
-    // Simulate smart Notion AI response
-    setTimeout(() => {
-      let responseText = `Here's what I found for "${textToSend}":\n\n• Organized key points from your current page: "${currentPageTitle}".\n• Identified action items and next steps.`;
+    try {
+      const response = await fetch("/api/user/plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "incrementAiUsage" }),
+      });
 
-      if (textToSend.toLowerCase().includes("html") || textToSend.toLowerCase().includes("create html")) {
-        responseText = `Here is a custom HTML template for your page:\n\`\`\`html\n<div class="card">\n  <h2>Getting Started</h2>\n  <p>Welcome to your Notion workspace.</p>\n</div>\n\`\`\``;
-      } else if (textToSend.toLowerCase().includes("personalize")) {
-        responseText = "You can customize Notion AI's tone, default language, and preferred formatting in Workspace Settings > AI Preferences.";
-      } else if (textToSend.toLowerCase().includes("translate")) {
-        responseText = "Translated Summary:\n\nBienvenido a Notion. Aquí están los aspectos básicos para comenzar en dispositivos móviles.";
-      } else if (textToSend.toLowerCase().includes("analyze")) {
-        responseText = "Insights Analysis:\n\n1. Page Length: 6 setup items.\n2. Completeness: Ready for initial user onboarding.\n3. Recommended next action: Invite teammates to collaborate.";
+      if (!response.ok) {
+        const errData = await response.json();
+        if (errData.limitReached) {
+          await update();
+          setShowPricing(true);
+          setIsGenerating(false);
+          return;
+        }
       }
 
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: (Date.now() + 1).toString(),
-          role: "assistant",
-          text: responseText,
-        },
-      ]);
+      await update();
+
+      // Simulate smart Notion AI response
+      setTimeout(() => {
+        let responseText = `Here's what I found for "${textToSend}":\n\n• Organized key points from your current page: "${currentPageTitle}".\n• Identified action items and next steps.`;
+
+        if (textToSend.toLowerCase().includes("html") || textToSend.toLowerCase().includes("create html")) {
+          responseText = `Here is a custom HTML template for your page:\n\`\`\`html\n<div class="card">\n  <h2>Getting Started</h2>\n  <p>Welcome to your Notion workspace.</p>\n</div>\n\`\`\``;
+        } else if (textToSend.toLowerCase().includes("personalize")) {
+          responseText = "You can customize Notion AI's tone, default language, and preferred formatting in Workspace Settings > AI Preferences.";
+        } else if (textToSend.toLowerCase().includes("translate")) {
+          responseText = "Translated Summary:\n\nBienvenido a Notion. Aquí están los aspectos básicos para comenzar en dispositivos móviles.";
+        } else if (textToSend.toLowerCase().includes("analyze")) {
+          responseText = "Insights Analysis:\n\n1. Page Length: 6 setup items.\n2. Completeness: Ready for initial user onboarding.\n3. Recommended next action: Invite teammates to collaborate.";
+        }
+
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            role: "assistant",
+            text: responseText,
+          },
+        ]);
+        setIsGenerating(false);
+      }, 900);
+    } catch (e) {
+      console.error("AI panel send error:", e);
       setIsGenerating(false);
-    }, 900);
+    }
   }
 
   function handleNewChat() {
@@ -375,7 +410,31 @@ export function NotionAiPanel({
             </div>
           </div>
         </div>
+
+        {/* Limit Reached Card / Overlay */}
+        {isLimitReached && (
+          <div className="absolute inset-x-0 bottom-0 top-11 bg-black/85 backdrop-blur-md flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-300 z-10">
+            <div className="p-3 bg-purple-950/60 border border-purple-800/40 text-purple-400 rounded-full mb-4">
+              <Lock className="h-6 w-6" />
+            </div>
+            <h3 className="text-sm font-bold text-white mb-2">Free Trial Limit Reached</h3>
+            <p className="text-[11px] text-neutral-400 max-w-[280px] mb-6 leading-relaxed">
+              You have sent {aiUsageCount}/3 free trial messages. Upgrade to the Pro plan for unlimited queries, priority support, and advanced AI models.
+            </p>
+            <button
+              onClick={() => setShowPricing(true)}
+              className="px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs rounded-lg transition shadow-lg shadow-purple-500/20 active:scale-95"
+            >
+              Upgrade Now
+            </button>
+          </div>
+        )}
       </div>
+
+      <PricingModal
+        isOpen={showPricing}
+        onClose={() => setShowPricing(false)}
+      />
     </aside>
   );
 }

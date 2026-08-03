@@ -38,8 +38,6 @@ const PageSchema = new Schema(
   { timestamps: true }
 );
 
-// Compound index for fast lookups on upsert (userId + title)
-PageSchema.index({ userId: 1, title: 1 }, { unique: true });
 
 // Text search index for searching across pages
 PageSchema.index({ title: "text", "blocks.properties.text": "text" });

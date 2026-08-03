@@ -63,6 +63,19 @@ export const authOptions: NextAuthOptions = {
         if (token.name) {
           session.user.name = token.name;
         }
+
+        try {
+          await connectToDatabase();
+          const dbUser = await User.findOne({ email: session.user.email });
+          if (dbUser) {
+            session.user.plan = dbUser.plan || "free";
+            session.user.aiUsageCount = dbUser.aiUsageCount || 0;
+          }
+        } catch (e) {
+          console.error("Session sync database error:", e);
+          session.user.plan = "free";
+          session.user.aiUsageCount = 0;
+        }
       }
       return session;
     },
