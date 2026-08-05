@@ -43,13 +43,7 @@ export async function POST(request: Request) {
       icon: "📄",
       category: category || "Private",
       isAiMeetingNote: !!isAiMeetingNote,
-      blocks: blocks || [
-        {
-          id: "block-1",
-          type: "paragraph",
-          properties: { text: "Start writing here..." },
-        },
-      ],
+      blocks: blocks || [],
     });
 
     return NextResponse.json({ page }, { status: 201 });

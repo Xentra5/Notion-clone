@@ -6,7 +6,6 @@ const BlockSchema = new Schema(
     type: {
       type: String,
       required: true,
-      enum: ["paragraph", "heading", "to_do", "page", "code", "callout", "bulleted_list_item", "quote", "bullet"],
       default: "paragraph",
     },
     properties: {

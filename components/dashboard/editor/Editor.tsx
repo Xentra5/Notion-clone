@@ -67,11 +67,77 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
     );
   }
 
-  function handleAddItem(type: BlockType = "todo") {
-    const textToAdd = newItemText.replace(/^\//, "").trim() || "New block item";
+  function handleUpdateItemText(id: string, text: string) {
+    setItems((prev) =>
+      prev.map((item) => (item.id === id ? { ...item, text } : item))
+    );
+  }
+
+  function handleAddItem(type: BlockType = "paragraph") {
+    let rawText = newItemText.replace(/^\//, "").trim();
+    if (!rawText) {
+      switch (type) {
+        case "heading1":
+          rawText = "Heading 1";
+          break;
+        case "heading2":
+          rawText = "Heading 2";
+          break;
+        case "heading3":
+          rawText = "Heading 3";
+          break;
+        case "heading4":
+        case "heading":
+          rawText = "Heading 4";
+          break;
+        case "todo":
+          rawText = "To-do item";
+          break;
+        case "bullet":
+        case "numbered":
+          rawText = "List item";
+          break;
+        case "quote":
+          rawText = "Quote text...";
+          break;
+        case "callout":
+          rawText = "Callout description...";
+          break;
+        case "toggle":
+          rawText = "Toggle title";
+          break;
+        case "code":
+          rawText = "// Write or paste code here";
+          break;
+        case "page":
+        case "link_to_page":
+          rawText = "Untitled sub-page";
+          break;
+        case "image":
+          rawText = "Image attachment";
+          break;
+        case "video":
+          rawText = "Video attachment";
+          break;
+        case "audio":
+          rawText = "Audio recording";
+          break;
+        case "file":
+          rawText = "Document.pdf";
+          break;
+        case "web_bookmark":
+          rawText = "Web Bookmark";
+          break;
+        case "paragraph":
+        default:
+          rawText = "New paragraph";
+          break;
+      }
+    }
+
     setItems((prev) => [
       ...prev,
-      { id: Date.now().toString(), type, text: textToAdd, checked: false },
+      { id: Date.now().toString(), type, text: rawText, checked: false },
     ]);
     setNewItemText("");
     setShowSlashMenu(false);
@@ -137,21 +203,12 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
           )}
         </div>
 
-        {/* Welcome Callout Banner */}
-        <div className="flex items-center gap-2.5 p-3 rounded-xl bg-card border border-border text-sm text-foreground">
-          <span className="text-base">👋</span>
-          <span className="font-semibold">Welcome to Notion!</span>
-        </div>
-
-        {/* Section Subtext */}
-        <div className="text-xs sm:text-sm font-medium text-muted-foreground pt-1">
-          Here are the basics:
-        </div>
 
         {/* Interactive Checklist & Block Items */}
         <BlockRenderer
           items={items}
           onToggleCheck={toggleCheck}
+          onUpdateText={handleUpdateItemText}
           onOpenAi={onOpenAi}
           onSelectSubPage={onSelectSubPage}
         />

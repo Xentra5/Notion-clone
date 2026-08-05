@@ -37,6 +37,11 @@ export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutos
           })) as never,
         });
         onStatusChange("saved");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(
+            new CustomEvent("page-updated", { detail: { updatedAt: new Date() } })
+          );
+        }
       } catch (err) {
         console.error("Auto-save error:", err);
         onStatusChange("idle");

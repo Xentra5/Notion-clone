@@ -21,16 +21,20 @@ export default function DashboardLayout({
   const pageId = params?.pageId as string | undefined;
 
   const [activeTitle, setActiveTitle] = useState("Getting Started on Mobile");
+  const [lastEditedAt, setLastEditedAt] = useState<string | Date | undefined>(undefined);
   const [isAiOpen, setIsAiOpen] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
 
-  // When navigating to a real page URL, sync the TopBar title from the DB
+  // When navigating to a real page URL, sync the TopBar title & updatedAt from the DB
   useEffect(() => {
     if (!pageId) return;
     getPage(pageId)
-      .then((p) => setActiveTitle(p.title))
+      .then((p) => {
+        setActiveTitle(p.title);
+        setLastEditedAt(p.updatedAt);
+      })
       .catch(() => setActiveTitle("Untitled"));
   }, [pageId]);
 
@@ -70,6 +74,7 @@ export default function DashboardLayout({
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         <TopBar
           activeTitle={activeTitle}
+          updatedAt={lastEditedAt}
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           onToggleAi={() => setIsAiOpen(!isAiOpen)}
           isAiOpen={isAiOpen}

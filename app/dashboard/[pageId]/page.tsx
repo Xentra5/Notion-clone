@@ -12,11 +12,12 @@ interface PageRouteProps {
 
 /** Convert a DB PageBlock into the editor's ChecklistItem shape. */
 function toChecklistItem(block: PageBlock): ChecklistItem {
-  let type: ChecklistItem["type"] = "todo";
+  let type: ChecklistItem["type"] = "paragraph";
   if (block.type === "heading") type = "heading";
   else if (block.type === "quote") type = "quote";
   else if (block.type === "bullet" || block.type === "bulleted_list_item") type = "bullet";
-  // "paragraph", "to_do", "page", "code", "callout" → "todo" (closest renderable type)
+  else if (block.type === "to_do" || block.type === "todo") type = "todo";
+  else type = "paragraph";
 
   return {
     id: block.id,

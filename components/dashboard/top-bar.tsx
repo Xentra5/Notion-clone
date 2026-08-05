@@ -15,8 +15,34 @@ import {
 } from "lucide-react";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 
+import { useEffect } from "react";
+
+function formatRelativeTime(dateInput?: string | Date | null): string {
+  if (!dateInput) return "Edited just now";
+  const date = new Date(dateInput);
+  if (isNaN(date.getTime())) return "Edited just now";
+  const now = new Date();
+  const diffInSeconds = Math.max(0, Math.floor((now.getTime() - date.getTime()) / 1000));
+
+  if (diffInSeconds < 30) return "Edited just now";
+  if (diffInSeconds < 60) return `Edited ${diffInSeconds}s ago`;
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) return `Edited ${diffInMinutes}m ago`;
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) return `Edited ${diffInHours}h ago`;
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 30) return `Edited ${diffInDays}d ago`;
+  if (diffInDays < 365) {
+    const diffInMonths = Math.floor(diffInDays / 30);
+    return `Edited ${diffInMonths}mo ago`;
+  }
+  const diffInYears = Math.floor(diffInDays / 365);
+  return `Edited ${diffInYears}y ago`;
+}
+
 interface TopBarProps {
   activeTitle: string;
+  updatedAt?: string | Date;
   onToggleSidebar?: () => void;
   onToggleAi: () => void;
   isAiOpen?: boolean;
@@ -24,6 +50,7 @@ interface TopBarProps {
 
 export function TopBar({
   activeTitle,
+  updatedAt,
   onToggleSidebar,
   onToggleAi,
   isAiOpen,
@@ -33,6 +60,21 @@ export function TopBar({
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [permission, setPermission] = useState("Private");
   const [showPermissionDropdown, setShowPermissionDropdown] = useState(false);
+  const [lastEdited, setLastEdited] = useState<string | Date | null>(updatedAt || null);
+
+  useEffect(() => {
+    setLastEdited(updatedAt || null);
+  }, [updatedAt]);
+
+  useEffect(() => {
+    function handlePageUpdate(e: CustomEvent<{ updatedAt?: Date | string }>) {
+      setLastEdited(e.detail?.updatedAt || new Date());
+    }
+    window.addEventListener("page-updated" as any, handlePageUpdate as EventListener);
+    return () => {
+      window.removeEventListener("page-updated" as any, handlePageUpdate as EventListener);
+    };
+  }, []);
 
   function handleCopyLink() {
     navigator.clipboard.writeText(window.location.href);
@@ -111,7 +153,7 @@ export function TopBar({
       {/* Right section: Metadata & Page Actions */}
       <div className="flex items-center gap-1 sm:gap-2 shrink-0">
         <span className="hidden sm:inline-block text-[11px] text-muted-foreground mr-1">
-          Edited 1y ago
+          {formatRelativeTime(lastEdited)}
         </span>
 
         {/* Share Button */}
