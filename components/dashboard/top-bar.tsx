@@ -12,6 +12,7 @@ import {
   Sparkles,
   Globe,
   Users,
+  Trash2,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 
@@ -42,22 +43,27 @@ function formatRelativeTime(dateInput?: string | Date | null): string {
 
 interface TopBarProps {
   activeTitle: string;
+  pageId?: string;
   updatedAt?: string | Date;
   onToggleSidebar?: () => void;
   onToggleAi: () => void;
   isAiOpen?: boolean;
+  onDeletePage?: (pageId: string) => void;
 }
 
 export function TopBar({
   activeTitle,
+  pageId,
   updatedAt,
   onToggleSidebar,
   onToggleAi,
   isAiOpen,
+  onDeletePage,
 }: TopBarProps) {
   const [isStarred, setIsStarred] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [permission, setPermission] = useState("Private");
   const [showPermissionDropdown, setShowPermissionDropdown] = useState(false);
   const [lastEdited, setLastEdited] = useState<string | Date | null>(updatedAt || null);
@@ -216,12 +222,34 @@ export function TopBar({
         </button>
 
         {/* More Options */}
-        <button
-          className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
-          title="More options"
-        >
-          <MoreHorizontal className="h-3.5 w-3.5" />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setShowMoreMenu(!showMoreMenu)}
+            className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
+            title="More options"
+          >
+            <MoreHorizontal className="h-3.5 w-3.5" />
+          </button>
+
+          {showMoreMenu && (
+            <div className="absolute right-0 top-full mt-1 w-44 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 text-xs text-popover-foreground">
+              {pageId && onDeletePage ? (
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    onDeletePage(pageId);
+                  }}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 transition text-left"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Delete page</span>
+                </button>
+              ) : (
+                <div className="px-2.5 py-1.5 text-muted-foreground">No actions available</div>
+              )}
+            </div>
+          )}
+        </div>
 
         {/* Theme Toggle option */}
         <div className="h-7 w-[1px] bg-border mx-1" />

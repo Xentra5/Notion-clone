@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Sparkles, X, Send, Bot, User as UserIcon, Lock } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { PricingModal } from "../pricing-modal";
@@ -82,8 +82,8 @@ export function AiChatModal({ isOpen, onClose }: AiChatModalProps) {
 
   return (
     <>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-        <div className="flex flex-col w-full max-w-xl h-[520px] bg-[#202020] border border-[#333333] rounded-xl shadow-2xl overflow-hidden text-neutral-200 relative">
+      <div className="fixed bottom-4 right-4 z-50 w-[380px] max-w-[calc(100vw-2rem)] animate-in slide-in-from-bottom-4 fade-in duration-200">
+        <div className="flex flex-col w-full h-[520px] bg-[#202020] border border-[#333333] rounded-xl shadow-2xl overflow-hidden text-neutral-200 relative">
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-[#2d2d2d] bg-[#191919]">
             <div className="flex items-center gap-2 text-sm font-medium text-purple-400">

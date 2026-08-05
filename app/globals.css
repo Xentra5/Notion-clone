@@ -127,4 +127,12 @@
   html {
     @apply font-sans;
   }
+  ::selection {
+    background-color: rgba(35, 131, 226, 0.28) !important;
+    color: inherit !important;
+  }
+  .dark ::selection {
+    background-color: rgba(35, 131, 226, 0.35) !important;
+    color: inherit !important;
+  }
 }

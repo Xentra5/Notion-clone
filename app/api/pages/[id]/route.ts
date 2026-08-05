@@ -22,6 +22,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
     const page = await Page.findOne({
       _id: id,
       userId: session.user.email,
+      $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }],
     }).lean();
 
     if (!page) {
@@ -61,7 +62,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     await connectToDatabase();
 
     const page = await Page.findOneAndUpdate(
-      { _id: id, userId: session.user.email },
+      { _id: id, userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] },
       { $set },
       { new: true, lean: true }
     );
@@ -77,27 +78,25 @@ export async function PATCH(request: Request, { params }: RouteParams) {
   }
 }
 
-// DELETE /api/pages/[id] — remove a page
-export async function DELETE(_req: Request, { params }: RouteParams) {
+// DELETE /api/pages/[id] — move a page to Trash, or permanently delete it when requested.
+export async function DELETE(req: Request, { params }: RouteParams) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-
+    if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     const { id } = await params;
+    const isPermanent = new URL(req.url).searchParams.get("permanent") === "true";
     await connectToDatabase();
 
-    const result = await Page.findOneAndDelete({
-      _id: id,
-      userId: session.user.email,
-    });
+    const result = isPermanent
+      ? await Page.findOneAndDelete({ _id: id, userId: session.user.email })
+      : await Page.findOneAndUpdate(
+          { _id: id, userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] },
+          { $set: { deletedAt: new Date() } },
+          { new: true }
+        );
 
-    if (!result) {
-      return NextResponse.json({ error: "Page not found" }, { status: 404 });
-    }
-
-    return NextResponse.json({ success: true });
+    if (!result) return NextResponse.json({ error: "Page not found" }, { status: 404 });
+    return NextResponse.json({ success: true, permanent: isPermanent });
   } catch (error) {
     console.error("Error deleting page:", error);
     return NextResponse.json({ error: "Failed to delete page" }, { status: 500 });

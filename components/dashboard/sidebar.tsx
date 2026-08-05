@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { PricingModal } from "./pricing-modal";
-import { getPages, createPage, type Page } from "@/lib/actions/pages";
+import { getPages, createPage, deletePage, type Page, type PageBlock } from "@/lib/actions/pages";
 import {
   Home,
   Search,
@@ -27,12 +27,19 @@ import {
   Mic,
 } from "lucide-react";
 
+const GETTING_STARTED_BLOCKS: PageBlock[] = [
+  { id: "getting-started-intro", type: "paragraph", properties: { text: "Welcome! This page shows you the basics. You can edit it, keep it as a reference, or delete it whenever you are ready." } },  { id: "getting-started-write", type: "heading", properties: { text: "Write naturally" } },  { id: "getting-started-write-text", type: "paragraph", properties: { text: "Click anywhere and start typing. Press Enter for a new block. Press Shift + Enter for a line break." } },  { id: "getting-started-blocks", type: "heading", properties: { text: "Use blocks" } },  { id: "getting-started-blocks-text", type: "paragraph", properties: { text: "Type / to open the block menu. Try /heading, /bullet, /todo, /quote, or /code." } },  { id: "getting-started-todo", type: "to_do", properties: { text: "Try checking off this task", checked: false } },  { id: "getting-started-shortcuts", type: "heading", properties: { text: "Useful shortcuts" } },  { id: "getting-started-shortcuts-text", type: "paragraph", properties: { text: "Use Ctrl/Cmd + A to select the page, Backspace or Delete to remove selected blocks, and Ctrl/Cmd + K to search." } },  { id: "getting-started-delete", type: "quote", properties: { text: "You can delete this page later from the trash icon beside its name in the sidebar." } },
+];
+
 interface SidebarProps {
   activePage: string;
   onSelectPage: (title: string) => void;
   onOpenSearch: () => void;
   onToggleAi: () => void;
   onOpenCalendar: () => void;
+  onOpenSettings: () => void;
+  onOpenTrash: () => void;
+  onOpenUtility: (page: "Library" | "My Tasks" | "Marketplace" | "Help") => void;
 }
 
 export function Sidebar({
@@ -41,6 +48,9 @@ export function Sidebar({
   onOpenSearch,
   onToggleAi,
   onOpenCalendar,
+  onOpenSettings,
+  onOpenTrash,
+  onOpenUtility,
 }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -51,6 +61,8 @@ export function Sidebar({
   const [showPricing, setShowPricing] = useState(false);
   const [pages, setPages] = useState<Page[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const isSeedingOnboarding = useRef(false);
+  const onboardingStorageKey = `notion-onboarding-created:${session?.user?.email || "workspace"}`;
   const [expandedSections, setExpandedSections] = useState({
     meetings: true,
     recents: true,
@@ -63,17 +75,50 @@ export function Sidebar({
   const loadPages = useCallback(async () => {
     try {
       const data = await getPages();
+      const onboardingAlreadyCreated = typeof window !== "undefined" && window.localStorage.getItem(onboardingStorageKey) === "1";
+      if (data.length === 0 && !isSeedingOnboarding.current && !onboardingAlreadyCreated) {
+        isSeedingOnboarding.current = true;
+        const onboarding = await createPage({
+          title: "Getting Started with Notion",
+          blocks: GETTING_STARTED_BLOCKS,
+        });
+        window.localStorage.setItem(onboardingStorageKey, "1");
+        setPages([onboarding]);
+        if (pathname === "/dashboard") router.push(`/dashboard/${onboarding._id}`);
+        return;
+      }
       setPages(data);
+
+
     } catch (e) {
       console.error("Failed to load pages:", e);
     }
-  }, []);
+  }, [onboardingStorageKey, pathname, router]);
 
-  useEffect(() => { loadPages(); }, [loadPages]);
+  useEffect(() => { const timer = window.setTimeout(() => { void loadPages(); }, 0); return () => window.clearTimeout(timer); }, [loadPages]);
+
+  useEffect(() => {
+    const refreshPages = () => { void loadPages(); };
+    window.addEventListener("page-updated", refreshPages);
+    return () => window.removeEventListener("page-updated", refreshPages);
+  }, [loadPages]);
 
   const userName = session?.user?.name || "o";
   const userInitial = userName.charAt(0).toUpperCase();
 
+  async function handleNewMeetingNote() {
+    if (isCreating) return;
+    setIsCreating(true);
+    try {
+      const meetingPage = await createPage({ title: "AI Meeting Note", isAiMeetingNote: true });
+      await loadPages();
+      router.push(`/dashboard/${meetingPage._id}`);
+    } catch (e) {
+      console.error("Failed to create meeting note:", e);
+    } finally {
+      setIsCreating(false);
+    }
+  }
   async function handleNewPage() {
     if (isCreating) return;
     setIsCreating(true);
@@ -85,6 +130,20 @@ export function Sidebar({
       console.error("Failed to create page:", e);
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleDeletePage(e: React.MouseEvent, pageId: string) {
+    e.stopPropagation();
+    if (!confirm("Are you sure you want to delete this page?")) return;
+    try {
+      await deletePage(pageId);
+      await loadPages();
+      if (pathname === `/dashboard/${pageId}`) {
+        router.push("/dashboard");
+      }
+    } catch (err) {
+      console.error("Failed to delete page:", err);
     }
   }
 
@@ -168,7 +227,7 @@ export function Sidebar({
             <Bell className="h-4 w-4" />
           </button>
           <button
-            onClick={() => setShowWorkspaceMenu(true)}
+            onClick={onOpenSettings}
             className="p-1.5 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition"
             title="Settings"
           >
@@ -210,9 +269,7 @@ export function Sidebar({
               </div>
 
               <button
-                onClick={() => {
-                  onSelectPage("AI Meeting Note");
-                }}
+                onClick={handleNewMeetingNote}
                 className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
               >
                 <Plus className="h-3.5 w-3.5 text-muted-foreground" />
@@ -301,18 +358,27 @@ export function Sidebar({
           {expandedSections.private && (
             <div className="space-y-0.5">
               {pages.map((page) => (
-                <button
+                <div
                   key={page._id}
                   onClick={() => router.push(`/dashboard/${page._id}`)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition text-left font-medium ${
+                  className={`w-full flex items-center justify-between group px-2 py-1.5 rounded-lg transition text-left font-medium cursor-pointer ${
                     pathname === `/dashboard/${page._id}`
                       ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
                       : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
                   }`}
                 >
-                  <span className="shrink-0 text-sm">{page.icon}</span>
-                  <span className="truncate text-[11px]">{page.title}</span>
-                </button>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="shrink-0 text-sm">{page.icon}</span>
+                    <span className="truncate text-[11px]">{page.title}</span>
+                  </div>
+                  <button
+                    onClick={(e) => handleDeletePage(e, page._id)}
+                    title="Delete page"
+                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-red-500 transition shrink-0"
+                  >
+                    <Trash2 className="h-3 w-3" />
+                  </button>
+                </div>
               ))}
               {pages.length === 0 && (
                 <p className="px-2 py-1 text-[11px] text-muted-foreground">No pages yet</p>
@@ -391,35 +457,35 @@ export function Sidebar({
         {/* Bottom Utility Items */}
         <div className="pt-3 border-t border-sidebar-border space-y-0.5">
           <button
-            onClick={() => alert("Library")}
+            onClick={() => onOpenUtility("Library")}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Library</span>
           </button>
           <button
-            onClick={() => alert("My Tasks")}
+            onClick={() => onOpenUtility("My Tasks")}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />
             <span>My Tasks</span>
           </button>
           <button
-            onClick={() => alert("Marketplace")}
+            onClick={() => onOpenUtility("Marketplace")}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <ShoppingBag className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Marketplace</span>
           </button>
           <button
-            onClick={() => alert("Help")}
+            onClick={() => onOpenUtility("Help")}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Help</span>
           </button>
           <button
-            onClick={() => alert("Trash")}
+            onClick={onOpenTrash}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -489,10 +555,7 @@ export function Sidebar({
               </div>
             </button>
             <button
-              onClick={() => {
-                setNewMenuOpen(false);
-                onSelectPage("AI Meeting Note");
-              }}
+              onClick={() => { setNewMenuOpen(false); handleNewMeetingNote(); }}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-accent hover:text-blue-500 dark:hover:text-blue-300 transition text-left font-medium"
             >
               <Mic className="h-4 w-4 text-blue-500" />

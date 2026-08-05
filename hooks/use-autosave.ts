@@ -39,7 +39,7 @@ export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutos
         onStatusChange("saved");
         if (typeof window !== "undefined") {
           window.dispatchEvent(
-            new CustomEvent("page-updated", { detail: { updatedAt: new Date() } })
+            new CustomEvent("page-updated", { detail: { updatedAt: new Date(), title } })
           );
         }
       } catch (err) {

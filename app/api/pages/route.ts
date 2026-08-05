@@ -13,7 +13,7 @@ export async function GET() {
     }
 
     await connectToDatabase();
-    const pages = await Page.find({ userId: session.user.email })
+    const pages = await Page.find({ userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] })
       .sort({ updatedAt: -1 })
       .lean();
 

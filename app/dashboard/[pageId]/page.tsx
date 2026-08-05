@@ -68,7 +68,7 @@ export default function PageRoute({ params }: PageRouteProps) {
       activeTitle={page.title}
       pageId={pageId}
       initialBlocks={page.blocks ? page.blocks.map(toChecklistItem) : []}
-      onOpenAi={() => {}}
+      onOpenAi={() => window.dispatchEvent(new Event("open-quick-ai"))}
       onSelectSubPage={() => {}}
     />
   );

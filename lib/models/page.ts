@@ -33,6 +33,7 @@ const PageSchema = new Schema(
     },
     isAiMeetingNote: { type: Boolean, default: false },
     blocks: [BlockSchema],
+    deletedAt: { type: Date, default: null },
   },
   { timestamps: true }
 );

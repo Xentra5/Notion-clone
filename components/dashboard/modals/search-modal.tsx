@@ -13,6 +13,9 @@ import {
   ChevronDown,
 } from "lucide-react";
 
+import { getPages, type Page } from "@/lib/actions/pages";
+import { useRouter } from "next/navigation";
+
 interface SearchModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -20,8 +23,20 @@ interface SearchModalProps {
 }
 
 export function SearchModal({ isOpen, onClose, onSelectPage }: SearchModalProps) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [titleOnly, setTitleOnly] = useState(false);
+  const [pages, setPages] = useState<Page[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setLoading(true);
+    getPages()
+      .then((data) => setPages(data))
+      .catch((err) => console.error("Error fetching pages for search:", err))
+      .finally(() => setLoading(false));
+  }, [isOpen]);
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
@@ -33,46 +48,19 @@ export function SearchModal({ isOpen, onClose, onSelectPage }: SearchModalProps)
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen, onClose]);
 
-  const todayItems = [
-    { title: "LangChain", path: "", icon: FileText },
-    { title: "Text Splitter", path: "— LangChain", icon: FileText },
-    { title: "New page", path: "", icon: FileText },
-    { title: "Project Whole readme", path: "", icon: FileText },
-    { title: "Retriever", path: "— LangChain", icon: FileText },
-  ];
-
-  const pastWeekItems = [
-    {
-      title: "ALL OF COMPONENT IN CPP",
-      path: "— LangChain / C++ Knowledge and Progress",
-      icon: FileText,
-      active: true,
-    },
-    {
-      title: "C++ Knowledge and Progress",
-      path: "— LangChain",
-      icon: FileText,
-    },
-    { title: "DSA Hub", path: "", icon: Atom },
-    { title: "Physics Concepts", path: "", icon: Atom },
-    { title: "Python Knowledge", path: "", icon: Terminal },
-    { title: "FASTAPI", path: "", icon: FileCode },
-    { title: "MACHING Learning", path: "", icon: FileText },
-    {
-      title: "Interview asked Question",
-      path: "— DSA Hub / ... / Hashing",
-      icon: FileText,
-    },
-  ];
-
   if (!isOpen) return null;
 
-  const filterFn = (item: { title: string; path?: string }) =>
-    item.title.toLowerCase().includes(query.toLowerCase()) ||
-    (item.path && item.path.toLowerCase().includes(query.toLowerCase()));
+  const filteredPages = pages.filter((page) => {
+    const q = query.toLowerCase().trim();
+    if (!q) return true;
+    const titleMatch = page.title.toLowerCase().includes(q);
+    if (titleOnly) return titleMatch;
 
-  const filteredToday = todayItems.filter(filterFn);
-  const filteredPastWeek = pastWeekItems.filter(filterFn);
+    const blockTextMatch = page.blocks?.some((b) =>
+      b.properties?.text?.toLowerCase().includes(q)
+    );
+    return titleMatch || blockTextMatch;
+  });
 
   return (
     <div
@@ -140,83 +128,40 @@ export function SearchModal({ isOpen, onClose, onSelectPage }: SearchModalProps)
 
         {/* Scrollable Results */}
         <div className="max-h-[420px] overflow-y-auto p-2 space-y-4 text-xs custom-scrollbar">
-          {/* Today Section */}
-          {filteredToday.length > 0 && (
+          {loading ? (
+            <div className="py-8 text-center text-[#777777]">Loading pages...</div>
+          ) : filteredPages.length > 0 ? (
             <div>
               <div className="px-3 py-1 text-[11px] font-semibold text-[#777777] uppercase tracking-wider">
-                Today
+                Workspace Pages ({filteredPages.length})
               </div>
               <div className="mt-1 space-y-0.5">
-                {filteredToday.map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={`today-${idx}`}
-                      onClick={() => {
-                        onSelectPage(item.title);
-                        onClose();
-                      }}
-                      className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-[#292929] transition group"
-                    >
-                      <Icon className="h-4 w-4 text-[#888888] shrink-0 group-hover:text-white" />
+                {filteredPages.map((page) => (
+                  <button
+                    key={page._id}
+                    onClick={() => {
+                      onSelectPage(page.title);
+                      onClose();
+                      router.push(`/dashboard/${page._id}`);
+                    }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-[#292929] transition group"
+                  >
+                    <span className="shrink-0 text-base">{page.icon || "📄"}</span>
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
                       <span className="font-medium text-[#d4d4d4] group-hover:text-white truncate">
-                        {item.title}
+                        {page.title}
                       </span>
-                      {item.path && (
-                        <span className="text-[#666666] text-[11px] truncate">
-                          {item.path}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
+                      <span className="text-[#666666] text-[11px] truncate">
+                        — {page.category || "Private"}
+                      </span>
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
-          )}
-
-          {/* Past Week Section */}
-          {filteredPastWeek.length > 0 && (
-            <div>
-              <div className="px-3 py-1 text-[11px] font-semibold text-[#777777] uppercase tracking-wider">
-                Past week
-              </div>
-              <div className="mt-1 space-y-0.5">
-                {filteredPastWeek.map((item, idx) => {
-                  const Icon = item.icon;
-                  return (
-                    <button
-                      key={`past-${idx}`}
-                      onClick={() => {
-                        onSelectPage(item.title);
-                        onClose();
-                      }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left transition group ${
-                        item.active
-                          ? "bg-[#2a2a2a] text-white border border-[#383838]"
-                          : "hover:bg-[#292929] text-[#d4d4d4]"
-                      }`}
-                    >
-                      <Icon className="h-4 w-4 text-[#888888] shrink-0 group-hover:text-white" />
-                      <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
-                        <span className="font-medium truncate group-hover:text-white">
-                          {item.title}
-                        </span>
-                        {item.path && (
-                          <span className="text-[#666666] text-[11px] truncate">
-                            {item.path}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {filteredToday.length === 0 && filteredPastWeek.length === 0 && (
+          ) : (
             <div className="py-12 text-center text-[#777777]">
-              No pages matching &quot;{query}&quot;
+              {query ? `No pages matching "${query}"` : "No pages found in database"}
             </div>
           )}
         </div>

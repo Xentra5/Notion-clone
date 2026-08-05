@@ -9,13 +9,13 @@ import { AuthButton } from "@/components/auth/auth-button";
 import { Button } from "@/components/ui/button";
 
 const navItems = [
-  { label: "Product", hasMenu: true },
-  { label: "Solutions", hasMenu: true },
-  { label: "Resources", hasMenu: true },
-  { label: "Developers" },
-  { label: "Enterprise" },
-  { label: "Pricing" },
-  { label: "Request a demo" },
+  { label: "Product", href: "/product", hasMenu: true },
+  { label: "Solutions", href: "/solutions", hasMenu: true },
+  { label: "Resources", href: "/resources", hasMenu: true },
+  { label: "Developers", href: "/developers" },
+  { label: "Enterprise", href: "/enterprise" },
+  { label: "Pricing", href: "/pricing" },
+  { label: "Request a demo", href: "/request-demo" },
 ];
 
 export const Navbar = () => {
@@ -36,10 +36,10 @@ export const Navbar = () => {
 
       <nav className="hidden items-center gap-7 text-[15px] font-semibold text-[#262626] lg:flex">
         {navItems.map((item) => (
-          <a key={item.label} href="#" className="flex items-center gap-1 transition hover:text-black">
+          <Link key={item.label} href={item.href} className="flex items-center gap-1 transition hover:text-black">
             {item.label}
             {item.hasMenu ? <ChevronDown className="h-3.5 w-3.5 stroke-[2.4]" /> : null}
-          </a>
+          </Link>
         ))}
       </nav>
 

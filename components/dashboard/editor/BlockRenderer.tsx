@@ -261,19 +261,19 @@ export function BlockRenderer({
               </div>
             )}
 
-            {/* Quote */}
+            {/* Quote / Callout box like Notion fine tuning block */}
             {item.type === "quote" && (
-              <div className="border-l-3 border-primary pl-3 py-1 text-sm text-muted-foreground italic bg-accent/20 rounded-r-lg">
+              <div className="p-3.5 rounded-xl bg-[#1e2430]/60 dark:bg-[#1a2332]/70 border border-[#2b3548] text-sm text-[#d0d7de] leading-relaxed shadow-sm my-1">
                 {onUpdateText ? (
-                  <input
-                    type="text"
+                  <textarea
+                    rows={item.text.length > 80 ? 3 : 1}
                     value={item.text}
                     onChange={(e) => onUpdateText(item.id, e.target.value)}
-                    className="w-full bg-transparent outline-none font-sans not-italic text-foreground"
-                    placeholder="Empty quote"
+                    className="w-full bg-transparent outline-none font-sans text-[#d0d7de] selection:bg-[#005fb8] selection:text-white resize-none"
+                    placeholder="Empty quote box..."
                   />
                 ) : (
-                  <span>{item.text}</span>
+                  <span className="selection:bg-[#005fb8] selection:text-white">{item.text}</span>
                 )}
               </div>
             )}
@@ -408,26 +408,37 @@ export function BlockRenderer({
               </div>
             )}
 
-            {/* Media: Code */}
+            {/* Media: Code / Chat snippet box */}
             {item.type === "code" && (
-              <div className="rounded-xl bg-neutral-900 text-neutral-100 p-3 font-mono text-xs space-y-2 border border-neutral-800">
-                <div className="flex items-center justify-between border-b border-neutral-800 pb-1 text-[10px] text-neutral-400">
-                  <div className="flex items-center gap-1.5">
-                    <CodeIcon className="h-3 w-3 text-emerald-400" />
-                    <span>TypeScript</span>
+              <div className="rounded-2xl bg-[#181d28] dark:bg-[#141a24] text-neutral-100 p-4 font-mono text-xs space-y-2 border border-[#2b3548] shadow-md my-2">
+                <div className="flex items-center justify-between border-b border-[#2b3548] pb-2 text-[11px] text-[#8b949e]">
+                  <div className="flex items-center gap-2">
+                    <CodeIcon className="h-3.5 w-3.5 text-[#58a6ff]" />
+                    <span className="font-semibold text-[#c9d1d9]">{item.codeLanguage || "Code / Text"}</span>
                   </div>
-                  <span>Copy</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(item.text);
+                      alert("Code copied to clipboard!");
+                    }}
+                    className="px-2 py-0.5 rounded hover:bg-[#21262d] text-[#8b949e] hover:text-white transition text-[10px]"
+                  >
+                    Copy
+                  </button>
                 </div>
                 {onUpdateText ? (
                   <textarea
-                    rows={3}
+                    rows={Math.max(3, item.text.split("\n").length)}
                     value={item.text}
                     onChange={(e) => onUpdateText(item.id, e.target.value)}
-                    className="w-full bg-transparent outline-none font-mono text-xs resize-none text-emerald-300"
-                    placeholder="// Write or paste code here..."
+                    className="w-full bg-transparent outline-none font-mono text-xs text-[#e6edf3] selection:bg-[#1f6beb] selection:text-white resize-y leading-relaxed"
+                    placeholder="// Write code or chat dialogue here..."
                   />
                 ) : (
-                  <pre className="text-emerald-300 overflow-x-auto">{item.text}</pre>
+                  <pre className="text-[#e6edf3] selection:bg-[#1f6beb] selection:text-white overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                    {item.text}
+                  </pre>
                 )}
               </div>
             )}

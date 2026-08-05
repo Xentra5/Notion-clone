@@ -29,6 +29,7 @@ export interface Page {
   blocks: PageBlock[];
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string;
 }
 
 // GET /api/pages — list all pages for the logged-in user
@@ -59,7 +60,10 @@ export async function createPage(data: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error("Failed to create page");
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Failed to create page (${res.status})`);
+  }
   const result = await res.json();
   return result.page as Page;
 }
@@ -83,4 +87,21 @@ export async function updatePage(
 export async function deletePage(id: string): Promise<void> {
   const res = await fetch(`/api/pages/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete page ${id}`);
+}
+
+
+export async function getTrashPages(): Promise<Page[]> {
+  const res = await fetch("/api/pages/trash", { cache: "no-store" });
+  if (!res.ok) throw new Error("Failed to fetch trash");
+  return (await res.json()).pages as Page[];
+}
+
+export async function restorePage(id: string): Promise<void> {
+  const res = await fetch(`/api/pages/${id}/restore`, { method: "POST" });
+  if (!res.ok) throw new Error("Failed to restore page");
+}
+
+export async function permanentlyDeletePage(id: string): Promise<void> {
+  const res = await fetch(`/api/pages/${id}?permanent=true`, { method: "DELETE" });
+  if (!res.ok) throw new Error("Failed to permanently delete page");
 }

@@ -15,7 +15,7 @@ import {
   CheckCircle2,
   Layers,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Strands from "../Strands";
 
 interface MeetingNoteViewProps {
@@ -28,6 +28,9 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
   const [isMuted, setIsMuted] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [activeTab, setActiveTab] = useState<"transcript" | "summary">("transcript");
+  const [isFinalizing, setIsFinalizing] = useState(false);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
   const [transcripts, setTranscripts] = useState<string[]>([
     "Press 'Start AI Recording' to begin real-time speech processing...",
   ]);
@@ -65,6 +68,32 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
       clearInterval(transcriptInterval);
     };
   }, [isRecording]);
+
+  async function startRecording() {
+    setRecordingError(null);
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
+      }
+      if (recordingTime === 0) setTranscripts(["Recording initialized… Real-time transcription engine active."]);
+      setIsRecording(true);
+    } catch {
+      setRecordingError("Microphone access was blocked. Allow microphone access and try again.");
+    }
+  }
+
+  function stopRecording() {
+    setIsRecording(false);
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    setTranscripts((prev) => [...prev, "Recording stopped. Preparing your AI summary…"]);
+    setIsFinalizing(true);
+    window.setTimeout(() => {
+      setIsFinalizing(false);
+      setActiveTab("summary");
+    }, 650);
+  }
+  const meetingStatus = isFinalizing ? "Processing" : isRecording ? "Recording" : recordingTime > 0 ? "Ready for review" : "Ready to record";
 
   function formatTime(sec: number) {
     const mins = Math.floor(sec / 60);
@@ -113,7 +142,13 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
             </div>
           </div>
         </div>
-
+        {/* Meeting context */}
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <div className="rounded-xl border border-border bg-card/50 px-3 py-2.5"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Status</p><p className="mt-1 flex items-center gap-1.5 text-xs font-semibold"><span className={`h-1.5 w-1.5 rounded-full ${isRecording ? "bg-red-500" : isFinalizing ? "bg-amber-500 animate-pulse" : "bg-emerald-500"}`} />{meetingStatus}</p></div>
+          <div className="rounded-xl border border-border bg-card/50 px-3 py-2.5"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Duration</p><p className="mt-1 text-xs font-semibold tabular-nums">{formatTime(recordingTime)}</p></div>
+          <div className="rounded-xl border border-border bg-card/50 px-3 py-2.5"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Participants</p><p className="mt-1 text-xs font-semibold">You · 2 speakers</p></div>
+          <div className="rounded-xl border border-border bg-card/50 px-3 py-2.5"><p className="text-[10px] uppercase tracking-wider text-muted-foreground">Capture</p><p className="mt-1 text-xs font-semibold">Live transcript</p></div>
+        </div>
         {/* Interactive Strands WebGL Visualizer Card */}
         <div className="h-[440px] w-full relative rounded-3xl overflow-hidden bg-[#050508] border border-neutral-800/80 shadow-[0_0_50px_rgba(0,0,0,0.5)] group transition-all duration-300">
           {/* Strands WebGL Background */}
@@ -150,7 +185,7 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
             </div>
             <div className="h-3 w-[1px] bg-white/20" />
             <span className="text-[10px] text-neutral-300 font-bold uppercase tracking-wider">
-              {isRecording ? "LIVE RECORDING" : "IDLE"}
+              {isRecording ? "LIVE RECORDING" : "READY"}
             </span>
           </div>
 
@@ -166,12 +201,7 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
             {/* Record / Pause Toggle Button */}
             {!isRecording ? (
               <button
-                onClick={() => {
-                  if (recordingTime === 0) {
-                    setTranscripts(["Recording initialized... Real-time transcription engine active."]);
-                  }
-                  setIsRecording(true);
-                }}
+                onClick={() => { void startRecording(); }}
                 className="flex items-center gap-2.5 px-6 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 active:scale-95 text-white text-xs font-extrabold rounded-full shadow-[0_0_20px_rgba(37,99,235,0.5)] transition duration-200"
               >
                 <Mic className="h-4 w-4" />
@@ -179,11 +209,12 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
               </button>
             ) : (
               <button
-                onClick={() => setIsRecording(false)}
-                className="flex items-center gap-2.5 px-6 py-2.5 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 active:scale-95 text-white text-xs font-extrabold rounded-full shadow-[0_0_20px_rgba(225,29,72,0.5)] transition duration-200"
+                onClick={stopRecording}
+                disabled={isFinalizing}
+                className="flex items-center gap-2.5 px-5 py-2.5 bg-white text-neutral-900 hover:bg-neutral-200 active:scale-95 text-xs font-extrabold rounded-full transition duration-200 disabled:opacity-60"
               >
                 <Pause className="h-4 w-4" />
-                <span>Pause Recording</span>
+                <span>{isFinalizing ? "Generating summary…" : "Stop & summarize"}</span>
               </button>
             )}
 
@@ -216,16 +247,20 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
           </div>
         </div>
 
+        {recordingError && (
+          <div className="flex items-start gap-3 rounded-xl border border-red-500/20 bg-red-500/5 px-4 py-3 text-xs text-red-400">
+            <MicOff className="mt-0.5 h-4 w-4 shrink-0" />
+            <div><p className="font-semibold">Microphone unavailable</p><p className="mt-0.5 text-red-400/80">{recordingError}</p></div>
+          </div>
+        )}
         {/* Intelligence Hub (Tabs: Live Transcript & AI Summary) */}
         <div className="space-y-4">
           <div className="flex items-center justify-between border-b border-border pb-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1 rounded-xl bg-muted/50 p-1">
               <button
                 onClick={() => setActiveTab("transcript")}
-                className={`flex items-center gap-2 pb-2 text-xs font-bold transition border-b-2 ${
-                  activeTab === "transcript"
-                    ? "border-blue-500 text-blue-600 dark:text-blue-400"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition ${
+                  activeTab === "transcript" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <FileText className="h-4 w-4" />
@@ -234,10 +269,8 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
 
               <button
                 onClick={() => setActiveTab("summary")}
-                className={`flex items-center gap-2 pb-2 text-xs font-bold transition border-b-2 ${
-                  activeTab === "summary"
-                    ? "border-purple-500 text-purple-600 dark:text-purple-400"
-                    : "border-transparent text-muted-foreground hover:text-foreground"
+                className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-bold transition ${
+                  activeTab === "summary" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Sparkles className="h-4 w-4" />
@@ -255,7 +288,7 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
 
           {/* Transcript Stream Tab */}
           {activeTab === "transcript" && (
-            <div className="bg-card border border-border rounded-3xl p-5 min-h-[180px] max-h-[320px] overflow-y-auto space-y-3.5 font-sans text-sm no-scrollbar shadow-sm">
+            <div className="bg-card/60 border border-border rounded-2xl p-4 min-h-[180px] max-h-[320px] overflow-y-auto space-y-2.5 font-sans text-sm no-scrollbar shadow-sm">
               {transcripts.map((phrase, idx) => {
                 const isAi = phrase.startsWith("Notion AI:");
                 const isSystem = idx === 0 && phrase.includes("Press");
@@ -286,7 +319,12 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
 
           {/* AI Summary Tab */}
           {activeTab === "summary" && (
-            <div className="bg-card border border-border rounded-3xl p-6 space-y-5 animate-in fade-in duration-200 shadow-sm">
+            <div className="space-y-3 animate-in fade-in duration-200">
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-purple-500/20 bg-purple-500/5 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-purple-500">Key decision</p><p className="mt-2 text-sm font-medium">Theme architecture direction was agreed.</p><p className="mt-1 text-xs text-muted-foreground">Extracted from the conversation</p></div>
+                <div className="rounded-2xl border border-blue-500/20 bg-blue-500/5 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-blue-500">Next step</p><p className="mt-2 text-sm font-medium">Integrate the recording workflow.</p><p className="mt-1 text-xs text-muted-foreground">Suggested action item</p></div>
+              </div>
+              <div className="bg-card border border-border rounded-2xl p-6 space-y-5 shadow-sm">
               <div className="space-y-2">
                 <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider flex items-center gap-2">
                   <Layers className="h-3.5 w-3.5 text-purple-500" />
@@ -322,6 +360,7 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
                 </ul>
               </div>
             </div>
+              </div>
           )}
         </div>
 
