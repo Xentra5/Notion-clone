@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Check,
   ChevronDown,
@@ -414,13 +415,14 @@ export function BlockRenderer({
                 <div className="flex items-center justify-between border-b border-[#2b3548] pb-2 text-[11px] text-[#8b949e]">
                   <div className="flex items-center gap-2">
                     <CodeIcon className="h-3.5 w-3.5 text-[#58a6ff]" />
-                    <span className="font-semibold text-[#c9d1d9]">{item.codeLanguage || "Code / Text"}</span>
+                    <span className="font-semibold text-[#c9d1d9] capitalize">{item.codeLanguage || "javascript"}</span>
                   </div>
+
                   <button
                     type="button"
                     onClick={() => {
                       navigator.clipboard.writeText(item.text);
-                      alert("Code copied to clipboard!");
+                      toast.success("Code copied to clipboard!");
                     }}
                     className="px-2 py-0.5 rounded hover:bg-[#21262d] text-[#8b949e] hover:text-white transition text-[10px]"
                   >

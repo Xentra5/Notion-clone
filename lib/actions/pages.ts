@@ -61,8 +61,9 @@ export async function createPage(data: {
     body: JSON.stringify(data),
   });
   if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `Failed to create page (${res.status})`);
+    const errorData = await res.json().catch(() => ({} as { detail?: string; error?: string }));
+    const reason = errorData.detail || errorData.error || `HTTP ${res.status}`;
+    throw new Error(`Failed to create page: ${reason}`);
   }
   const result = await res.json();
   return result.page as Page;
@@ -78,7 +79,10 @@ export async function updatePage(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
-  if (!res.ok) throw new Error(`Failed to update page ${id}`);
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({} as { detail?: string; error?: string }));
+    throw new Error(errorData.detail || errorData.error || `Failed to update page ${id}`);
+  }
   const result = await res.json();
   return result.page as Page;
 }

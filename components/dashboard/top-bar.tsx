@@ -1,6 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { toast } from "sonner";
+import { updatePage } from "@/lib/actions/pages";
 import {
   Lock,
   ChevronDown,
@@ -13,10 +15,9 @@ import {
   Globe,
   Users,
   Trash2,
+  SquarePen,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
-
-import { useEffect } from "react";
 
 function formatRelativeTime(dateInput?: string | Date | null): string {
   if (!dateInput) return "Edited just now";
@@ -67,13 +68,20 @@ export function TopBar({
   const [permission, setPermission] = useState("Private");
   const [showPermissionDropdown, setShowPermissionDropdown] = useState(false);
   const [lastEdited, setLastEdited] = useState<string | Date | null>(updatedAt || null);
+  const [isRenamingTitle, setIsRenamingTitle] = useState(false);
+  const [renameTitleValue, setRenameTitleValue] = useState(activeTitle);
 
   useEffect(() => {
     setLastEdited(updatedAt || null);
   }, [updatedAt]);
 
   useEffect(() => {
-    function handlePageUpdate(e: CustomEvent<{ updatedAt?: Date | string }>) {
+    setRenameTitleValue(activeTitle);
+  }, [activeTitle]);
+
+  useEffect(() => {
+    function handlePageUpdate(e: CustomEvent<{ title?: string; updatedAt?: Date | string }>) {
+      if (e.detail?.title) setRenameTitleValue(e.detail.title);
       setLastEdited(e.detail?.updatedAt || new Date());
     }
     window.addEventListener("page-updated" as any, handlePageUpdate as EventListener);
@@ -82,9 +90,24 @@ export function TopBar({
     };
   }, []);
 
+  async function handleFinishTitleRename() {
+    setIsRenamingTitle(false);
+    if (!pageId) return;
+    const title = renameTitleValue.trim() || "Untitled";
+    try {
+      await updatePage(pageId, { title });
+      window.dispatchEvent(new CustomEvent("page-updated", { detail: { title, updatedAt: new Date() } }));
+      toast.success("Page title updated");
+    } catch (err) {
+      toast.error("Failed to update page title");
+      console.error(err);
+    }
+  }
+
   function handleCopyLink() {
     navigator.clipboard.writeText(window.location.href);
     setCopied(true);
+    toast.success("Page link copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
   }
 
@@ -103,9 +126,53 @@ export function TopBar({
         )}
 
         <div className="flex items-center gap-1.5 font-medium text-foreground truncate">
-          <span className="hover:text-foreground/80 transition cursor-pointer truncate font-semibold">
-            {activeTitle}
-          </span>
+          {isRenamingTitle ? (
+            <input
+              autoFocus
+              value={renameTitleValue}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setRenameTitleValue(e.target.value)}
+              onBlur={() => void handleFinishTitleRename()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+                if (e.key === "Escape") {
+                  setIsRenamingTitle(false);
+                  setRenameTitleValue(activeTitle);
+                }
+              }}
+              className="min-w-[120px] max-w-[200px] bg-background border border-primary rounded px-1.5 py-0.5 text-xs outline-none font-semibold text-foreground shadow-sm"
+            />
+          ) : (
+            <div className="flex items-center gap-1 group/title">
+              <span
+                className="hover:text-foreground/80 transition cursor-pointer truncate font-semibold"
+                onDoubleClick={() => {
+                  if (pageId) {
+                    setRenameTitleValue(activeTitle);
+                    setIsRenamingTitle(true);
+                  }
+                }}
+                title="Double-click to rename"
+              >
+                {activeTitle}
+              </span>
+              {pageId && (
+                <button
+                  onClick={() => {
+                    setRenameTitleValue(activeTitle);
+                    setIsRenamingTitle(true);
+                  }}
+                  className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-accent rounded text-muted-foreground transition"
+                  title="Rename page"
+                >
+                  <SquarePen className="h-3 w-3" />
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Permission Dropdown */}
           <div className="relative">

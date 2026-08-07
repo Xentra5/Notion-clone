@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { use } from "react";
 import { DocumentCanvas } from "@/components/dashboard/document-canvas";
 import { getPage, type Page, type PageBlock } from "@/lib/actions/pages";
@@ -17,13 +17,31 @@ function toChecklistItem(block: PageBlock): ChecklistItem {
   else if (block.type === "quote") type = "quote";
   else if (block.type === "bullet" || block.type === "bulleted_list_item") type = "bullet";
   else if (block.type === "to_do" || block.type === "todo") type = "todo";
-  else type = "paragraph";
+  else if (
+    block.type === "code" ||
+    block.type === "callout" ||
+    block.type === "divider" ||
+    block.type === "toggle" ||
+    block.type === "page" ||
+    block.type === "image" ||
+    block.type === "video" ||
+    block.type === "audio" ||
+    block.type === "file" ||
+    block.type === "table" ||
+    block.type === "web_bookmark" ||
+    block.type === "link_to_page"
+  ) {
+    type = block.type as ChecklistItem["type"];
+  } else {
+    type = "paragraph";
+  }
 
   return {
     id: block.id,
     type,
     text: block.properties?.text ?? "",
     checked: block.properties?.checked ?? false,
+    codeLanguage: block.properties?.language ?? "javascript",
   };
 }
 
@@ -46,6 +64,11 @@ export default function PageRoute({ params }: PageRouteProps) {
     return () => { cancelled = true; };
   }, [pageId]);
 
+  const initialBlocks = useMemo(
+    () => (page?.blocks ? page.blocks.map(toChecklistItem) : []),
+    [page?.blocks]
+  );
+
   if (notFound) {
     return (
       <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm select-none">
@@ -67,7 +90,7 @@ export default function PageRoute({ params }: PageRouteProps) {
       key={pageId}
       activeTitle={page.title}
       pageId={pageId}
-      initialBlocks={page.blocks ? page.blocks.map(toChecklistItem) : []}
+      initialBlocks={initialBlocks}
       onOpenAi={() => window.dispatchEvent(new Event("open-quick-ai"))}
       onSelectSubPage={() => {}}
     />

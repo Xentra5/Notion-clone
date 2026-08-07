@@ -40,6 +40,7 @@ import {
   Link,
   Trash2,
   Sparkles,
+  SquarePen,
 } from "lucide-react";
 
 export interface EditorProps {
@@ -123,6 +124,7 @@ interface BlockProps {
   isFocused: boolean;
   onFocus: (id: string) => void;
   onUpdateText: (id: string, text: string) => void;
+  onUpdateLanguage?: (id: string, language: string) => void;
   onToggleCheck: (id: string) => void;
   onKeyDown: (e: React.KeyboardEvent, id: string) => void;
   onDelete?: (id: string) => void;
@@ -132,7 +134,7 @@ interface BlockProps {
 }
 
 function Block({
-  item, index, isFocused, onFocus, onUpdateText,
+  item, index, isFocused, onFocus, onUpdateText, onUpdateLanguage,
   onToggleCheck, onKeyDown, onDelete, onAddAfter, onSelectSubPage, registerRef,
 }: BlockProps) {
   const elRef = useRef<HTMLElement | null>(null);
@@ -189,19 +191,19 @@ function Block({
 
   return (
     <div
-      className="group/b relative flex items-start -mx-8 px-8 rounded-sm hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors"
+      className="group/b relative flex items-start -ml-16 -mr-4 pl-16 pr-4 rounded-md hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors"
       data-block-id={item.id}
     >
-      {/* Drag handle & Delete button */}
-      <div className="absolute left-0 top-[5px] flex items-center gap-0.5 opacity-0 group-hover/b:opacity-100 transition-opacity z-10">
-        <button type="button" className="p-0.5 rounded text-[#ccc] dark:text-[#444] hover:text-[#555] dark:hover:text-[#aaa] hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Drag">
+      {/* Drag handle & Delete button (positioned neatly in the left margin) */}
+      <div className="absolute left-1 top-[4px] flex items-center gap-0.5 opacity-0 group-hover/b:opacity-100 transition-opacity z-10">
+        <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Drag">
           <GripVertical className="h-3.5 w-3.5" />
         </button>
-        <button type="button" className="p-0.5 rounded text-[#ccc] dark:text-[#444] hover:text-[#555] dark:hover:text-[#aaa] hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Add block below" onClick={() => onAddAfter?.(item.id)}>
+        <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Add block below" onClick={() => onAddAfter?.(item.id)}>
           <Plus className="h-3.5 w-3.5" />
         </button>
         {onDelete && (
-          <button type="button" className="p-0.5 rounded text-[#ccc] dark:text-[#444] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition" title="Delete block" onClick={() => onDelete(item.id)}>
+          <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition" title="Delete block" onClick={() => onDelete(item.id)}>
             <Trash2 className="h-3.5 w-3.5" />
           </button>
         )}
@@ -307,16 +309,49 @@ function Block({
         {item.type === "code" && (
           <div className="my-2 rounded-lg overflow-hidden border border-[#30363d] bg-[#0d1117]">
             <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d]">
-              <span className="text-[11px] font-semibold text-[#7d8590] font-mono tracking-wide">CODE</span>
-              <button type="button"
+              <div className="flex items-center gap-2">
+                <select
+                  value={item.codeLanguage || "javascript"}
+                  onChange={(e) => onUpdateLanguage?.(item.id, e.target.value)}
+                  className="bg-[#21262d] text-[#c9d1d9] hover:text-white border border-[#30363d] rounded px-2 py-0.5 text-[11px] font-mono font-medium outline-none cursor-pointer hover:border-[#8b949e] transition select-none"
+                >
+                  <option value="javascript">JavaScript</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="python">Python</option>
+                  <option value="html">HTML</option>
+                  <option value="css">CSS</option>
+                  <option value="cpp">C++</option>
+                  <option value="csharp">C#</option>
+                  <option value="java">Java</option>
+                  <option value="rust">Rust</option>
+                  <option value="go">Go</option>
+                  <option value="sql">SQL</option>
+                  <option value="json">JSON</option>
+                  <option value="bash">Bash / Shell</option>
+                  <option value="php">PHP</option>
+                  <option value="ruby">Ruby</option>
+                  <option value="swift">Swift</option>
+                  <option value="kotlin">Kotlin</option>
+                  <option value="yaml">YAML</option>
+                  <option value="markdown">Markdown</option>
+                  <option value="plaintext">Plain Text</option>
+                </select>
+              </div>
+              <button
+                type="button"
                 onClick={() => navigator.clipboard.writeText(item.text)}
-                className="text-[11px] text-[#7d8590] hover:text-[#e6edf3] px-2 py-0.5 rounded hover:bg-[#21262d] transition">
+                className="text-[11px] text-[#7d8590] hover:text-[#e6edf3] px-2 py-0.5 rounded hover:bg-[#21262d] transition select-none"
+              >
                 Copy
               </button>
             </div>
-            <div {...ce} ref={setRef} spellCheck={false}
+            <div
+              {...ce}
+              ref={setRef}
+              spellCheck={false}
               data-placeholder="// Write or paste code..."
-              className="px-4 py-4 font-mono text-[13px] leading-[1.8] text-[#e6edf3] outline-none whitespace-pre-wrap empty:before:content-[attr(data-placeholder)] empty:before:text-[#3d444e] empty:before:pointer-events-none" />
+              className="px-4 py-4 font-mono text-[13px] leading-[1.8] text-[#e6edf3] outline-none whitespace-pre-wrap empty:before:content-[attr(data-placeholder)] empty:before:text-[#3d444e] empty:before:pointer-events-none select-text cursor-text"
+            />
           </div>
         )}
 
@@ -418,11 +453,30 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
 
   const blockRefs = useRef<Map<string, HTMLElement>>(new Map());
   const titleRef = useRef<HTMLTextAreaElement>(null);
+  const titleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasMounted = useRef(false);
+
+  const handleTitleChange = useCallback((newTitle: string) => {
+    setCurrentTitle(newTitle);
+    if (!pageId) return;
+
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    titleTimerRef.current = setTimeout(async () => {
+      const finalTitle = newTitle.trim() || "Untitled";
+      try {
+        await updatePage(pageId, { title: finalTitle });
+        window.dispatchEvent(
+          new CustomEvent("page-updated", { detail: { title: finalTitle, updatedAt: new Date() } })
+        );
+      } catch (err) {
+        console.error("Title save error:", err);
+      }
+    }, 300);
+  }, [pageId]);
 
   const { scheduleAutosave, cancelAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
 
-  // Sync when navigating pages
+  // Sync when navigating to a new page
   useEffect(() => {
     setCurrentTitle(activeTitle);
     setItems(initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]);
@@ -430,7 +484,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
     setSlash({ blockId: "", query: "", open: false });
     setFocusedId(null);
     hasMounted.current = false;
-  }, [activeTitle, initialBlocks]);
+  }, [pageId]);
 
   // Auto-resize title textarea
   useEffect(() => {
@@ -471,6 +525,10 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
 
   const updateText = useCallback((id: string, text: string) => {
     setItems(prev => prev.map(b => b.id === id ? { ...b, text } : b));
+  }, []);
+
+  const updateLanguage = useCallback((id: string, codeLanguage: string) => {
+    setItems(prev => prev.map(b => b.id === id ? { ...b, codeLanguage } : b));
   }, []);
 
   const toggleCheck = useCallback((id: string) => {
@@ -709,7 +767,13 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
       className="flex-1 bg-background text-foreground overflow-y-auto relative font-sans"
       onClick={e => {
         setShowEmojiPicker(false);
-        if (!(e.target as HTMLElement).closest("[data-block-id]")) {
+        const target = e.target as HTMLElement;
+        if (
+          !target.closest("[data-block-id]") &&
+          !target.closest("textarea") &&
+          !target.closest("input") &&
+          !target.closest("button")
+        ) {
           const last = items[items.length - 1];
           if (last) focusBlock(last.id, true);
         }
@@ -740,31 +804,47 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
         </div>
 
         {/* Title */}
-        <textarea
-          ref={titleRef}
-          value={currentTitle}
-          onChange={e => setCurrentTitle(e.target.value)}
-          onBlur={async () => {
-            if (!pageId) return;
-            const title = currentTitle.trim() || "Untitled";
-            try {
-              await updatePage(pageId, { title });
-              window.dispatchEvent(new CustomEvent("page-updated", { detail: { title, updatedAt: new Date() } }));
-            } catch (error) {
-              console.error("Title save failed:", error);
-            }
-          }}
-          onKeyDown={e => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              if (items[0]) focusBlock(items[0].id);
-            }
-          }}
-          placeholder="Untitled"
-          rows={1}
-          className="w-full resize-none overflow-hidden bg-transparent text-[2.6rem] font-bold tracking-tight text-foreground outline-none placeholder:text-foreground/20 leading-tight mb-6"
-          style={{ height: "auto" }}
-        />
+        <div className="relative group/title-container mb-6 flex items-start gap-2">
+          <textarea
+            ref={titleRef}
+            value={currentTitle}
+            onChange={e => handleTitleChange(e.target.value)}
+            onBlur={async () => {
+              if (!pageId) return;
+              if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+              cancelAutosave();
+              const title = currentTitle.trim() || "Untitled";
+              try {
+                await updatePage(pageId, { title });
+                window.dispatchEvent(new CustomEvent("page-updated", { detail: { title, updatedAt: new Date() } }));
+              } catch (error) {
+                console.error("Title save failed:", error);
+              }
+            }}
+            onKeyDown={e => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                if (items[0]) focusBlock(items[0].id);
+              }
+            }}
+            placeholder="Untitled"
+            rows={1}
+            className="w-full resize-none overflow-hidden bg-transparent text-[2.6rem] font-bold tracking-tight text-foreground outline-none placeholder:text-foreground/20 leading-tight select-text cursor-text"
+            style={{ height: "auto" }}
+          />
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              titleRef.current?.focus();
+              titleRef.current?.select();
+            }}
+            className="opacity-0 group-hover/title-container:opacity-100 p-2 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition shrink-0 mt-2"
+            title="Click to edit title"
+          >
+            <SquarePen className="h-5 w-5" />
+          </button>
+        </div>
 
         {/* Blocks */}
         <div className="space-y-px">
@@ -776,6 +856,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
                 isFocused={focusedId === item.id}
                 onFocus={setFocusedId}
                 onUpdateText={updateText}
+                onUpdateLanguage={updateLanguage}
                 onToggleCheck={toggleCheck}
                 onKeyDown={handleKeyDown}
                 onAddAfter={(id) => {

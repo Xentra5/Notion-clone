@@ -1,20 +1,19 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import bcryptjs from "bcryptjs";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import User from "@/lib/models/user";
 
-export async function GET() {
-  const session = await getServerSession(authOptions);
+export async function GET(request: NextRequest) {
+  const session = await getSession(request);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectToDatabase();
   const user = await User.findOne({ email: session.user.email }).select("name email plan createdAt").lean();
   return NextResponse.json({ user });
 }
 
-export async function PATCH(request: Request) {
-  const session = await getServerSession(authOptions);
+export async function PATCH(request: NextRequest) {
+  const session = await getSession(request);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const body = await request.json();
   await connectToDatabase();

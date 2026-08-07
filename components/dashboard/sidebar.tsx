@@ -3,8 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
+import { toast } from "sonner";
 import { PricingModal } from "./pricing-modal";
-import { getPages, createPage, deletePage, type Page, type PageBlock } from "@/lib/actions/pages";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { RenameModal } from "@/components/ui/rename-modal";
+import { getPages, createPage, updatePage, deletePage, type Page, type PageBlock } from "@/lib/actions/pages";
 import {
   Home,
   Search,
@@ -61,6 +64,10 @@ export function Sidebar({
   const [showPricing, setShowPricing] = useState(false);
   const [pages, setPages] = useState<Page[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [renamingPageId, setRenamingPageId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [renameModalPage, setRenameModalPage] = useState<Page | null>(null);
   const isSeedingOnboarding = useRef(false);
   const onboardingStorageKey = `notion-onboarding-created:${session?.user?.email || "workspace"}`;
   const [expandedSections, setExpandedSections] = useState({
@@ -112,8 +119,10 @@ export function Sidebar({
     try {
       const meetingPage = await createPage({ title: "AI Meeting Note", isAiMeetingNote: true });
       await loadPages();
+      toast.success("AI Meeting Note created");
       router.push(`/dashboard/${meetingPage._id}`);
     } catch (e) {
+      toast.error("Failed to create meeting note");
       console.error("Failed to create meeting note:", e);
     } finally {
       setIsCreating(false);
@@ -125,24 +134,91 @@ export function Sidebar({
     try {
       const newPage = await createPage({ title: "Untitled" });
       await loadPages();
+      toast.success("New page created");
       router.push(`/dashboard/${newPage._id}`);
     } catch (e) {
+      toast.error("Failed to create page");
       console.error("Failed to create page:", e);
     } finally {
       setIsCreating(false);
     }
   }
 
-  async function handleDeletePage(e: React.MouseEvent, pageId: string) {
+  const clickTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  function beginRename(e: React.MouseEvent, page: Page) {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this page?")) return;
+    e.preventDefault();
+    if (clickTimeoutRef.current) {
+      clearTimeout(clickTimeoutRef.current);
+      clickTimeoutRef.current = null;
+    }
+    setRenameModalPage(page);
+    setRenamingPageId(page._id);
+    setRenameValue(page.title);
+  }
+
+  function handlePageClick(e: React.MouseEvent, page: Page) {
+    if (renamingPageId === page._id) return;
+
+    if (e.detail === 2) {
+      if (clickTimeoutRef.current) {
+        clearTimeout(clickTimeoutRef.current);
+        clickTimeoutRef.current = null;
+      }
+      e.stopPropagation();
+      e.preventDefault();
+      setRenameModalPage(page);
+      setRenamingPageId(page._id);
+      setRenameValue(page.title);
+      return;
+    }
+
+    if (e.detail === 1) {
+      if (clickTimeoutRef.current) clearTimeout(clickTimeoutRef.current);
+      const targetPath = `/dashboard/${page._id}`;
+      clickTimeoutRef.current = setTimeout(() => {
+        if (pathname !== targetPath) {
+          router.push(targetPath);
+        }
+        clickTimeoutRef.current = null;
+      }, 230);
+    }
+  }
+
+  async function finishRename(pageId: string) {
+    if (!renamingPageId) return;
+    const title = renameValue.trim() || "Untitled";
+    setRenamingPageId(null);
     try {
-      await deletePage(pageId);
+      await updatePage(pageId, { title });
       await loadPages();
-      if (pathname === `/dashboard/${pageId}`) {
+      window.dispatchEvent(new CustomEvent("page-updated", { detail: { title, updatedAt: new Date() } }));
+      toast.success("Page renamed");
+    } catch (error) {
+      toast.error("Failed to rename page");
+      console.error("Failed to rename page:", error);
+    }
+  }
+  function handleDeletePage(e: React.MouseEvent, pageId: string) {
+    e.stopPropagation();
+    setDeleteTargetId(pageId);
+  }
+
+  async function performDeletePage() {
+    if (!deleteTargetId) return;
+    const id = deleteTargetId;
+    setDeleteTargetId(null);
+    try {
+      if (pathname === `/dashboard/${id}`) {
         router.push("/dashboard");
       }
+      await deletePage(id);
+      await loadPages();
+      toast.success("Page moved to Trash");
+      window.dispatchEvent(new Event("page-updated"));
     } catch (err) {
+      toast.error("Failed to delete page");
       console.error("Failed to delete page:", err);
     }
   }
@@ -296,18 +372,58 @@ export function Sidebar({
           {expandedSections.recents && (
             <div className="space-y-0.5">
               {pages.slice(0, 3).map((page) => (
-                <button
+                <div
                   key={page._id}
-                  onClick={() => router.push(`/dashboard/${page._id}`)}
-                  className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-lg transition text-left font-medium ${
+                  onClick={(e) => handlePageClick(e, page)}
+                  className={`w-full flex items-center justify-between group px-2 py-1.5 rounded-lg transition text-left font-medium cursor-pointer ${
                     pathname === `/dashboard/${page._id}`
                       ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
                       : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
                   }`}
                 >
-                  <span className="shrink-0 text-sm">{page.icon}</span>
-                  <span className="truncate text-[11px]">{page.title}</span>
-                </button>
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <span className="shrink-0 text-sm">{page.icon}</span>
+                    {renamingPageId === page._id ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onBlur={() => void finishRename(page._id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setRenamingPageId(null);
+                          }
+                        }}
+                        className="min-w-0 w-full bg-background border border-primary rounded px-1.5 py-0.5 text-[11px] outline-none font-normal text-foreground shadow-sm"
+                      />
+                    ) : (
+                      <span
+                        className="truncate text-[11px] flex-1"
+                        onDoubleClick={(e) => beginRename(e, page)}
+                        title="Double-click to rename"
+                      >
+                        {page.title}
+                      </span>
+                    )}
+                  </div>
+                  {renamingPageId !== page._id && (
+                    <button
+                      onClick={(e) => beginRename(e, page)}
+                      title="Rename page"
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-foreground transition shrink-0"
+                    >
+                      <SquarePen className="h-3 w-3" />
+                    </button>
+                  )}
+                </div>
               ))}
               {pages.length === 0 && (
                 <p className="px-2 py-1 text-[11px] text-muted-foreground">No recent pages</p>
@@ -360,24 +476,64 @@ export function Sidebar({
               {pages.map((page) => (
                 <div
                   key={page._id}
-                  onClick={() => router.push(`/dashboard/${page._id}`)}
+                  onClick={(e) => handlePageClick(e, page)}
                   className={`w-full flex items-center justify-between group px-2 py-1.5 rounded-lg transition text-left font-medium cursor-pointer ${
                     pathname === `/dashboard/${page._id}`
                       ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
                       : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
                   }`}
                 >
-                  <div className="flex items-center gap-2 min-w-0">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     <span className="shrink-0 text-sm">{page.icon}</span>
-                    <span className="truncate text-[11px]">{page.title}</span>
+                    {renamingPageId === page._id ? (
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        onFocus={(e) => e.target.select()}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onClick={(e) => e.stopPropagation()}
+                        onMouseDown={(e) => e.stopPropagation()}
+                        onBlur={() => void finishRename(page._id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            e.preventDefault();
+                            e.currentTarget.blur();
+                          }
+                          if (e.key === "Escape") {
+                            e.preventDefault();
+                            setRenamingPageId(null);
+                          }
+                        }}
+                        className="min-w-0 w-full bg-background border border-primary rounded px-1.5 py-0.5 text-[11px] outline-none font-normal text-foreground shadow-sm"
+                      />
+                    ) : (
+                      <span
+                        className="truncate text-[11px] flex-1"
+                        onDoubleClick={(e) => beginRename(e, page)}
+                        title="Double-click to rename"
+                      >
+                        {page.title}
+                      </span>
+                    )}
                   </div>
-                  <button
-                    onClick={(e) => handleDeletePage(e, page._id)}
-                    title="Delete page"
-                    className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-red-500 transition shrink-0"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
+                  {renamingPageId !== page._id && (
+                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition">
+                      <button
+                        onClick={(e) => beginRename(e, page)}
+                        title="Rename page"
+                        className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-foreground transition"
+                      >
+                        <SquarePen className="h-3 w-3" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeletePage(e, page._id)}
+                        title="Delete page"
+                        className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-red-500 transition"
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
               {pages.length === 0 && (
@@ -411,7 +567,7 @@ export function Sidebar({
 
           {expandedSections.shared && (
             <button
-              onClick={() => alert("Start collaborating clicked")}
+              onClick={() => toast.info("Collaborative workspace feature coming soon!")}
               className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
             >
               <Plus className="h-3.5 w-3.5 text-muted-foreground" />
@@ -444,7 +600,7 @@ export function Sidebar({
                 <span className="truncate">Notion Calendar</span>
               </button>
               <button
-                onClick={() => alert("Notion Desktop app")}
+                onClick={() => toast.info("Notion Desktop app launcher initialized")}
                 className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
               >
                 <Monitor className="h-3.5 w-3.5 text-muted-foreground" />
@@ -580,6 +736,35 @@ export function Sidebar({
       <PricingModal
         isOpen={showPricing}
         onClose={() => setShowPricing(false)}
+      />
+
+      <ConfirmModal
+        isOpen={!!deleteTargetId}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={performDeletePage}
+        title="Delete page?"
+        description="This page will be moved to Trash. You can restore it anytime."
+        confirmText="Delete"
+      />
+
+      <RenameModal
+        isOpen={!!renameModalPage}
+        onClose={() => setRenameModalPage(null)}
+        currentTitle={renameModalPage?.title || ""}
+        onSave={async (newTitle) => {
+          if (!renameModalPage) return;
+          try {
+            await updatePage(renameModalPage._id, { title: newTitle });
+            await loadPages();
+            window.dispatchEvent(
+              new CustomEvent("page-updated", { detail: { title: newTitle, updatedAt: new Date() } })
+            );
+            toast.success("Page renamed");
+          } catch (err) {
+            toast.error("Failed to rename page");
+            console.error(err);
+          }
+        }}
       />
     </aside>
   );

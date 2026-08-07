@@ -16,6 +16,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
+import { toast } from "sonner";
 import Strands from "../Strands";
 
 interface MeetingNoteViewProps {
@@ -132,7 +133,7 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
 
             <div className="hidden sm:flex items-center gap-2">
               <button
-                onClick={() => alert("Transcript exported to Notion doc")}
+                onClick={() => toast.success("Transcript exported to Notion doc")}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border hover:bg-accent text-xs font-semibold text-foreground transition shadow-sm"
                 title="Export Transcript"
               >

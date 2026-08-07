@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
+import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { NotionAiPanel } from "@/components/dashboard/notion-ai-panel";
@@ -11,7 +12,8 @@ import { CalendarModal } from "@/components/dashboard/modals/calendar-modal";
 import { SettingsModal } from "@/components/dashboard/modals/settings-modal";
 import { TrashModal } from "@/components/dashboard/modals/trash-modal";
 import { AiChatModal } from "@/components/dashboard/modals/ai-chat-modal";
-import { getPage } from "@/lib/actions/pages";
+import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { getPage, deletePage } from "@/lib/actions/pages";
 import { UtilityPage } from "@/components/dashboard/utility-page";
 
 export default function DashboardLayout({
@@ -19,6 +21,7 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const router = useRouter();
   const { status } = useSession();
   const params = useParams();
   // pageId is present when the URL is /dashboard/[pageId], absent on /dashboard
@@ -34,6 +37,7 @@ export default function DashboardLayout({
   const [isQuickAiOpen, setIsQuickAiOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [utilityPage, setUtilityPage] = useState<"Library" | "My Tasks" | "Marketplace" | "Help" | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     const openQuickAi = () => setIsQuickAiOpen(true);
@@ -62,6 +66,20 @@ export default function DashboardLayout({
       })
       .catch(() => setActiveTitle("Untitled"));
   }, [pageId]);
+
+  async function handleConfirmDelete() {
+    if (!deleteTargetId) return;
+    try {
+      await deletePage(deleteTargetId);
+      toast.success("Page moved to Trash");
+      window.dispatchEvent(new Event("page-updated"));
+      router.push("/dashboard");
+    } catch {
+      toast.error("Failed to delete page");
+    } finally {
+      setDeleteTargetId(null);
+    }
+  }
 
   if (status === "loading") {
     return (
@@ -107,13 +125,7 @@ export default function DashboardLayout({
           onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
           onToggleAi={() => setIsAiOpen(!isAiOpen)}
           isAiOpen={isAiOpen}
-          onDeletePage={async (id) => {
-            if (confirm("Are you sure you want to delete this page?")) {
-              const { deletePage } = await import("@/lib/actions/pages");
-              await deletePage(id);
-              window.location.href = "/dashboard";
-            }
-          }}
+          onDeletePage={(id) => setDeleteTargetId(id)}
         />
         {/* Page content (dashboard/page.tsx or dashboard/[pageId]/page.tsx) */}
         {utilityPage ? <UtilityPage type={utilityPage} onBack={() => { setUtilityPage(null); setActiveTitle("Getting Started with Notion"); }} /> : children}
@@ -139,6 +151,14 @@ export default function DashboardLayout({
       <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
       <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} />
       <AiChatModal isOpen={isQuickAiOpen} onClose={() => setIsQuickAiOpen(false)} />
+      <ConfirmModal
+        isOpen={!!deleteTargetId}
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={handleConfirmDelete}
+        title="Delete page?"
+        description="This page will be moved to your Trash. You can restore it anytime."
+        confirmText="Delete"
+      />
 
     </div>
   );

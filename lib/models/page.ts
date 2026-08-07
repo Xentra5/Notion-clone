@@ -45,3 +45,19 @@ PageSchema.index({ title: "text", "blocks.properties.text": "text" });
 const Page = models.Page || model("Page", PageSchema);
 
 export default Page;
+
+let legacyTitleIndexMigration: Promise<void> | null = null;
+
+/** Remove the old schema index that incorrectly allowed only one title per user. */
+export async function removeLegacyTitleIndex() {
+  if (!legacyTitleIndexMigration) {
+    legacyTitleIndexMigration = Page.collection
+      .dropIndex("userId_1_title_1")
+      .then(() => undefined)
+      .catch((error: { code?: number }) => {
+        // MongoDB error 27 means the index is already absent.
+        if (error.code !== 27) throw error;
+      });
+  }
+  await legacyTitleIndexMigration;
+}

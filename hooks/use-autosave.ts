@@ -33,7 +33,11 @@ export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutos
                 : item.type === "bullet"
                 ? "bulleted_list_item"
                 : item.type,
-            properties: { text: item.text, checked: !!item.checked },
+            properties: {
+              text: item.text,
+              checked: !!item.checked,
+              language: item.codeLanguage ?? "javascript",
+            },
           })) as never,
         });
         onStatusChange("saved");

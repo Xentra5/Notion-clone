@@ -1,13 +1,12 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
-import Page from "@/lib/models/page";
+import Page, { removeLegacyTitleIndex } from "@/lib/models/page";
 
 // GET /api/pages — fetch all pages for the logged-in user
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
@@ -25,31 +24,67 @@ export async function GET() {
 }
 
 // POST /api/pages — create a new page (creation only — use PATCH /api/pages/[id] to update)
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { title, category, isAiMeetingNote, blocks } = await request.json();
-    const pageTitle = (title || "Untitled").trim();
+    const body = await request.json().catch(() => null);
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
+    const { title, category, isAiMeetingNote, blocks } = body as {
+      title?: unknown;
+      category?: unknown;
+      isAiMeetingNote?: unknown;
+      blocks?: unknown;
+    };
+    const pageTitle = typeof title === "string" && title.trim() ? title.trim() : "Untitled";
+    const pageCategory = category === "Private" || category === "Shared" || category === "Meetings" ? category : "Private";
+
+    if (blocks !== undefined && !Array.isArray(blocks)) {
+      return NextResponse.json({ error: "Blocks must be an array" }, { status: 400 });
+    }
+
+    const pageBlocks = (blocks ?? []).map((block, index) => {
+      if (!block || typeof block !== "object" || Array.isArray(block)) {
+        throw new Error("Invalid block at index " + index);
+      }
+      const candidate = block as Record<string, unknown>;
+      const properties = candidate.properties;
+      if (!properties || typeof properties !== "object" || Array.isArray(properties)) {
+        throw new Error("Invalid block properties at index " + index);
+      }
+      return {
+        id: typeof candidate.id === "string" && candidate.id.trim() ? candidate.id : crypto.randomUUID(),
+        type: typeof candidate.type === "string" && candidate.type.trim() ? candidate.type : "paragraph",
+        properties,
+        ...(Array.isArray(candidate.content) ? { content: candidate.content.filter((item): item is string => typeof item === "string") } : {}),
+        ...(typeof candidate.parent === "string" ? { parent: candidate.parent } : {}),
+      };
+    });
 
     await connectToDatabase();
+    await removeLegacyTitleIndex();
 
     const page = await Page.create({
       userId: session.user.email,
       title: pageTitle,
       icon: "📄",
-      category: category || "Private",
+      category: pageCategory,
       isAiMeetingNote: !!isAiMeetingNote,
-      blocks: blocks || [],
+      blocks: pageBlocks,
     });
 
-    return NextResponse.json({ page }, { status: 201 });
+    return NextResponse.json({ page: page.toObject() }, { status: 201 });
   } catch (error) {
-    console.error("Error creating page:", error);
-    return NextResponse.json({ error: "Failed to create page" }, { status: 500 });
+    const err = error as Error & { code?: number; errors?: Record<string, unknown> };
+    console.error("Error creating page:", err.message, err.errors ?? "");
+    const detail = process.env.NODE_ENV !== "production" ? err.message : "Database operation failed. Check the server logs.";
+    const status = err.name === "ValidationError" ? 400 : 500;
+    return NextResponse.json({ error: "Failed to create page", detail }, { status });
   }
 }
-

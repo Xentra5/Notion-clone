@@ -1,6 +1,6 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import mongoose from "mongoose";
+import { NextRequest, NextResponse } from "next/server";
+import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import Page from "@/lib/models/page";
 
@@ -9,14 +9,18 @@ interface RouteParams {
 }
 
 // GET /api/pages/[id] — fetch a single page by its MongoDB _id
-export async function GET(_req: Request, { params }: RouteParams) {
+export async function GET(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
+    }
+
     await connectToDatabase();
 
     const page = await Page.findOne({
@@ -37,20 +41,29 @@ export async function GET(_req: Request, { params }: RouteParams) {
 }
 
 // PATCH /api/pages/[id] — update title, blocks, category, or icon
-export async function PATCH(request: Request, { params }: RouteParams) {
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const { id } = await params;
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
+    }
+
     const body = await request.json();
     const { title, blocks, category, icon } = body;
 
     // Build update payload from only the provided fields
     const $set: Record<string, unknown> = {};
-    if (title !== undefined) $set.title = title;
+    if (title !== undefined) {
+      if (typeof title !== "string" || !title.trim()) {
+        return NextResponse.json({ error: "Page title cannot be empty" }, { status: 400 });
+      }
+      $set.title = title.trim();
+    }
     if (blocks !== undefined) $set.blocks = blocks;
     if (category !== undefined) $set.category = category;
     if (icon !== undefined) $set.icon = icon;
@@ -64,7 +77,7 @@ export async function PATCH(request: Request, { params }: RouteParams) {
     const page = await Page.findOneAndUpdate(
       { _id: id, userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] },
       { $set },
-      { new: true, lean: true }
+      { new: true, lean: true, runValidators: true }
     );
 
     if (!page) {
@@ -79,18 +92,23 @@ export async function PATCH(request: Request, { params }: RouteParams) {
 }
 
 // DELETE /api/pages/[id] — move a page to Trash, or permanently delete it when requested.
-export async function DELETE(req: Request, { params }: RouteParams) {
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await getServerSession(authOptions);
+    const session = await getSession(request);
     if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
     const { id } = await params;
-    const isPermanent = new URL(req.url).searchParams.get("permanent") === "true";
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Page not found" }, { status: 404 });
+    }
+
+    const isPermanent = new URL(request.url).searchParams.get("permanent") === "true";
     await connectToDatabase();
 
     const result = isPermanent
       ? await Page.findOneAndDelete({ _id: id, userId: session.user.email })
       : await Page.findOneAndUpdate(
-          { _id: id, userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] },
+          { _id: id, userId: session.user.email },
           { $set: { deletedAt: new Date() } },
           { new: true }
         );
