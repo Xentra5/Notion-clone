@@ -10,12 +10,12 @@ import {
 import { useSession } from "next-auth/react";
 import { MeetingNoteView } from "./MeetingNoteView";
 import { EmojiDropdown } from "./EmojiPicker";
+import { CodeBlock } from "./CodeBlock";
 import { useAutosave } from "@/hooks/use-autosave";
 import { updatePage } from "@/lib/actions/pages";
 import type { ChecklistItem, BlockType } from "@/hooks/use-pages";
 import {
   Check,
-  ChevronDown,
   ChevronRight,
   GripVertical,
   Plus,
@@ -121,10 +121,14 @@ function getPlaceholder(type: BlockType | undefined): string {
 interface BlockProps {
   item: ChecklistItem;
   index: number;
+  seqNumber?: number;
   isFocused: boolean;
   onFocus: (id: string) => void;
   onUpdateText: (id: string, text: string) => void;
   onUpdateLanguage?: (id: string, language: string) => void;
+  onUpdateCalloutIcon?: (id: string, icon: string) => void;
+  onUpdateToggleChildren?: (id: string, childrenText: string) => void;
+  onUpdateTableData?: (id: string, data: string[][]) => void;
   onToggleCheck: (id: string) => void;
   onKeyDown: (e: React.KeyboardEvent, id: string) => void;
   onDelete?: (id: string) => void;
@@ -134,11 +138,13 @@ interface BlockProps {
 }
 
 function Block({
-  item, index, isFocused, onFocus, onUpdateText, onUpdateLanguage,
+  item, index, seqNumber = 1, isFocused, onFocus, onUpdateText, onUpdateLanguage,
+  onUpdateCalloutIcon, onUpdateToggleChildren, onUpdateTableData,
   onToggleCheck, onKeyDown, onDelete, onAddAfter, onSelectSubPage, registerRef,
 }: BlockProps) {
   const elRef = useRef<HTMLElement | null>(null);
   const [toggleOpen, setToggleOpen] = useState(false);
+  const [showCalloutPicker, setShowCalloutPicker] = useState(false);
 
   // Keep contentEditable text in sync without losing caret
   useLayoutEffect(() => {
@@ -191,16 +197,17 @@ function Block({
 
   return (
     <div
-      className="group/b relative flex items-start -ml-16 -mr-4 pl-16 pr-4 rounded-md hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors"
+      className="group/b relative flex items-start -ml-4 -mr-16 pl-4 pr-16 rounded-md hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors overflow-visible"
       data-block-id={item.id}
     >
-      {/* Drag handle & Delete button (positioned neatly in the left margin) */}
-      <div className="absolute left-1 top-[4px] flex items-center gap-0.5 opacity-0 group-hover/b:opacity-100 transition-opacity z-10">
-        <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Drag">
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
+      {/* Drag handle, Add & Delete — hidden for code blocks (they have their own header) */}
+      {item.type !== "code" && (
+      <div className="absolute right-1 top-[4px] flex items-center gap-0.5 opacity-0 group-hover/b:opacity-100 transition-opacity z-10">
         <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Add block below" onClick={() => onAddAfter?.(item.id)}>
           <Plus className="h-3.5 w-3.5" />
+        </button>
+        <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Drag">
+          <GripVertical className="h-3.5 w-3.5" />
         </button>
         {onDelete && (
           <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition" title="Delete block" onClick={() => onDelete(item.id)}>
@@ -208,6 +215,7 @@ function Block({
           </button>
         )}
       </div>
+      )}
 
       <div className="flex-1 min-w-0 py-[1.5px]">
 
@@ -236,16 +244,16 @@ function Block({
 
         {/* ── Bullet ── */}
         {item.type === "bullet" && (
-          <div className="flex items-start gap-2">
-            <span className="shrink-0 select-none text-foreground/40 font-bold text-[9px] mt-[7px]">●</span>
+          <div className="flex items-start gap-2.5 py-px">
+            <span className="shrink-0 select-none text-foreground/50 font-bold text-[8px] mt-[9px] leading-none">•</span>
             <div {...ce} ref={setRef} className={textCls} />
           </div>
         )}
 
         {/* ── Numbered ── */}
         {item.type === "numbered" && (
-          <div className="flex items-start gap-2">
-            <span className="shrink-0 select-none text-foreground/40 tabular-nums text-[13px] mt-[3px] min-w-[1.4rem] text-right">{index + 1}.</span>
+          <div className="flex items-start gap-2.5 py-px">
+            <span className="shrink-0 select-none text-foreground/50 tabular-nums text-[13px] mt-[2px] min-w-[1.2rem] text-right font-medium">{seqNumber}.</span>
             <div {...ce} ref={setRef} className={textCls} />
           </div>
         )}
@@ -268,15 +276,24 @@ function Block({
         {item.type === "toggle" && (
           <div>
             <div className="flex items-start gap-1">
-              <button type="button" onClick={() => setToggleOpen(v => !v)}
-                className="shrink-0 mt-[4px] p-0.5 rounded text-foreground/30 hover:text-foreground/70 hover:bg-black/5 dark:hover:bg-white/5 transition">
-                {toggleOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+              <button
+                type="button"
+                onClick={() => setToggleOpen(v => !v)}
+                className={`shrink-0 mt-[3px] p-0.5 rounded text-foreground/40 hover:text-foreground/80 hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 ${toggleOpen ? "rotate-90" : ""}`}
+              >
+                <ChevronRight className="h-4 w-4" />
               </button>
               <div {...ce} ref={setRef} className={`${textCls} font-medium`} />
             </div>
             {toggleOpen && (
-              <div className="ml-6 pl-3 border-l-2 border-foreground/10 mt-1 py-1 text-[14px] text-foreground/50">
-                Toggle content — click inside to add blocks
+              <div className="ml-[22px] pl-3.5 border-l-2 border-foreground/[0.08] dark:border-foreground/10 mt-1.5 pb-1">
+                <textarea
+                  value={item.toggleChildren || ""}
+                  onChange={(e) => onUpdateToggleChildren?.(item.id, e.target.value)}
+                  placeholder="Type something inside the toggle..."
+                  rows={Math.max(2, (item.toggleChildren || "").split("\n").length)}
+                  className="w-full bg-transparent text-[14px] text-foreground/70 outline-none resize-none placeholder:text-foreground/25 leading-relaxed font-sans"
+                />
               </div>
             )}
           </div>
@@ -284,17 +301,36 @@ function Block({
 
         {/* ── Quote ── */}
         {item.type === "quote" && (
-          <div className="pl-4 border-l-[3px] border-foreground/15 dark:border-foreground/10 py-0.5">
+          <div className="flex items-start gap-0 py-1">
+            <div className="w-[3px] shrink-0 self-stretch bg-foreground/20 dark:bg-foreground/15 rounded-full mr-4" />
             <div {...ce} ref={setRef}
-              className={`${textCls} text-foreground/75 italic`} />
+              className={`${textCls} text-foreground/80 italic`} />
           </div>
         )}
 
         {/* ── Callout ── */}
         {item.type === "callout" && (
-          <div className="flex items-start gap-3 px-4 py-3 rounded-lg bg-[#f5f5f4] dark:bg-[#1e1e1e] border border-[#e9e9e8] dark:border-[#2a2a2a] my-1">
-            <span className="shrink-0 text-xl select-none mt-0.5">💡</span>
-            <div {...ce} ref={setRef} className={textCls} />
+          <div className="relative flex items-start gap-3 px-3.5 py-2.5 rounded-lg bg-[#f3f3f2] dark:bg-[#1c1c1c] border border-transparent dark:border-white/[0.05] my-1 transition-colors hover:bg-[#eeeeed] dark:hover:bg-[#1f1f1f]">
+            <button
+              type="button"
+              onClick={() => setShowCalloutPicker(!showCalloutPicker)}
+              className="shrink-0 text-[18px] select-none mt-[2px] hover:scale-110 transition-transform cursor-pointer p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5"
+              title="Change callout icon"
+            >
+              {item.calloutIcon || "💡"}
+            </button>
+            {showCalloutPicker && (
+              <div className="absolute left-4 top-12 z-50">
+                <EmojiDropdown
+                  onSelect={(emoji) => {
+                    onUpdateCalloutIcon?.(item.id, emoji);
+                    setShowCalloutPicker(false);
+                  }}
+                  onClose={() => setShowCalloutPicker(false)}
+                />
+              </div>
+            )}
+            <div {...ce} ref={setRef} className={`${textCls} text-[14px]`} />
           </div>
         )}
 
@@ -307,61 +343,40 @@ function Block({
 
         {/* ── Code ── */}
         {item.type === "code" && (
-          <div className="my-2 rounded-lg overflow-hidden border border-[#30363d] bg-[#0d1117]">
-            <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d]">
-              <div className="flex items-center gap-2">
-                <select
-                  value={item.codeLanguage || "javascript"}
-                  onChange={(e) => onUpdateLanguage?.(item.id, e.target.value)}
-                  className="bg-[#21262d] text-[#c9d1d9] hover:text-white border border-[#30363d] rounded px-2 py-0.5 text-[11px] font-mono font-medium outline-none cursor-pointer hover:border-[#8b949e] transition select-none"
-                >
-                  <option value="javascript">JavaScript</option>
-                  <option value="typescript">TypeScript</option>
-                  <option value="python">Python</option>
-                  <option value="html">HTML</option>
-                  <option value="css">CSS</option>
-                  <option value="cpp">C++</option>
-                  <option value="csharp">C#</option>
-                  <option value="java">Java</option>
-                  <option value="rust">Rust</option>
-                  <option value="go">Go</option>
-                  <option value="sql">SQL</option>
-                  <option value="json">JSON</option>
-                  <option value="bash">Bash / Shell</option>
-                  <option value="php">PHP</option>
-                  <option value="ruby">Ruby</option>
-                  <option value="swift">Swift</option>
-                  <option value="kotlin">Kotlin</option>
-                  <option value="yaml">YAML</option>
-                  <option value="markdown">Markdown</option>
-                  <option value="plaintext">Plain Text</option>
-                </select>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigator.clipboard.writeText(item.text)}
-                className="text-[11px] text-[#7d8590] hover:text-[#e6edf3] px-2 py-0.5 rounded hover:bg-[#21262d] transition select-none"
-              >
-                Copy
-              </button>
-            </div>
-            <div
-              {...ce}
-              ref={setRef}
-              spellCheck={false}
-              data-placeholder="// Write or paste code..."
-              className="px-4 py-4 font-mono text-[13px] leading-[1.8] text-[#e6edf3] outline-none whitespace-pre-wrap empty:before:content-[attr(data-placeholder)] empty:before:text-[#3d444e] empty:before:pointer-events-none select-text cursor-text"
-            />
-          </div>
+          <CodeBlock
+            id={item.id}
+            code={item.text}
+            language={item.codeLanguage || "javascript"}
+            onChangeCode={(id, code) => onUpdateText(id, code)}
+            onChangeLang={(id, lang) => onUpdateLanguage?.(id, lang)}
+            isFocused={isFocused}
+            onFocus={handleFocus}
+            onExitToNewBlock={() => onAddAfter?.(item.id)}
+          />
         )}
 
         {/* ── Page / Link to page ── */}
         {(item.type === "page" || item.type === "link_to_page") && (
-          <button type="button" onClick={() => onSelectSubPage(item.text || "Untitled")}
-            className="flex items-center gap-2.5 px-3 py-2 rounded-lg border border-foreground/10 hover:bg-[#f5f5f4] dark:hover:bg-[#1e1e1e] transition text-sm font-medium w-full text-left group my-0.5">
-            <FileText className="h-4 w-4 text-foreground/40 shrink-0 group-hover:text-foreground/70 transition" />
-            <span className="underline underline-offset-2 decoration-foreground/20">{item.text || "Untitled Page"}</span>
-          </button>
+          <div className="flex items-center gap-2 my-1 group/page">
+            <button
+              type="button"
+              onClick={() => onSelectSubPage(item.text || "Untitled")}
+              className="flex items-center gap-2.5 flex-1 px-3 py-2.5 rounded-lg border border-foreground/[0.08] hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.03] transition-colors text-left"
+            >
+              <span className="text-base select-none">📄</span>
+              <div className="flex-1 min-w-0">
+                <div
+                  {...ce}
+                  ref={setRef}
+                  className="text-[14px] font-medium text-foreground outline-none w-full empty:before:content-[attr(data-placeholder)] empty:before:text-foreground/30 empty:before:pointer-events-none"
+                  data-placeholder="Untitled"
+                  onClick={(e) => e.stopPropagation()}
+                />
+                <div className="text-[11px] text-foreground/40 mt-0.5">Click to open page</div>
+              </div>
+              <span className="text-foreground/20 group-hover/page:text-foreground/40 transition text-xs">↗</span>
+            </button>
+          </div>
         )}
 
         {/* ── Image ── */}
@@ -408,28 +423,71 @@ function Block({
         )}
 
         {/* ── Table ── */}
-        {item.type === "table" && (
-          <div className="my-2 overflow-x-auto rounded-lg border border-foreground/10">
-            <table className="w-full text-sm border-collapse">
-              <thead>
-                <tr className="border-b border-foreground/10">
-                  {["Column 1", "Column 2", "Column 3"].map(h => (
-                    <th key={h} className="px-4 py-2 text-left text-xs font-semibold text-foreground/40 uppercase tracking-wide bg-foreground/[0.02]">{h}</th>
+        {item.type === "table" && (() => {
+          const table = item.tableData || [
+            ["Header 1", "Header 2", "Header 3"],
+            ["Row 1, Cell 1", "Row 1, Cell 2", "Row 1, Cell 3"],
+            ["Row 2, Cell 1", "Row 2, Cell 2", "Row 2, Cell 3"],
+          ];
+          return (
+            <div className="my-2 overflow-x-auto rounded-lg border border-foreground/10 p-2 space-y-2">
+              <table className="w-full text-sm border-collapse border border-foreground/10">
+                <tbody>
+                  {table.map((row, rIdx) => (
+                    <tr key={rIdx} className="border-b border-foreground/10 last:border-0">
+                      {row.map((cell, cIdx) => (
+                        <td
+                          key={cIdx}
+                          className={`p-0 border-r border-foreground/10 last:border-r-0 ${
+                            rIdx === 0 ? "bg-foreground/[0.03] font-semibold" : ""
+                          }`}
+                        >
+                          <input
+                            type="text"
+                            value={cell}
+                            onChange={(e) => {
+                              const nextData = table.map((r, ri) =>
+                                ri === rIdx
+                                  ? r.map((c, ci) => (ci === cIdx ? e.target.value : c))
+                                  : r
+                              );
+                              onUpdateTableData?.(item.id, nextData);
+                            }}
+                            placeholder={rIdx === 0 ? `Column ${cIdx + 1}` : ""}
+                            className="w-full px-3 py-1.5 bg-transparent text-xs text-foreground outline-none placeholder:text-foreground/20"
+                          />
+                        </td>
+                      ))}
+                    </tr>
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[0, 1].map(r => (
-                  <tr key={r} className="border-b border-foreground/5 last:border-0">
-                    {[0, 1, 2].map(c => (
-                      <td key={c} contentEditable suppressContentEditableWarning className="px-4 py-2 outline-none text-foreground focus:bg-blue-50/50 dark:focus:bg-blue-950/10" />
-                    ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                </tbody>
+              </table>
+              <div className="flex items-center gap-2 pt-1 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const cols = table[0]?.length || 3;
+                    const nextData = [...table, Array(cols).fill("")];
+                    onUpdateTableData?.(item.id, nextData);
+                  }}
+                  className="px-2.5 py-1 rounded bg-foreground/5 hover:bg-foreground/10 text-foreground/70 font-medium transition cursor-pointer"
+                >
+                  + Add Row
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextData = table.map((row) => [...row, ""]);
+                    onUpdateTableData?.(item.id, nextData);
+                  }}
+                  className="px-2.5 py-1 rounded bg-[#2383e2]/10 hover:bg-[#2383e2]/20 text-[#2383e2] font-medium transition cursor-pointer"
+                >
+                  + Add Column
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </div>
     </div>
   );
@@ -535,6 +593,18 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
     setItems(prev => prev.map(b => b.id === id ? { ...b, checked: !b.checked } : b));
   }, []);
 
+  const updateCalloutIcon = useCallback((id: string, calloutIcon: string) => {
+    setItems(prev => prev.map(b => b.id === id ? { ...b, calloutIcon } : b));
+  }, []);
+
+  const updateToggleChildren = useCallback((id: string, toggleChildren: string) => {
+    setItems(prev => prev.map(b => b.id === id ? { ...b, toggleChildren } : b));
+  }, []);
+
+  const updateTableData = useCallback((id: string, tableData: string[][]) => {
+    setItems(prev => prev.map(b => b.id === id ? { ...b, tableData } : b));
+  }, []);
+
   const slashFiltered = slash.query
     ? SLASH_ITEMS.filter(s =>
         s.label.toLowerCase().includes(slash.query.toLowerCase()) ||
@@ -599,8 +669,13 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
       }, 0);
     }
 
-    // Enter → split block
+    // Enter → split block (code blocks handle Enter internally via CodeBlock component)
     if (e.key === "Enter" && !e.shiftKey) {
+      const curType = itemsSnap[idx]?.type;
+
+      // Code blocks: let the CodeBlock component handle Enter (insert newline)
+      if (curType === "code") return;
+
       e.preventDefault();
       const sel = window.getSelection();
       let before = text;
@@ -618,7 +693,14 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
           after = aRange.toString();
         } catch { /* ignore */ }
       }
-      const curType = itemsSnap[idx]?.type;
+
+      // Empty bullet/numbered/todo → convert to paragraph (like Notion)
+      if ((curType === "bullet" || curType === "numbered" || curType === "todo") && text.trim() === "") {
+        setItems(prev => prev.map(b => b.id === id ? { ...b, type: "paragraph", text: "" } : b));
+        setTimeout(() => focusBlock(id), 0);
+        return;
+      }
+
       const newType: BlockType = curType === "bullet" || curType === "numbered" || curType === "todo" ? curType : "paragraph";
       const nb = makeBlock(newType, after);
       setItems(prev => {
@@ -640,19 +722,31 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
         const editorContainer = document.getElementById("editor-page-container");
 
         // Check if selection covers multiple blocks or elements
-        if (
-          el &&
-          range.commonAncestorContainer !== el &&
-          !el.contains(range.commonAncestorContainer)
-        ) {
+        const isMultiBlockSelection =
+          !el ||
+          !range.commonAncestorContainer ||
+          (range.commonAncestorContainer !== el && !el.contains(range.commonAncestorContainer));
+
+        if (isMultiBlockSelection) {
           e.preventDefault();
 
-          // Find which blocks are fully or partially included in the selection
-          const selectedBlockElements = editorContainer
-            ? Array.from(editorContainer.querySelectorAll("[data-block-id]")).filter((blockEl) =>
-                sel.containsNode(blockEl, true)
-              )
+          const allBlockElements = editorContainer
+            ? Array.from(editorContainer.querySelectorAll("[data-block-id]"))
             : [];
+
+          // Find which blocks are included in the selection
+          let selectedBlockElements = allBlockElements.filter((blockEl) => {
+            try {
+              return sel.containsNode(blockEl, true) || range.intersectsNode(blockEl);
+            } catch {
+              return true;
+            }
+          });
+
+          // Fallback if container selection returned 0 via containsNode/intersectsNode
+          if (selectedBlockElements.length === 0 && allBlockElements.length > 0) {
+            selectedBlockElements = allBlockElements;
+          }
 
           const selectedIds = new Set(
             selectedBlockElements.map((bEl) => bEl.getAttribute("data-block-id")).filter(Boolean)
@@ -721,19 +815,24 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
       }
     }
 
-    // Ctrl+A / Cmd+A → Select all content across entire page container
+    // Ctrl+A / Cmd+A → Select block text first, then all blocks on second press
     if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
+      const sel = window.getSelection();
       const editorContainer = document.getElementById("editor-page-container");
-      if (editorContainer) {
-        e.preventDefault();
-        const sel = window.getSelection();
-        if (sel) {
+
+      if (sel && el && editorContainer) {
+        const textLen = (el.innerText || "").length;
+        const selectedLen = sel.toString().length;
+
+        // If current block text is already selected (or empty), select entire page container
+        if (textLen === 0 || selectedLen >= textLen) {
+          e.preventDefault();
           const range = document.createRange();
           range.selectNodeContents(editorContainer);
           sel.removeAllRanges();
           sel.addRange(range);
+          return;
         }
-        return;
       }
     }
 
@@ -768,14 +867,27 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
       onClick={e => {
         setShowEmojiPicker(false);
         const target = e.target as HTMLElement;
+        // Don't intercept clicks on any block, form element, or button
         if (
-          !target.closest("[data-block-id]") &&
-          !target.closest("textarea") &&
-          !target.closest("input") &&
-          !target.closest("button")
-        ) {
-          const last = items[items.length - 1];
-          if (last) focusBlock(last.id, true);
+          target.closest("[data-block-id]") ||
+          target.closest("textarea") ||
+          target.closest("input") ||
+          target.closest("button") ||
+          target.closest("select")
+        ) return;
+
+        // Click in the blank area below all content → add a new paragraph at end
+        const last = items[items.length - 1];
+        if (!last) return;
+
+        // If last block has text, add a new empty block below it
+        if (last.text && last.type !== "divider") {
+          const newBlock = makeBlock("paragraph");
+          setItems(prev => [...prev, newBlock]);
+          setTimeout(() => focusBlock(newBlock.id), 0);
+        } else {
+          // Just focus the last empty block
+          focusBlock(last.id, false);
         }
       }}
     >
@@ -848,95 +960,111 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
 
         {/* Blocks */}
         <div className="space-y-px">
-          {items.map((item, index) => (
-            <div key={item.id} className="relative">
-              <Block
-                item={item}
-                index={index}
-                isFocused={focusedId === item.id}
-                onFocus={setFocusedId}
-                onUpdateText={updateText}
-                onUpdateLanguage={updateLanguage}
-                onToggleCheck={toggleCheck}
-                onKeyDown={handleKeyDown}
-                onAddAfter={(id) => {
-                  const newBlock = makeBlock("paragraph");
-                  const idx = items.findIndex((b) => b.id === id);
-                  setItems((p) => { const next = [...p]; next.splice(idx + 1, 0, newBlock); return next; });
-                  setTimeout(() => focusBlock(newBlock.id), 0);
-                }}
-                onDelete={(id) => {
-                  if (items.length > 1) {
-                    const idx = items.findIndex((b) => b.id === id);
-                    const prev = items[idx - 1] ?? items[idx + 1];
-                    setItems((p) => p.filter((b) => b.id !== id));
-                    if (prev) setTimeout(() => focusBlock(prev.id, true), 0);
-                  } else {
-                    setItems([makeBlock("paragraph")]);
-                  }
-                }}
-                onSelectSubPage={onSelectSubPage}
-                registerRef={registerRef}
-              />
+          {(() => {
+            let numberedSeqCount = 0;
+            return items.map((item, index) => {
+              if (item.type === "numbered") {
+                numberedSeqCount++;
+              } else {
+                numberedSeqCount = 0;
+              }
+              const seqNumber = numberedSeqCount;
 
-              {/* Slash menu attached to this block */}
-              {slash.open && slash.blockId === item.id && (
-                <div
-                  className="absolute left-0 top-full z-50 mt-1 w-80 max-h-96 overflow-y-auto bg-white dark:bg-[#1c1c1c] border border-black/[0.08] dark:border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1.5"
-                  onMouseDown={e => e.preventDefault()}
-                >
-                  {slashFiltered.length === 0 ? (
-                    <p className="px-3 py-2 text-xs text-foreground/40">No results</p>
-                  ) : (
-                    <>
-                      {basicItems.length > 0 && (
+              return (
+                <div key={item.id} className="relative">
+                  <Block
+                    item={item}
+                    index={index}
+                    seqNumber={seqNumber}
+                    isFocused={focusedId === item.id}
+                    onFocus={setFocusedId}
+                    onUpdateText={updateText}
+                    onUpdateLanguage={updateLanguage}
+                    onUpdateCalloutIcon={updateCalloutIcon}
+                    onUpdateToggleChildren={updateToggleChildren}
+                    onUpdateTableData={updateTableData}
+                    onToggleCheck={toggleCheck}
+                    onKeyDown={handleKeyDown}
+                    onAddAfter={(id) => {
+                      const newBlock = makeBlock("paragraph");
+                      const idx = items.findIndex((b) => b.id === id);
+                      setItems((p) => { const next = [...p]; next.splice(idx + 1, 0, newBlock); return next; });
+                      setTimeout(() => focusBlock(newBlock.id), 0);
+                    }}
+                    onDelete={(id) => {
+                      if (items.length > 1) {
+                        const idx = items.findIndex((b) => b.id === id);
+                        const prev = items[idx - 1] ?? items[idx + 1];
+                        setItems((p) => p.filter((b) => b.id !== id));
+                        if (prev) setTimeout(() => focusBlock(prev.id, true), 0);
+                      } else {
+                        setItems([makeBlock("paragraph")]);
+                      }
+                    }}
+                    onSelectSubPage={onSelectSubPage}
+                    registerRef={registerRef}
+                  />
+
+                  {/* Slash menu attached to this block */}
+                  {slash.open && slash.blockId === item.id && (
+                    <div
+                      className="absolute left-0 top-full z-50 mt-1 w-80 max-h-96 overflow-y-auto bg-white dark:bg-[#1c1c1c] border border-black/[0.08] dark:border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1.5"
+                      onMouseDown={e => e.preventDefault()}
+                    >
+                      {slashFiltered.length === 0 ? (
+                        <p className="px-3 py-2 text-xs text-foreground/40">No results</p>
+                      ) : (
                         <>
-                          <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">Basic blocks</p>
-                          {basicItems.map(s => {
-                            const Icon = s.icon;
-                            const gi = slashFiltered.indexOf(s);
-                            return (
-                              <button key={s.type} onMouseDown={() => applySlash(s.type)}
-                                className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${slashIdx === gi ? "bg-[#f0f0ef] dark:bg-white/[0.06]" : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"}`}>
-                                <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
-                                  <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
-                                </div>
-                                <div>
-                                  <div className="text-[13px] font-medium text-foreground">{s.label}</div>
-                                  <div className="text-[11px] text-foreground/40">{s.description}</div>
-                                </div>
-                              </button>
-                            );
-                          })}
+                          {basicItems.length > 0 && (
+                            <>
+                              <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">Basic blocks</p>
+                              {basicItems.map(s => {
+                                const Icon = s.icon;
+                                const gi = slashFiltered.indexOf(s);
+                                return (
+                                  <button key={s.type} onMouseDown={() => applySlash(s.type)}
+                                    className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${slashIdx === gi ? "bg-[#f0f0ef] dark:bg-white/[0.06]" : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"}`}>
+                                    <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
+                                      <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
+                                    </div>
+                                    <div>
+                                      <div className="text-[13px] font-medium text-foreground">{s.label}</div>
+                                      <div className="text-[11px] text-foreground/40">{s.description}</div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </>
+                          )}
+                          {mediaItems.length > 0 && (
+                            <>
+                              <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">Media</p>
+                              {mediaItems.map(s => {
+                                const Icon = s.icon;
+                                const gi = slashFiltered.indexOf(s);
+                                return (
+                                  <button key={s.type} onMouseDown={() => applySlash(s.type)}
+                                    className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${slashIdx === gi ? "bg-[#f0f0ef] dark:bg-white/[0.06]" : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"}`}>
+                                    <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
+                                      <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
+                                    </div>
+                                    <div>
+                                      <div className="text-[13px] font-medium text-foreground">{s.label}</div>
+                                      <div className="text-[11px] text-foreground/40">{s.description}</div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </>
+                          )}
                         </>
                       )}
-                      {mediaItems.length > 0 && (
-                        <>
-                          <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">Media</p>
-                          {mediaItems.map(s => {
-                            const Icon = s.icon;
-                            const gi = slashFiltered.indexOf(s);
-                            return (
-                              <button key={s.type} onMouseDown={() => applySlash(s.type)}
-                                className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${slashIdx === gi ? "bg-[#f0f0ef] dark:bg-white/[0.06]" : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"}`}>
-                                <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
-                                  <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
-                                </div>
-                                <div>
-                                  <div className="text-[13px] font-medium text-foreground">{s.label}</div>
-                                  <div className="text-[11px] text-foreground/40">{s.description}</div>
-                                </div>
-                              </button>
-                            );
-                          })}
-                        </>
-                      )}
-                    </>
+                    </div>
                   )}
                 </div>
-              )}
-            </div>
-          ))}
+              );
+            });
+          })()}
 
           {/* Empty state hint */}
           {items.length === 1 && !items[0].text && focusedId !== items[0].id && (
@@ -947,6 +1075,23 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
               Press <kbd className="font-mono text-[11px] border border-foreground/10 rounded px-1 py-0.5">/</kbd> for commands…
             </p>
           )}
+
+          {/* Click-to-add area below all blocks — ensures user can always write after code/media blocks */}
+          <div
+            className="h-40 cursor-text"
+            onClick={() => {
+              const last = items[items.length - 1];
+              if (!last) return;
+              if (!last.text || last.type === "code" || last.type === "image" || last.type === "video" || last.type === "audio" || last.type === "divider" || last.type === "table") {
+                // After non-text blocks, always create a new empty paragraph
+                const newBlock = makeBlock("paragraph");
+                setItems(prev => [...prev, newBlock]);
+                setTimeout(() => focusBlock(newBlock.id), 0);
+              } else {
+                focusBlock(last.id, true);
+              }
+            }}
+          />
         </div>
       </div>
 

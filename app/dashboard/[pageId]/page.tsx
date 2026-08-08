@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { use } from "react";
+import { useRouter } from "next/navigation";
 import { DocumentCanvas } from "@/components/dashboard/document-canvas";
-import { getPage, type Page, type PageBlock } from "@/lib/actions/pages";
+import { getPage, createPage, type Page, type PageBlock } from "@/lib/actions/pages";
 import type { ChecklistItem } from "@/hooks/use-pages";
 
 interface PageRouteProps {
@@ -46,9 +47,9 @@ function toChecklistItem(block: PageBlock): ChecklistItem {
 }
 
 // Individual page route — /dashboard/[pageId]
-// The layout.tsx above provides the Sidebar, TopBar, AI panel, and modals.
 export default function PageRoute({ params }: PageRouteProps) {
   const { pageId } = use(params);
+  const router = useRouter();
   const [page, setPage] = useState<Page | null>(null);
   const [notFound, setNotFound] = useState(false);
 
@@ -68,6 +69,22 @@ export default function PageRoute({ params }: PageRouteProps) {
     () => (page?.blocks ? page.blocks.map(toChecklistItem) : []),
     [page?.blocks]
   );
+
+  // Create a new sub-page and navigate into it
+  const handleSelectSubPage = useCallback(async (title: string) => {
+    try {
+      const newPage = await createPage({
+        title: title || "Untitled",
+        category: "Private",
+      });
+      // Notify sidebar to refresh its page list
+      window.dispatchEvent(new CustomEvent("page-created", { detail: { page: newPage } }));
+      // Navigate to the new page
+      router.push(`/dashboard/${newPage._id}`);
+    } catch (err) {
+      console.error("Failed to create sub-page:", err);
+    }
+  }, [router]);
 
   if (notFound) {
     return (
@@ -92,7 +109,7 @@ export default function PageRoute({ params }: PageRouteProps) {
       pageId={pageId}
       initialBlocks={initialBlocks}
       onOpenAi={() => window.dispatchEvent(new Event("open-quick-ai"))}
-      onSelectSubPage={() => {}}
+      onSelectSubPage={handleSelectSubPage}
     />
   );
 }

@@ -2,9 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import User from "@/lib/models/user";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 export async function POST(request: NextRequest) {
   try {
+    const rateLimit = await checkRateLimit(request, "plan_api", { limit: 20, windowMs: 60000 });
+    if (!rateLimit.success) {
+      return NextResponse.json({ error: "Too many requests. Please try again later." }, { status: 429 });
+    }
+
     const session = await getSession(request);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

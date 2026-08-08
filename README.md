@@ -1,62 +1,116 @@
-# Notion Clone
+# Notion Workspace & Modern SaaS Platform 🚀
 
-A feature-rich, high-performance collaborative workspace application built on Next.js, mimicking the core experience of Notion with real-time editing, document organization, AI assistance, and subscription tiers.
+A feature-rich, enterprise-grade collaborative workspace application built on **Next.js 16 (App Router)** and **MongoDB**, mimicking the core experience of Notion with real-time block editing, Notion Calendar app, advanced code editor with syntax highlighting, AI meeting notes, Markdown/PDF export & import, block comments & @mentions, page revision history, WebGL canvas shaders, and multi-region payment gateway support (Stripe & Razorpay).
 
-## Key Features
+---
 
-- **Document Management:** Create, delete, nest, and organize workspace pages dynamically.
-- **Rich Editor:** Fully functional document editor with page cover image uploads, custom emoji pickers, and real-time content saving.
-- **Notion AI Integration:** In-app AI chat modal helper to summarize, compose, and refine notes.
-- **Premium Subscription & Pricing:**
-  - **Free Tier:** Core access, basic storage, up to 3 AI trial messages.
-  - **Pro Tier:** Up to 5 team members, advanced library, priority support.
-  - **Ultimate Tier:** Unlimited team members, custom domain mapping, dedicated 24/7 support.
-  - **Flexible Billing:** Switch between Monthly and Annual billing options (Annual saves 20% and shows total yearly pricing).
-- **Modern Typography:** Styled globally with the premium, warm geometric font **Plus Jakarta Sans**.
-- **Dark Mode Support:** Clean, native toggling between light and dark themes.
+## 🌟 Comprehensive Feature Overview
 
-## Tech Stack
+### 📄 1. Document & Block-Based Editor
+- **Notion-Grade Block Architecture**: Support for Paragraphs, Headings (`H1`, `H2`, `H3`), Bulleted Lists, Numbered Lists (with relative sequence calculation), Callouts (with click-to-change Emoji Picker), Collapsible Toggle Blocks (with preserved nested child content), Quotes, Dividers, Dynamic Matrix Tables (with `+ Add Row` / `+ Add Column`), and Sub-Pages.
+- **Code Block Editor (`CodeBlock.tsx`)**:
+  - Pinned top-right language selector with **70+ supported languages** and filter search.
+  - Pixel-perfect Notion styling with dark/light mode background integration.
+  - Real-time syntax highlighting (`react-syntax-highlighter` integration).
+  - Floating **"✦ Use AI"** contextual prompt on empty focused code blocks.
+  - Intuitive keyboard navigation: `Enter` stays inside the code block (inserts newline), `Enter` on empty escapes to a new paragraph, and `Tab` / `Shift + Tab` handles indentation.
+- **Debounced Auto-Save (`use-autosave.ts`)**: Automatic background saving with visual status indicators (`Saving...`, `Saved`).
+- **Cover Photos & Custom Emojis**: Dynamic header cover image support and interactive Emoji Picker (`EmojiPicker.tsx`).
+- **Toolbar & Format Bar**: Inline formatting for **Bold**, *Italic*, ~Strikethrough~, Underline, Code formatting, Text Colors, and Highlight Colors.
 
-- **Framework:** Next.js (App Router with Tailwind CSS v4)
-- **Database:** MongoDB (via Mongoose)
-- **Authentication:** NextAuth.js
-- **Icons & Styling:** Lucide React, Tailwind CSS
+### 📅 2. Full Notion Calendar App (`/dashboard/calendar`)
+- **Interactive Views**: Switch seamlessly between **Month**, **Week**, **Day**, and **Agenda** views.
+- **Full Event Lifecycle**: Add, edit, and delete events with date pickers, start/end time selectors, all-day toggles, locations, tags, and multi-line descriptions.
+- **Color Coding**: 8 curated event color themes (`blue`, `red`, `green`, `yellow`, `purple`, `pink`, `orange`, `gray`).
+- **Navigation & Shortcuts**: One-click **Today** navigation button and relative month/week chevron controls.
 
-## Getting Started
+### 🌿 3. Sub-Page Creation & Hierarchical Navigation
+- **Nested Page Links**: Insert a `/page` block anywhere inside a document to generate a sub-page.
+- **Instant Page Generation**: Clicking a sub-page link automatically provisions a new MongoDB page record and navigates directly into the nested route.
+- **Sidebar Integration**: Sub-pages and parent-child hierarchies dynamically update in the sidebar tree.
 
-First, make sure to set up your environment variables (e.g. `MONGODB_URI`, `NEXTAUTH_SECRET`, etc.). Refer to `.env.example` for details.
+### 📥 4. Document Export & Import Suite
+- **Export to Markdown (`.md`)**: One-click export converting page blocks into clean GitHub-flavored Markdown text (`blocksToMarkdown`).
+- **Export / Print to PDF**: Printable PDF export engine formatted with custom CSS typography.
+- **Import Markdown Files (`import-modal.tsx`)**: Drag-and-drop `.md` file importer parsing headings, lists, code snippets, and to-do checkboxes directly into a new Notion workspace page.
 
-Then, run the development server:
+### 💬 5. Block-Level Comments & @User Mentions
+- **Slide-Out Comments Panel (`CommentsPanel.tsx`)**: Real-time document discussion drawer allowing users to view and post comments on documents.
+- **Team @Mentions**: Support for `@username` tags and inline mentions within discussions.
+
+### ⏳ 6. Page Revision History & Snapshot Restoration
+- **Revision History Modal (`history-modal.tsx`)**: View historical edit snapshots with author timestamps.
+- **Checkpoint Creation & Restore**: Create manual checkpoints and restore any past revision snapshot back to the live document.
+
+### 🤖 7. Notion AI Assistant & AI Meeting Notes
+- **In-App AI Assistant Modal (`ai-chat-modal.tsx`)**: Summarize notes, draft outlines, improve writing, or generate action items dynamically.
+- **AI Meeting Notes View (`MeetingNoteView.tsx`)**: Dedicated view to automatically digest transcripts, generate executive meeting minutes, and extract assignees & action items.
+- **AI Usage Tracking & Limits**: Built-in free trial limits (3 trial requests) with seamless upgrade prompts for Pro and Ultimate accounts.
+
+### 🔍 8. Quick Search & Navigation (`Ctrl + K`)
+- **Global Command Palette (`search-modal.tsx`)**: Keyboard shortcut `Ctrl + K` / `Cmd + K` search modal for instant lookup across all workspace page titles and block contents.
+- **Dynamic Tree Hierarchy**: Nested page sidebars with drag-and-drop hierarchy support, quick page creation, collapsible lists, and favorites.
+
+### 💳 9. Multi-Region Payment Gateways & SaaS Checkout (Stripe + Razorpay)
+- **Regional Payment Selection**: Auto-detects region and lets users choose between **USA / Global (Stripe)** and **India (Razorpay)**.
+- **Card & Platform Fee Transparency**: Dynamically renders base subscription costs, regional fee percentages, card processing fees, and net total breakdown.
+- **Stripe Subscriptions**: Automated checkout sessions (`/api/stripe/checkout`) and webhook handling (`/api/stripe/webhook`).
+- **Razorpay Integration**: Native support for Razorpay Order creation (`/api/razorpay/create-order`) and HMAC SHA256 payment signature verification (`/api/razorpay/verify`).
+- **Subscription Tiers**:
+  - **Free Tier**: Core workspace features, up to 3 AI trial prompts.
+  - **Pro Tier**: Advanced editor capabilities, unlimited AI usage, up to 5 team members ($10/mo or ₹499/mo).
+  - **Ultimate Tier**: Unlimited team members, custom domain mapping, 24/7 dedicated support ($25/mo or ₹999/mo).
+
+### 🛡️ 10. Security, Performance & Monitoring
+- **Rate Limiting Protection (`lib/ratelimit.ts`)**: `@upstash/ratelimit` integration with sliding-window token bucket fallback protecting API routes (`/api/user/plan`).
+- **HTTP Security Headers**: Enforced `X-Frame-Options: DENY`, `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, HSTS, and `Permissions-Policy` via `next.config.ts` and `proxy.ts`.
+- **Observability & Analytics**: Universal error logging wrapper (`lib/logger.ts`) with Sentry integration and PostHog / Mixpanel event tracking (`lib/analytics.ts`).
+
+---
+
+## 🛠️ Tech Stack & Architecture
+
+- **Framework**: Next.js 16 (App Router with React 19)
+- **Styling**: Tailwind CSS v4, Lucide React icons, Sonner toast notifications
+- **Syntax Highlighting**: `react-syntax-highlighter` (Atom One Dark theme & CJS loader)
+- **Interactive Graphics**: OGL (WebGL framework for 3D animated background canvas)
+- **Database**: MongoDB (Mongoose models for User, Page, Block, Comment, Revision)
+- **Authentication**: NextAuth.js (Credentials + OAuth for Google, GitHub, Apple, Facebook)
+- **Payment Gateways**: Stripe Node SDK & Razorpay API (HMAC SHA256 verification)
+- **Rate Limiting**: Upstash Redis & In-Memory Sliding Window
+- **Containerization**: Multi-stage Docker build (`Dockerfile`)
+- **CI/CD**: GitHub Actions workflow (`.github/workflows/ci-cd.yml`)
+
+---
+
+## 🔑 Environment Setup
+
+Copy `.env.example` to create your local `.env` configuration file:
 
 ```bash
+cp .env.example .env
+```
+
+---
+
+## ⚙️ Development & Build Commands
+
+```bash
+# Install dependencies
+npm install
+
+# Run dev server
 npm run dev
-```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+# Lint code
+npm run lint
 
-## Building for Production
+# TypeScript check
+npx tsc --noEmit
 
-To create an optimized production build:
-
-```bash
+# Build production bundle
 npm run build
-```
 
-And start the production server:
-
-```bash
+# Start production server
 npm run start
 ```
-
-## Environments & CI/CD Pipeline
-
-### 🌐 Environments Setup
-- **Staging (`.env.staging`)**: Connects to the staging MongoDB instance (`notion_staging`) for integration testing and pre-release feature verification.
-- **Production (`.env.production`)**: Connects to the primary MongoDB cluster (`notion_prod`) for live user data.
-
-### ⚙️ GitHub Actions CI/CD
-Automated workflow located at `.github/workflows/ci-cd.yml` performs:
-1. **Lint & Typecheck**: Executes `npm run lint` and `npx tsc --noEmit` on every pull request or push to `main`/`staging`.
-2. **Build Validation**: Validates full Next.js production build (`npm run build`).
-3. **Deployment**: Triggers automated deployment for target branch (`staging` vs `main`).
-

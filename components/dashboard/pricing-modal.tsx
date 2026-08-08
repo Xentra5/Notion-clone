@@ -1,9 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { X, Check, Sparkles, Shield, Building2 } from "lucide-react";
+import { X, Check, Sparkles, Building2 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 interface PricingModalProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface PricingModalProps {
 
 export function PricingModal({ isOpen, onClose, onUpgradeSuccess }: PricingModalProps) {
   const { data: session, update } = useSession();
+  const router = useRouter();
   const [isAnnual, setIsAnnual] = useState(true);
   const [loading, setLoading] = useState(false);
 
@@ -21,6 +23,13 @@ export function PricingModal({ isOpen, onClose, onUpgradeSuccess }: PricingModal
   const handlePurchase = async (plan: string) => {
     if (plan === "enterprise") {
       onClose();
+      router.push("/request-demo");
+      return;
+    }
+    if (plan === "pro" || plan === "ultimate") {
+      onClose();
+      const billingParam = isAnnual ? "annual" : "monthly";
+      router.push(`/checkout?plan=${plan}&billing=${billingParam}`);
       return;
     }
     setLoading(true);
@@ -44,186 +53,203 @@ export function PricingModal({ isOpen, onClose, onUpgradeSuccess }: PricingModal
     }
   };
 
+  const currentPlan = session?.user?.plan || "free";
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-200">
-      <div className="relative w-full max-w-6xl bg-[#121212] border border-[#2a2a2a] rounded-3xl shadow-2xl p-6 md:p-8 text-white overflow-y-auto max-h-[92vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 font-sans animate-in fade-in duration-150 select-text">
+      <div className="relative w-full max-w-5xl bg-[#121215] border border-[#27272a] rounded-2xl shadow-2xl p-6 md:p-8 text-zinc-100 overflow-y-auto max-h-[90vh]">
         {/* Close button */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 p-2 rounded-full text-neutral-400 hover:text-white hover:bg-[#252525] transition"
+          className="absolute top-5 right-5 p-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-[#27272a] transition"
           aria-label="Close modal"
         >
-          <X className="h-5 w-5" />
+          <X className="h-4 w-4" />
         </button>
 
-        {/* Header Title */}
+        {/* Header */}
         <div className="text-center mb-8">
-          <span className="text-xs font-extrabold uppercase tracking-widest text-[#0078df]">
-            Workspace Upgrade
-          </span>
-          <h1 className="text-3xl md:text-4xl font-[850] tracking-tight text-white mt-1 mb-2">
-            Pricing Plans &amp; Enterprise
-          </h1>
-          <p className="text-neutral-400 text-sm max-w-md mx-auto font-medium">
-            Choose the right plan to power up your workspace with AI tools, team collaboration, and security.
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
+            Plans &amp; Pricing
+          </h2>
+          <p className="text-zinc-400 text-xs md:text-sm max-w-md mx-auto mt-1.5 font-normal">
+            Select the best plan for your team and workspace collaboration.
           </p>
 
-          {/* Billing Toggle */}
-          <div className="flex items-center justify-center gap-3 mt-6">
-            <span className={`text-xs font-extrabold ${!isAnnual ? "text-white" : "text-neutral-400"}`}>
-              Monthly billing
-            </span>
+          {/* Segmented Billing Toggle */}
+          <div className="inline-flex items-center gap-1 mt-5 p-1 rounded-xl bg-[#18181b] border border-[#27272a]">
             <button
-              onClick={() => setIsAnnual(!isAnnual)}
-              className="relative inline-flex h-6 w-12 shrink-0 cursor-pointer rounded-full bg-[#2a2a2a] p-0.5 transition-colors duration-200 ease-in-out hover:bg-[#333]"
-              aria-label="Toggle annual billing"
+              type="button"
+              onClick={() => setIsAnnual(false)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition ${
+                !isAnnual ? "bg-[#27272a] text-white shadow-xs" : "text-zinc-400 hover:text-zinc-200"
+              }`}
             >
-              <span
-                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-[#0078df] shadow-md transition duration-200 ease-in-out ${
-                  isAnnual ? "translate-x-6" : "translate-x-0"
-                }`}
-              />
+              Monthly billing
             </button>
-            <span className={`text-xs font-extrabold flex items-center gap-1.5 ${isAnnual ? "text-white" : "text-neutral-400"}`}>
-              Annual billing
-              <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800/80 px-2 py-0.5 rounded-full font-extrabold">
-                Save 20%
+            <button
+              type="button"
+              onClick={() => setIsAnnual(true)}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                isAnnual ? "bg-[#27272a] text-white shadow-xs" : "text-zinc-400 hover:text-zinc-200"
+              }`}
+            >
+              <span>Annual billing</span>
+              <span className="text-[10px] font-bold text-emerald-400 bg-emerald-950/60 border border-emerald-800/40 px-1.5 py-0.5 rounded-md">
+                20% off
               </span>
-            </span>
+            </button>
           </div>
         </div>
 
-        {/* 4 Cards Grid: Free, Plus, Business, Enterprise */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {/* 4 Cards Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Free Plan */}
-          <div className="flex flex-col justify-between p-6 bg-[#1a1a1a] border border-[#2b2b2b] rounded-2xl shadow-sm hover:border-[#444] transition-all">
+          <div className="flex flex-col justify-between p-5 bg-[#18181b] border border-[#27272a] rounded-xl hover:border-[#3f3f46] transition">
             <div>
-              <h3 className="text-xl font-extrabold text-white mb-1">Free</h3>
-              <p className="text-xs font-medium text-neutral-400 mb-4 min-h-[32px]">
-                For individuals getting organized
+              <h3 className="text-base font-bold text-white mb-1">Free</h3>
+              <p className="text-xs text-zinc-400 mb-4 min-h-[32px]">
+                For personal notes &amp; organizing
               </p>
-              <div className="flex items-baseline mb-6 border-b border-[#2b2b2b] pb-4">
-                <span className="text-4xl font-extrabold text-white">$0</span>
-                <span className="text-xs font-bold text-neutral-400 ml-1">/ forever</span>
+              <div className="border-b border-[#27272a] pb-4 mb-4">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-3xl font-bold text-white">$0</span>
+                  <span className="text-xs text-zinc-400">/ month</span>
+                </div>
+                <span className="text-[11px] text-zinc-500 block mt-1">Free forever</span>
               </div>
 
-              <ul className="space-y-3 text-xs font-bold text-neutral-300 mb-8">
+              <ul className="space-y-2.5 text-xs text-zinc-300 mb-6">
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
-                  <span>Single user workspace</span>
+                  <Check className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                  <span>1 user workspace</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   <span>5 guest collaborators</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
-                  <span>Basic page analytics</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
-                  <span>7-day version history</span>
+                  <Check className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
+                  <span>7-day page history</span>
                 </li>
               </ul>
             </div>
 
             <button
-              disabled={session?.user?.plan === "free"}
+              disabled={currentPlan === "free"}
               onClick={() => handlePurchase("free")}
-              className="w-full py-3 rounded-xl border border-[#333] font-extrabold text-xs sm:text-sm text-center bg-[#252525] hover:bg-[#303030] text-white disabled:opacity-50 transition cursor-pointer"
+              className="w-full py-2 rounded-lg border border-[#27272a] font-semibold text-xs text-center bg-[#121215] hover:bg-[#27272a] text-zinc-300 disabled:opacity-40 transition cursor-pointer"
             >
-              {session?.user?.plan === "free" ? "Current Plan" : "Downgrade"}
+              {currentPlan === "free" ? "Current Plan" : "Downgrade"}
             </button>
           </div>
 
-          {/* Plus Plan (Popular) */}
-          <div className="flex flex-col justify-between p-6 bg-gradient-to-b from-[#182638] to-[#121c2b] border-2 border-[#0078df] rounded-2xl shadow-xl shadow-blue-950/30 relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-[#0078df] text-white text-[10px] font-extrabold tracking-wider uppercase px-3 py-1 rounded-bl-xl flex items-center gap-1">
+          {/* Plus Plan (Most Popular) */}
+          <div className="flex flex-col justify-between p-5 bg-[#18181b] border-2 border-blue-500/80 rounded-xl relative shadow-lg">
+            <div className="absolute -top-3 left-4 bg-blue-600 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full flex items-center gap-1">
               <Sparkles className="h-3 w-3" /> Most Popular
             </div>
 
             <div>
-              <h3 className="text-xl font-extrabold text-white mb-1">Plus</h3>
-              <p className="text-xs font-medium text-blue-200/80 mb-4 min-h-[32px]">
-                For small teams planning together
+              <h3 className="text-base font-bold text-white mb-1 mt-1">Plus</h3>
+              <p className="text-xs text-zinc-400 mb-4 min-h-[32px]">
+                For small teams &amp; active projects
               </p>
-              <div className="flex items-baseline mb-6 border-b border-blue-900/50 pb-4">
-                <span className="text-4xl font-extrabold text-white">
-                  {isAnnual ? "$10" : "$12"}
-                </span>
-                <span className="text-xs font-bold text-blue-200/80 ml-1">
-                  / seat / month
-                </span>
+
+              <div className="border-b border-[#27272a] pb-4 mb-4">
+                <div className="flex items-baseline gap-1.5">
+                  {isAnnual ? (
+                    <>
+                      <span className="text-base text-zinc-500 line-through font-medium">$12</span>
+                      <span className="text-3xl font-bold text-white">$10</span>
+                    </>
+                  ) : (
+                    <span className="text-3xl font-bold text-white">$12</span>
+                  )}
+                  <span className="text-xs text-zinc-400">/ seat / mo</span>
+                </div>
+                {isAnnual ? (
+                  <span className="text-[11px] font-medium text-emerald-400 block mt-1">
+                    $120 billed yearly (save $24)
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-zinc-500 block mt-1">Billed monthly</span>
+                )}
               </div>
 
-              <ul className="space-y-3 text-xs font-bold text-white mb-8">
+              <ul className="space-y-2.5 text-xs text-zinc-200 mb-6">
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                   <span>Unlimited team blocks</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                   <span>100 guest collaborators</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                   <span>Priority AI search</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-blue-400 shrink-0" />
                   <span>30-day page history</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
-                  <span>Unlimited file uploads</span>
                 </li>
               </ul>
             </div>
 
             <button
               onClick={() => handlePurchase("pro")}
-              disabled={loading || session?.user?.plan === "pro"}
-              className="w-full py-3 rounded-xl bg-[#0078df] hover:bg-[#0066bd] text-white font-extrabold text-xs sm:text-sm text-center shadow-lg transition disabled:opacity-50 cursor-pointer"
+              disabled={loading || currentPlan === "pro"}
+              className="w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs text-center shadow-sm transition disabled:opacity-50 cursor-pointer"
             >
-              {session?.user?.plan === "pro" ? "Current Plan" : loading ? "Upgrading..." : "Upgrade to Plus"}
+              {currentPlan === "pro" ? "Current Plan" : loading ? "Loading..." : "Upgrade to Plus"}
             </button>
           </div>
 
           {/* Business Plan */}
-          <div className="flex flex-col justify-between p-6 bg-[#1a1a1a] border border-[#2b2b2b] rounded-2xl shadow-sm hover:border-[#444] transition-all">
+          <div className="flex flex-col justify-between p-5 bg-[#18181b] border border-[#27272a] rounded-xl hover:border-[#3f3f46] transition">
             <div>
-              <h3 className="text-xl font-extrabold text-white mb-1">Business</h3>
-              <p className="text-xs font-medium text-neutral-400 mb-4 min-h-[32px]">
+              <h3 className="text-base font-bold text-white mb-1">Business</h3>
+              <p className="text-xs text-zinc-400 mb-4 min-h-[32px]">
                 For growing companies &amp; orgs
               </p>
-              <div className="flex items-baseline mb-6 border-b border-[#2b2b2b] pb-4">
-                <span className="text-4xl font-extrabold text-white">
-                  {isAnnual ? "$18" : "$22"}
-                </span>
-                <span className="text-xs font-bold text-neutral-400 ml-1">
-                  / seat / month
-                </span>
+
+              <div className="border-b border-[#27272a] pb-4 mb-4">
+                <div className="flex items-baseline gap-1.5">
+                  {isAnnual ? (
+                    <>
+                      <span className="text-base text-zinc-500 line-through font-medium">$22</span>
+                      <span className="text-3xl font-bold text-white">$18</span>
+                    </>
+                  ) : (
+                    <span className="text-3xl font-bold text-white">$22</span>
+                  )}
+                  <span className="text-xs text-zinc-400">/ seat / mo</span>
+                </div>
+                {isAnnual ? (
+                  <span className="text-[11px] font-medium text-emerald-400 block mt-1">
+                    $216 billed yearly (save $48)
+                  </span>
+                ) : (
+                  <span className="text-[11px] text-zinc-500 block mt-1">Billed monthly</span>
+                )}
               </div>
 
-              <ul className="space-y-3 text-xs font-bold text-neutral-300 mb-8">
+              <ul className="space-y-2.5 text-xs text-zinc-300 mb-6">
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   <span>Everything in Plus</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   <span>SAML SSO authentication</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   <span>Private team spaces</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
-                  <span>250 guest collaborators</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-[#0078df] stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-zinc-400 shrink-0" />
                   <span>90-day version history</span>
                 </li>
               </ul>
@@ -231,48 +257,43 @@ export function PricingModal({ isOpen, onClose, onUpgradeSuccess }: PricingModal
 
             <button
               onClick={() => handlePurchase("ultimate")}
-              disabled={loading || session?.user?.plan === "ultimate"}
-              className="w-full py-3 rounded-xl bg-white hover:bg-neutral-200 text-black font-extrabold text-xs sm:text-sm text-center shadow-md transition disabled:opacity-50 cursor-pointer"
+              disabled={loading || currentPlan === "ultimate"}
+              className="w-full py-2 rounded-lg bg-white hover:bg-zinc-200 text-black font-semibold text-xs text-center shadow-xs transition disabled:opacity-50 cursor-pointer"
             >
-              {session?.user?.plan === "ultimate" ? "Current Plan" : loading ? "Upgrading..." : "Upgrade to Business"}
+              {currentPlan === "ultimate" ? "Current Plan" : loading ? "Loading..." : "Upgrade to Business"}
             </button>
           </div>
 
           {/* Enterprise Plan */}
-          <div className="flex flex-col justify-between p-6 bg-gradient-to-b from-[#251936] to-[#181124] border border-purple-500/50 rounded-2xl shadow-xl shadow-purple-950/30 relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-purple-600 text-white text-[10px] font-extrabold tracking-wider uppercase px-3 py-1 rounded-bl-xl flex items-center gap-1">
-              <Building2 className="h-3 w-3" /> Enterprise
-            </div>
-
+          <div className="flex flex-col justify-between p-5 bg-[#18181b] border border-[#27272a] rounded-xl hover:border-[#3f3f46] transition">
             <div>
-              <h3 className="text-xl font-extrabold text-white mb-1">Enterprise</h3>
-              <p className="text-xs font-medium text-purple-200/80 mb-4 min-h-[32px]">
+              <h3 className="text-base font-bold text-white mb-1">Enterprise</h3>
+              <p className="text-xs text-zinc-400 mb-4 min-h-[32px]">
                 Advanced security &amp; controls
               </p>
-              <div className="flex items-baseline mb-6 border-b border-purple-900/50 pb-4">
-                <span className="text-3xl font-extrabold text-white">Custom</span>
-                <span className="text-xs font-bold text-purple-200/80 ml-1">/ tailored billing</span>
+
+              <div className="border-b border-[#27272a] pb-4 mb-4">
+                <div className="flex items-baseline gap-1">
+                  <span className="text-2xl font-bold text-white">Custom</span>
+                </div>
+                <span className="text-[11px] text-zinc-500 block mt-1">Tailored billing</span>
               </div>
 
-              <ul className="space-y-3 text-xs font-bold text-white mb-8">
+              <ul className="space-y-2.5 text-xs text-zinc-300 mb-6">
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400 stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-purple-400 shrink-0" />
                   <span>Everything in Business</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400 stroke-[3] shrink-0" />
-                  <span>User SCIM provisioning</span>
+                  <Check className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                  <span>SCIM user provisioning</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400 stroke-[3] shrink-0" />
-                  <span>Advanced Audit Log exporting</span>
+                  <Check className="h-3.5 w-3.5 text-purple-400 shrink-0" />
+                  <span>Audit log exporting</span>
                 </li>
                 <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400 stroke-[3] shrink-0" />
-                  <span>Workspace DLP security</span>
-                </li>
-                <li className="flex items-center gap-2">
-                  <Check className="h-4 w-4 text-purple-400 stroke-[3] shrink-0" />
+                  <Check className="h-3.5 w-3.5 text-purple-400 shrink-0" />
                   <span>Dedicated CSM &amp; 99.9% SLA</span>
                 </li>
               </ul>
@@ -280,9 +301,9 @@ export function PricingModal({ isOpen, onClose, onUpgradeSuccess }: PricingModal
 
             <Link href="/request-demo" onClick={onClose}>
               <button
-                className="w-full py-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-extrabold text-xs sm:text-sm text-center shadow-lg transition cursor-pointer"
+                className="w-full py-2 rounded-lg border border-[#27272a] hover:bg-[#27272a] text-white font-semibold text-xs text-center transition cursor-pointer"
               >
-                Request Enterprise Demo
+                Contact Sales
               </button>
             </Link>
           </div>

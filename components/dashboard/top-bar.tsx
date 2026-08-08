@@ -16,8 +16,17 @@ import {
   Users,
   Trash2,
   SquarePen,
+  FileDown,
+  Printer,
+  Upload,
+  History as HistoryIcon,
+  MessageSquare,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
+import { ImportModal } from "@/components/dashboard/modals/import-modal";
+import { HistoryModal } from "@/components/dashboard/modals/history-modal";
+import { CommentsPanel } from "@/components/dashboard/editor/CommentsPanel";
+import { blocksToMarkdown, downloadMarkdownFile, exportToPdfPrint } from "@/lib/export-import";
 
 function formatRelativeTime(dateInput?: string | Date | null): string {
   if (!dateInput) return "Edited just now";
@@ -46,6 +55,7 @@ interface TopBarProps {
   activeTitle: string;
   pageId?: string;
   updatedAt?: string | Date;
+  blocks?: any[];
   onToggleSidebar?: () => void;
   onToggleAi: () => void;
   isAiOpen?: boolean;
@@ -56,6 +66,7 @@ export function TopBar({
   activeTitle,
   pageId,
   updatedAt,
+  blocks = [],
   onToggleSidebar,
   onToggleAi,
   isAiOpen,
@@ -70,6 +81,11 @@ export function TopBar({
   const [lastEdited, setLastEdited] = useState<string | Date | null>(updatedAt || null);
   const [isRenamingTitle, setIsRenamingTitle] = useState(false);
   const [renameTitleValue, setRenameTitleValue] = useState(activeTitle);
+
+  // Modals state
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showCommentsPanel, setShowCommentsPanel] = useState(false);
 
   useEffect(() => {
     setLastEdited(updatedAt || null);
@@ -111,232 +127,300 @@ export function TopBar({
     setTimeout(() => setCopied(false), 2000);
   }
 
-  return (
-    <header className="h-11 border-b border-border bg-background px-3 flex items-center justify-between text-xs text-muted-foreground select-none shrink-0 font-sans">
-      {/* Left section: Sidebar toggle & Breadcrumbs */}
-      <div className="flex items-center gap-2 overflow-hidden">
-        {onToggleSidebar && (
-          <button
-            onClick={onToggleSidebar}
-            className="p-1 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] text-neutral-600 dark:text-[#9b9b9b] hover:text-neutral-900 dark:hover:text-white transition md:hidden"
-            title="Toggle Sidebar"
-          >
-            <SidebarIcon className="h-4 w-4" />
-          </button>
-        )}
+  function handleExportMarkdown() {
+    setShowMoreMenu(false);
+    const md = blocksToMarkdown(activeTitle, blocks);
+    downloadMarkdownFile(activeTitle || "notion-export", md);
+    toast.success("Exported page as Markdown");
+  }
 
-        <div className="flex items-center gap-1.5 font-medium text-foreground truncate">
-          {isRenamingTitle ? (
-            <input
-              autoFocus
-              value={renameTitleValue}
-              onFocus={(e) => e.target.select()}
-              onChange={(e) => setRenameTitleValue(e.target.value)}
-              onBlur={() => void handleFinishTitleRename()}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                }
-                if (e.key === "Escape") {
-                  setIsRenamingTitle(false);
-                  setRenameTitleValue(activeTitle);
-                }
-              }}
-              className="min-w-[120px] max-w-[200px] bg-background border border-primary rounded px-1.5 py-0.5 text-xs outline-none font-semibold text-foreground shadow-sm"
-            />
-          ) : (
-            <div className="flex items-center gap-1 group/title">
-              <span
-                className="hover:text-foreground/80 transition cursor-pointer truncate font-semibold"
-                onDoubleClick={() => {
-                  if (pageId) {
-                    setRenameTitleValue(activeTitle);
-                    setIsRenamingTitle(true);
-                  }
-                }}
-                title="Double-click to rename"
-              >
-                {activeTitle}
-              </span>
-              {pageId && (
-                <button
-                  onClick={() => {
-                    setRenameTitleValue(activeTitle);
-                    setIsRenamingTitle(true);
-                  }}
-                  className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-accent rounded text-muted-foreground transition"
-                  title="Rename page"
-                >
-                  <SquarePen className="h-3 w-3" />
-                </button>
-              )}
-            </div>
+  function handleExportPdf() {
+    setShowMoreMenu(false);
+    exportToPdfPrint(activeTitle, blocks);
+  }
+
+  return (
+    <>
+      <header className="h-11 border-b border-border bg-background px-3 flex items-center justify-between text-xs text-muted-foreground select-none shrink-0 font-sans">
+        {/* Left section: Sidebar toggle & Breadcrumbs */}
+        <div className="flex items-center gap-2 overflow-hidden">
+          {onToggleSidebar && (
+            <button
+              onClick={onToggleSidebar}
+              className="p-1 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] text-neutral-600 dark:text-[#9b9b9b] hover:text-neutral-900 dark:hover:text-white transition md:hidden"
+              title="Toggle Sidebar"
+            >
+              <SidebarIcon className="h-4 w-4" />
+            </button>
           )}
 
-          {/* Permission Dropdown */}
+          <div className="flex items-center gap-1.5 font-medium text-foreground truncate">
+            {isRenamingTitle ? (
+              <input
+                autoFocus
+                value={renameTitleValue}
+                onFocus={(e) => e.target.select()}
+                onChange={(e) => setRenameTitleValue(e.target.value)}
+                onBlur={() => void handleFinishTitleRename()}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.currentTarget.blur();
+                  }
+                  if (e.key === "Escape") {
+                    setIsRenamingTitle(false);
+                    setRenameTitleValue(activeTitle);
+                  }
+                }}
+                className="min-w-[120px] max-w-[200px] bg-background border border-primary rounded px-1.5 py-0.5 text-xs outline-none font-semibold text-foreground shadow-sm"
+              />
+            ) : (
+              <div className="flex items-center gap-1 group/title">
+                <span
+                  className="hover:text-foreground/80 transition cursor-pointer truncate font-semibold"
+                  onDoubleClick={() => {
+                    if (pageId) {
+                      setRenameTitleValue(activeTitle);
+                      setIsRenamingTitle(true);
+                    }
+                  }}
+                  title="Double-click to rename"
+                >
+                  {activeTitle}
+                </span>
+                {pageId && (
+                  <button
+                    onClick={() => {
+                      setRenameTitleValue(activeTitle);
+                      setIsRenamingTitle(true);
+                    }}
+                    className="opacity-0 group-hover/title:opacity-100 p-0.5 hover:bg-accent rounded text-muted-foreground transition"
+                    title="Rename page"
+                  >
+                    <SquarePen className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Permission Dropdown */}
+            <div className="relative">
+              <button
+                onClick={() => setShowPermissionDropdown(!showPermissionDropdown)}
+                className="flex items-center gap-1 text-[11px] text-muted-foreground hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground px-1.5 py-0.5 rounded transition"
+              >
+                <Lock className="h-3 w-3" />
+                <span>{permission}</span>
+                <ChevronDown className="h-3 w-3" />
+              </button>
+
+              {showPermissionDropdown && (
+                <div className="absolute left-0 top-full mt-1 w-44 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 text-xs text-popover-foreground">
+                  <button
+                    onClick={() => {
+                      setPermission("Private");
+                      setShowPermissionDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
+                  >
+                    <Lock className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>Private</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPermission("Workspace");
+                      setShowPermissionDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
+                  >
+                    <Users className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>Workspace</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      setPermission("Public");
+                      setShowPermissionDropdown(false);
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
+                  >
+                    <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>Public Web</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Right section: Metadata & Page Actions */}
+        <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          <span className="hidden sm:inline-block text-[11px] text-muted-foreground mr-1">
+            {formatRelativeTime(lastEdited)}
+          </span>
+
+          {/* Comments Panel Button */}
+          <button
+            onClick={() => setShowCommentsPanel(!showCommentsPanel)}
+            className={`p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] transition ${
+              showCommentsPanel ? "text-primary bg-primary/10" : "text-muted-foreground"
+            }`}
+            title="Comments & Mentions"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+          </button>
+
+          {/* Version History Button */}
+          {pageId && (
+            <button
+              onClick={() => setShowHistoryModal(true)}
+              className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
+              title="Page Revision History"
+            >
+              <HistoryIcon className="h-3.5 w-3.5" />
+            </button>
+          )}
+
+          {/* Share Button */}
           <div className="relative">
             <button
-              onClick={() => setShowPermissionDropdown(!showPermissionDropdown)}
-              className="flex items-center gap-1 text-[11px] text-muted-foreground hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground px-1.5 py-0.5 rounded transition"
+              onClick={() => setShowShareMenu(!showShareMenu)}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-xs font-semibold text-foreground"
             >
-              <Lock className="h-3 w-3" />
-              <span>{permission}</span>
+              <Lock className="h-3 w-3 text-muted-foreground" />
+              <span>Share</span>
               <ChevronDown className="h-3 w-3" />
             </button>
 
-            {showPermissionDropdown && (
-              <div className="absolute left-0 top-full mt-1 w-44 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 text-xs text-popover-foreground">
+            {showShareMenu && (
+              <div className="absolute right-0 top-full mt-1 w-72 bg-popover border border-border rounded-2xl shadow-2xl p-3.5 z-50 text-xs text-popover-foreground animate-in fade-in duration-100">
+                <div className="flex items-center justify-between pb-2 border-b border-border mb-3">
+                  <span className="font-bold text-foreground">Share page</span>
+                  <span className="text-[10px] text-muted-foreground bg-background border border-border px-2 py-0.5 rounded-full font-medium">
+                    {permission}
+                  </span>
+                </div>
+                <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
+                  Only you have access to this page. Invite others to start collaborating.
+                </p>
                 <button
-                  onClick={() => {
-                    setPermission("Private");
-                    setShowPermissionDropdown(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
+                  onClick={handleCopyLink}
+                  className="w-full flex items-center justify-center gap-2 bg-[#0078df] hover:bg-[#0067c2] text-white py-2 px-3 rounded-xl font-semibold transition shadow-sm"
                 >
-                  <Lock className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>Private</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setPermission("Workspace");
-                    setShowPermissionDropdown(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
-                >
-                  <Users className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>Workspace</span>
-                </button>
-                <button
-                  onClick={() => {
-                    setPermission("Public");
-                    setShowPermissionDropdown(false);
-                  }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
-                >
-                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>Public Web</span>
+                  <LinkIcon className="h-3.5 w-3.5" />
+                  <span>{copied ? "Link Copied!" : "Copy link"}</span>
                 </button>
               </div>
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Right section: Metadata & Page Actions */}
-      <div className="flex items-center gap-1 sm:gap-2 shrink-0">
-        <span className="hidden sm:inline-block text-[11px] text-muted-foreground mr-1">
-          {formatRelativeTime(lastEdited)}
-        </span>
-
-        {/* Share Button */}
-        <div className="relative">
+          {/* Link Button */}
           <button
-            onClick={() => setShowShareMenu(!showShareMenu)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-xs font-semibold text-foreground"
-          >
-            <Lock className="h-3 w-3 text-muted-foreground" />
-            <span>Share</span>
-            <ChevronDown className="h-3 w-3" />
-          </button>
-
-          {showShareMenu && (
-            <div className="absolute right-0 top-full mt-1 w-72 bg-popover border border-border rounded-2xl shadow-2xl p-3.5 z-50 text-xs text-popover-foreground animate-in fade-in duration-100">
-              <div className="flex items-center justify-between pb-2 border-b border-border mb-3">
-                <span className="font-bold text-foreground">Share page</span>
-                <span className="text-[10px] text-muted-foreground bg-background border border-border px-2 py-0.5 rounded-full font-medium">
-                  {permission}
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
-                Only you have access to this page. Invite others to start collaborating.
-              </p>
-              <button
-                onClick={handleCopyLink}
-                className="w-full flex items-center justify-center gap-2 bg-[#0078df] hover:bg-[#0067c2] text-white py-2 px-3 rounded-xl font-semibold transition shadow-sm"
-              >
-                <LinkIcon className="h-3.5 w-3.5" />
-                <span>{copied ? "Link Copied!" : "Copy link"}</span>
-              </button>
-            </div>
-          )}
-        </div>
-
-        {/* Link Button */}
-        <button
-          onClick={handleCopyLink}
-          className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
-          title="Copy link"
-        >
-          {copied ? (
-            <Check className="h-3.5 w-3.5 text-emerald-500" />
-          ) : (
-            <LinkIcon className="h-3.5 w-3.5" />
-          )}
-        </button>
-
-        {/* Favorite / Star */}
-        <button
-          onClick={() => setIsStarred(!isStarred)}
-          className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
-          title="Favorite page"
-        >
-          <Star
-            className={`h-3.5 w-3.5 transition-colors ${
-              isStarred ? "fill-amber-500 text-amber-500 font-bold" : ""
-            }`}
-          />
-        </button>
-
-        {/* More Options */}
-        <div className="relative">
-          <button
-            onClick={() => setShowMoreMenu(!showMoreMenu)}
+            onClick={handleCopyLink}
             className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
-            title="More options"
+            title="Copy link"
           >
-            <MoreHorizontal className="h-3.5 w-3.5" />
+            {copied ? (
+              <Check className="h-3.5 w-3.5 text-emerald-500" />
+            ) : (
+              <LinkIcon className="h-3.5 w-3.5" />
+            )}
           </button>
 
-          {showMoreMenu && (
-            <div className="absolute right-0 top-full mt-1 w-44 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 text-xs text-popover-foreground">
-              {pageId && onDeletePage ? (
+          {/* Favorite / Star */}
+          <button
+            onClick={() => setIsStarred(!isStarred)}
+            className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
+            title="Favorite page"
+          >
+            <Star
+              className={`h-3.5 w-3.5 transition-colors ${
+                isStarred ? "fill-amber-500 text-amber-500 font-bold" : ""
+              }`}
+            />
+          </button>
+
+          {/* More Options */}
+          <div className="relative">
+            <button
+              onClick={() => setShowMoreMenu(!showMoreMenu)}
+              className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
+              title="More options"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </button>
+
+            {showMoreMenu && (
+              <div className="absolute right-0 top-full mt-1 w-48 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 text-xs text-popover-foreground">
                 <button
                   onClick={() => {
                     setShowMoreMenu(false);
-                    onDeletePage(pageId);
+                    setShowImportModal(true);
                   }}
-                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 transition text-left"
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-left transition"
                 >
-                  <Trash2 className="h-3.5 w-3.5" />
-                  <span>Delete page</span>
+                  <Upload className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Import Markdown</span>
                 </button>
-              ) : (
-                <div className="px-2.5 py-1.5 text-muted-foreground">No actions available</div>
-              )}
-            </div>
-          )}
+                <button
+                  onClick={handleExportMarkdown}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-left transition"
+                >
+                  <FileDown className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Export as Markdown</span>
+                </button>
+                <button
+                  onClick={handleExportPdf}
+                  className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-left transition"
+                >
+                  <Printer className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Export / Print PDF</span>
+                </button>
+                <div className="h-[1px] bg-border my-1" />
+                {pageId && onDeletePage ? (
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      onDeletePage(pageId);
+                    }}
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 transition text-left"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                    <span>Delete page</span>
+                  </button>
+                ) : null}
+              </div>
+            )}
+          </div>
+
+          {/* Theme Toggle option */}
+          <div className="h-7 w-[1px] bg-border mx-1" />
+          <ThemeToggle />
+          <div className="h-7 w-[1px] bg-border mx-1" />
+
+          {/* Notion AI Toggle Button */}
+          <button
+            onClick={onToggleAi}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ml-1 ${
+              isAiOpen
+                ? "bg-purple-900/30 border border-purple-800/50 text-purple-600 dark:text-purple-300"
+                : "hover:bg-neutral-200 dark:hover:bg-[#252525] text-purple-500 dark:text-purple-400"
+            }`}
+            title="Toggle Notion AI Side Panel"
+          >
+            <Sparkles className="h-3.5 w-3.5 fill-purple-500/20" />
+            <span className="hidden sm:inline">Notion AI</span>
+          </button>
         </div>
+      </header>
 
-        {/* Theme Toggle option */}
-        <div className="h-7 w-[1px] bg-border mx-1" />
-        <ThemeToggle />
-        <div className="h-7 w-[1px] bg-border mx-1" />
-
-        {/* Notion AI Toggle Button */}
-        <button
-          onClick={onToggleAi}
-          className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ml-1 ${
-            isAiOpen
-              ? "bg-purple-900/30 border border-purple-800/50 text-purple-600 dark:text-purple-300"
-              : "hover:bg-neutral-200 dark:hover:bg-[#252525] text-purple-500 dark:text-purple-400"
-          }`}
-          title="Toggle Notion AI Side Panel"
-        >
-          <Sparkles className="h-3.5 w-3.5 fill-purple-500/20" />
-          <span className="hidden sm:inline">Notion AI</span>
-        </button>
-      </div>
-    </header>
+      {/* Modals & Slideouts */}
+      <ImportModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} />
+      <HistoryModal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} pageId={pageId} />
+      {showCommentsPanel && (
+        <div className="fixed right-0 top-11 bottom-0 z-40">
+          <CommentsPanel isOpen={showCommentsPanel} onClose={() => setShowCommentsPanel(false)} pageId={pageId} />
+        </div>
+      )}
+    </>
   );
 }

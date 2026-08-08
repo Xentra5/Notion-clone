@@ -1,6 +1,5 @@
-import mongoose, { Schema, models, model } from "mongoose";
+import { Schema, models, model } from "mongoose";
 
-// TODO: Define your User Schema fields (e.g. email, password, etc.)
 const UserSchema = new Schema(
   {
     name: {
@@ -28,6 +27,16 @@ const UserSchema = new Schema(
       type: Number,
       default: 0,
     },
+    // Stripe Payment Metadata
+    stripeCustomerId: { type: String, default: null },
+    stripeSubscriptionId: { type: String, default: null },
+    stripePriceId: { type: String, default: null },
+    stripeCurrentPeriodEnd: { type: Date, default: null },
+    // Razorpay Payment Metadata
+    razorpayCustomerId: { type: String, default: null },
+    razorpaySubscriptionId: { type: String, default: null },
+    razorpayOrderId: { type: String, default: null },
+    razorpayPaymentId: { type: String, default: null },
   },
   { timestamps: true }
 );

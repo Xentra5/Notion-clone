@@ -593,8 +593,10 @@ export function Sidebar({
           {expandedSections.apps && (
             <div className="space-y-0.5">
               <button
-                onClick={onOpenCalendar}
-                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
+                onClick={() => router.push("/dashboard/calendar")}
+                className={`w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left ${
+                  pathname === "/dashboard/calendar" ? "bg-sidebar-accent text-sidebar-accent-foreground font-medium" : ""
+                }`}
               >
                 <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="truncate">Notion Calendar</span>

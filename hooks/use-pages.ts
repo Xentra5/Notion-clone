@@ -37,6 +37,7 @@ export interface ChecklistItem {
   codeLanguage?: string;
   calloutIcon?: string;
   toggleOpen?: boolean;
+  toggleChildren?: string;
   tableData?: string[][];
   fileSize?: string;
   fileName?: string;

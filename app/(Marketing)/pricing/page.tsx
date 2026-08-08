@@ -30,7 +30,9 @@ export default function PricingPage() {
     {
       name: "Plus",
       price: isAnnual ? "$10" : "$12",
-      period: "per seat / month",
+      originalPrice: "$12",
+      annualTotal: "Billed annually as $120/yr (Save $24/yr)",
+      period: "seat / month",
       desc: "For small teams planning together",
       buttonText: "Start Free Trial",
       buttonStyle: "bg-[#0078df] text-white hover:bg-[#006dcc] shadow-md font-extrabold",
@@ -47,7 +49,9 @@ export default function PricingPage() {
     {
       name: "Business",
       price: isAnnual ? "$18" : "$22",
-      period: "per seat / month",
+      originalPrice: "$22",
+      annualTotal: "Billed annually as $216/yr (Save $48/yr)",
+      period: "seat / month",
       desc: "For growing companies & orgs",
       buttonText: "Start Free Trial",
       buttonStyle: "bg-neutral-900 text-white hover:bg-black font-extrabold",
@@ -141,9 +145,23 @@ export default function PricingPage() {
                   {p.desc}
                 </p>
 
-                <div className="mt-6 flex items-baseline gap-1.5 border-b border-neutral-200 pb-5">
-                  <span className="text-4xl font-extrabold text-black">{p.price}</span>
-                  <span className="text-xs font-bold text-neutral-600">/ {p.period}</span>
+                <div className="mt-6 flex flex-col border-b border-neutral-200 pb-5">
+                  <div className="flex items-baseline gap-1.5">
+                    {isAnnual && p.originalPrice ? (
+                      <span className="text-xl font-bold text-neutral-400 line-through mr-1">{p.originalPrice}</span>
+                    ) : null}
+                    <span className="text-4xl font-extrabold text-black">{p.price}</span>
+                    <span className="text-xs font-bold text-neutral-600">/ {p.period}</span>
+                  </div>
+                  {isAnnual && p.annualTotal ? (
+                    <span className="text-[11px] font-extrabold text-emerald-600 mt-1">
+                      {p.annualTotal}
+                    </span>
+                  ) : (
+                    <span className="text-[11px] font-extrabold text-neutral-500 mt-1">
+                      {p.name === "Free" || p.name === "Enterprise" ? "Flexible billing" : "Billed monthly"}
+                    </span>
+                  )}
                 </div>
 
                 <ul className="mt-6 flex flex-col gap-3.5">
@@ -157,7 +175,17 @@ export default function PricingPage() {
               </div>
 
               <div className="mt-8 pt-4">
-                <Link href={p.name === "Enterprise" ? "/request-demo" : "/signup"}>
+                <Link
+                  href={
+                    p.name === "Enterprise"
+                      ? "/request-demo"
+                      : p.name === "Plus"
+                      ? `/checkout?plan=pro&billing=${isAnnual ? "annual" : "monthly"}`
+                      : p.name === "Business"
+                      ? `/checkout?plan=ultimate&billing=${isAnnual ? "annual" : "monthly"}`
+                      : "/signup"
+                  }
+                >
                   <Button
                     className={`w-full h-11 rounded-xl text-sm font-extrabold shadow-sm ${p.buttonStyle}`}
                   >
