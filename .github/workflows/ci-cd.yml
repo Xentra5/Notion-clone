@@ -1,0 +1,83 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+      - staging
+  pull_request:
+    branches:
+      - main
+      - staging
+
+jobs:
+  lint-and-typecheck:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run ESLint
+        run: npm run lint
+
+      - name: Run TypeScript Check
+        run: npx tsc --noEmit
+
+  build-check:
+    name: Compilation & Build Check
+    runs-on: ubuntu-latest
+    needs: lint-and-typecheck
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Run Production Build Validation
+        env:
+          NEXTAUTH_URL: http://localhost:3000
+          NEXTAUTH_SECRET: ci-testing-secret-key-32-chars-minimum
+          MONGODB_URI: mongodb://127.0.0.1:27017/ci_test_db
+        run: npm run build
+
+  deploy:
+    name: Deploy to Environment
+    runs-on: ubuntu-latest
+    needs: build-check
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/staging')
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set Environment Target
+        id: env-target
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "TARGET_ENV=production" >> $GITHUB_OUTPUT
+            echo "Deploying to Production environment..."
+          else
+            echo "TARGET_ENV=staging" >> $GITHUB_OUTPUT
+            echo "Deploying to Staging environment..."
+          fi
+
+      - name: Deployment Step (Vercel / Docker Container)
+        run: |
+          echo "Triggering deployment for environment: ${{ steps.env-target.outputs.TARGET_ENV }}"
+          # Integrate deployment CLI step here (e.g. npx vercel --prod --token ${{ secrets.VERCEL_TOKEN }})

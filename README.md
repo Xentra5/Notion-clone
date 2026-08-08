@@ -47,3 +47,16 @@ And start the production server:
 ```bash
 npm run start
 ```
+
+## Environments & CI/CD Pipeline
+
+### 🌐 Environments Setup
+- **Staging (`.env.staging`)**: Connects to the staging MongoDB instance (`notion_staging`) for integration testing and pre-release feature verification.
+- **Production (`.env.production`)**: Connects to the primary MongoDB cluster (`notion_prod`) for live user data.
+
+### ⚙️ GitHub Actions CI/CD
+Automated workflow located at `.github/workflows/ci-cd.yml` performs:
+1. **Lint & Typecheck**: Executes `npm run lint` and `npx tsc --noEmit` on every pull request or push to `main`/`staging`.
+2. **Build Validation**: Validates full Next.js production build (`npm run build`).
+3. **Deployment**: Triggers automated deployment for target branch (`staging` vs `main`).
+
