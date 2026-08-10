@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, Suspense } from "react";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -18,7 +18,6 @@ import { toast } from "sonner";
 
 function CheckoutContent() {
   const { data: session, update } = useSession();
-  const router = useRouter();
   const searchParams = useSearchParams();
 
   const urlPlan = searchParams.get("plan");
@@ -117,7 +116,7 @@ function CheckoutContent() {
       } else {
         await handleDirectUpgrade();
       }
-    } catch (_err) {
+    } catch {
       await handleDirectUpgrade();
     }
   }

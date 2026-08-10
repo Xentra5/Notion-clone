@@ -1,9 +1,7 @@
 import React from "react";
-import Link from "next/link";
 import { Navbar } from "../_components/navbar";
 import { Footer } from "../_components/footer";
-import { Button } from "@/components/ui/button";
-import { BookOpen, Video, LayoutTemplate, HelpCircle, GraduationCap, Compass, ArrowRight } from "lucide-react";
+import { BookOpen, Video, LayoutTemplate, HelpCircle, GraduationCap, Compass } from "lucide-react";
 
 export const metadata = {
   title: "Resources - Notion Guides, Templates & Community",

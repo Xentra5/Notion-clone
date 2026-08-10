@@ -303,32 +303,34 @@ export const LogoLoop = React.memo<LogoLoopProps>(
             </li>
           );
         }
+        type NodeItem = Extract<LogoItem, { node: React.ReactNode }>;
+        type ImgItem = Extract<LogoItem, { src: string }>;
         const isNodeItem = 'node' in item;
         const content = isNodeItem ? (
-          <span className="logoloop__node" aria-hidden={!!item.href && !item.ariaLabel}>
-            {(item as any).node}
+          <span className="logoloop__node" aria-hidden={!!item.href && !(item as NodeItem).ariaLabel}>
+            {(item as NodeItem).node}
           </span>
         ) : (
           <img
-            src={(item as any).src}
-            srcSet={(item as any).srcSet}
-            sizes={(item as any).sizes}
-            width={(item as any).width}
-            height={(item as any).height}
-            alt={(item as any).alt ?? ''}
-            title={(item as any).title}
+            src={(item as ImgItem).src}
+            srcSet={(item as ImgItem).srcSet}
+            sizes={(item as ImgItem).sizes}
+            width={(item as ImgItem).width}
+            height={(item as ImgItem).height}
+            alt={(item as ImgItem).alt ?? ''}
+            title={(item as ImgItem).title}
             loading="lazy"
             decoding="async"
             draggable={false}
           />
         );
         const itemAriaLabel = isNodeItem
-          ? ((item as any).ariaLabel ?? (item as any).title)
-          : ((item as any).alt ?? (item as any).title);
-        const itemContent = (item as any).href ? (
+          ? ((item as NodeItem).ariaLabel ?? (item as NodeItem).title)
+          : ((item as ImgItem).alt ?? (item as ImgItem).title);
+        const itemContent = item.href ? (
           <a
             className="logoloop__link"
-            href={(item as any).href}
+            href={item.href}
             aria-label={itemAriaLabel || 'logo link'}
             target="_blank"
             rel="noreferrer noopener"

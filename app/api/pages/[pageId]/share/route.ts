@@ -2,6 +2,11 @@ import { NextResponse } from "next/server";
 import { getPage, updatePage } from "@/lib/actions/pages";
 import { addNotification } from "@/lib/actions/notifications";
 
+interface Collaborator {
+  email: string;
+  role: string;
+}
+
 export async function POST(
   req: Request,
   { params }: { params: Promise<{ pageId: string }> }
@@ -9,7 +14,11 @@ export async function POST(
   try {
     const { pageId } = await params;
     const body = await req.json();
-    const { email, role, isPublic } = body;
+    const { email, role, isPublic } = body as {
+      email?: string;
+      role?: string;
+      isPublic?: boolean;
+    };
 
     const page = await getPage(pageId);
     if (!page) {
@@ -17,17 +26,18 @@ export async function POST(
     }
 
     if (typeof isPublic === "boolean") {
-      await updatePage(pageId, { isPublic } as any);
+      await updatePage(pageId, { isPublic } as Parameters<typeof updatePage>[1]);
     }
 
     if (email && role) {
-      const existingCollaborators = (page as any).collaborators || [];
+      const pageRecord = page as typeof page & { collaborators?: Collaborator[] };
+      const existingCollaborators = pageRecord.collaborators || [];
       const updatedCollaborators = [
-        ...existingCollaborators.filter((c: any) => c.email !== email),
+        ...existingCollaborators.filter((c: Collaborator) => c.email !== email),
         { email, role },
       ];
 
-      await updatePage(pageId, { collaborators: updatedCollaborators } as any);
+      await updatePage(pageId, { collaborators: updatedCollaborators } as Parameters<typeof updatePage>[1]);
 
       // Create notification for collaborator
       await addNotification({
@@ -42,7 +52,8 @@ export async function POST(
 
     const updatedPage = await getPage(pageId);
     return NextResponse.json({ page: updatedPage, success: true });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Failed to share page" }, { status: 500 });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to share page";
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }

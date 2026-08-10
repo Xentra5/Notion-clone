@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Navbar } from "../_components/navbar";
 import { Footer } from "../_components/footer";
 import { Button } from "@/components/ui/button";
-import { Check, Sparkles, Bot, Zap, ArrowRight, ShieldCheck, Building2 } from "lucide-react";
+import { Check, Sparkles, Bot, Zap, ArrowRight, ShieldCheck } from "lucide-react";
 
 export default function PricingPage() {
   const [isAnnual, setIsAnnual] = useState(true);

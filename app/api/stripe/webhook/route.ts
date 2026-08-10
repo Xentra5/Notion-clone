@@ -3,6 +3,22 @@ import { stripe } from "@/lib/stripe";
 import { connectToDatabase } from "@/lib/mongodb";
 import User from "@/lib/models/user";
 
+interface StripeSession {
+  customer_email?: string;
+  metadata?: Record<string, string>;
+  customer?: string;
+  subscription?: string;
+}
+
+interface StripeSubscription {
+  id: string;
+}
+
+interface StripeEvent {
+  type: string;
+  data: { object: Record<string, unknown> };
+}
+
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = request.headers.get("stripe-signature");
@@ -16,9 +32,9 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let event: { type: string; data: { object: Record<string, unknown> } };
+  let event: StripeEvent;
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret) as any;
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret) as StripeEvent;
   } catch (err: unknown) {
     const error = err as { message?: string };
     console.error("Stripe Webhook Signature Error:", error?.message);
@@ -29,7 +45,7 @@ export async function POST(request: NextRequest) {
 
   switch (event.type) {
     case "checkout.session.completed": {
-      const session = event.data.object as Record<string, any>;
+      const session = event.data.object as StripeSession;
       const userEmail = session.customer_email || session.metadata?.userEmail;
       if (userEmail) {
         await User.findOneAndUpdate(
@@ -44,7 +60,7 @@ export async function POST(request: NextRequest) {
       break;
     }
     case "customer.subscription.deleted": {
-      const subscription = event.data.object;
+      const subscription = event.data.object as unknown as StripeSubscription;
       await User.findOneAndUpdate(
         { stripeSubscriptionId: subscription.id },
         {

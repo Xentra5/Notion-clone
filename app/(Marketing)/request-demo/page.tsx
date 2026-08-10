@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { Navbar } from "../_components/navbar";
 import { Footer } from "../_components/footer";
 import { Button } from "@/components/ui/button";
-import { CheckCircle2, Building2, Users, Shield, Sparkles } from "lucide-react";
+import { CheckCircle2, Building2, Users, Shield } from "lucide-react";
 
 export default function RequestDemoPage() {
   const [submitted, setSubmitted] = useState(false);

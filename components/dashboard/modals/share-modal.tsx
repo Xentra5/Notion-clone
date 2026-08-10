@@ -128,7 +128,7 @@ export function ShareModal({
               />
               <select
                 value={roleInput}
-                onChange={(e) => setRoleInput(e.target.value as any)}
+                onChange={(e) => setRoleInput(e.target.value as "full" | "edit" | "comment" | "view")}
                 className="bg-accent/30 border border-border rounded-lg px-2 py-2 text-foreground outline-none text-xs font-medium cursor-pointer"
               >
                 <option value="full">Full access</option>

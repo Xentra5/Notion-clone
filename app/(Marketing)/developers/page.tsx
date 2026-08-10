@@ -1,9 +1,8 @@
 import React from "react";
-import Link from "next/link";
 import { Navbar } from "../_components/navbar";
 import { Footer } from "../_components/footer";
 import { Button } from "@/components/ui/button";
-import { Code2, Terminal, Cpu, Key, Layers, ExternalLink } from "lucide-react";
+import { Terminal, Cpu, Key, ExternalLink } from "lucide-react";
 
 export const metadata = {
   title: "Developers - Notion API & Integrations",

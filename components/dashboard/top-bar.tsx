@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import { updatePage } from "@/lib/actions/pages";
+import type { PageBlock } from "@/lib/actions/pages";
 import {
   Lock,
   ChevronDown,
@@ -58,7 +59,7 @@ interface TopBarProps {
   activeTitle: string;
   pageId?: string;
   updatedAt?: string | Date;
-  blocks?: any[];
+  blocks?: PageBlock[];
   onToggleSidebar?: () => void;
   onToggleAi: () => void;
   isAiOpen?: boolean;
