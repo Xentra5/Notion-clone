@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Upload, X, FileText } from "lucide-react";
 import { markdownToBlocks } from "@/lib/export-import";
-import { createPage } from "@/lib/actions/pages";
+import { createPage, type PageBlock } from "@/lib/actions/pages";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
@@ -30,7 +30,7 @@ export function ImportModal({ isOpen, onClose }: ImportModalProps) {
       const newPage = await createPage({
         title: title || file.name.replace(/\.md$/i, ""),
         icon: "📄",
-        blocks: blocks as any,
+        blocks: blocks as PageBlock[],
       });
 
       toast.success("Markdown page imported successfully!");

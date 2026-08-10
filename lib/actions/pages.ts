@@ -51,6 +51,7 @@ export async function getPage(id: string): Promise<Page> {
 // POST /api/pages — create a new page and return it (with _id)
 export async function createPage(data: {
   title?: string;
+  icon?: string;
   category?: "Private" | "Shared" | "Meetings";
   isAiMeetingNote?: boolean;
   blocks?: PageBlock[];

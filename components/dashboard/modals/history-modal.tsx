@@ -9,7 +9,7 @@ interface RevisionItem {
   title: string;
   createdAt: string;
   createdBy: string;
-  blocks: any[];
+  blocks: Record<string, unknown>[];
 }
 
 interface HistoryModalProps {
@@ -26,7 +26,17 @@ export function HistoryModal({ isOpen, onClose, pageId, onRestored }: HistoryMod
 
   useEffect(() => {
     if (isOpen && pageId) {
-      fetchRevisions();
+      setLoading(true);
+      fetch(`/api/pages/${pageId}/revisions`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.revisions) setRevisions(data.revisions);
+          setLoading(false);
+        })
+        .catch((err) => {
+          console.error("Fetch revisions error:", err);
+          setLoading(false);
+        });
     }
   }, [isOpen, pageId]);
 
@@ -133,7 +143,7 @@ export function HistoryModal({ isOpen, onClose, pageId, onRestored }: HistoryMod
             </div>
           ) : revisions.length === 0 ? (
             <div className="py-8 text-center text-xs text-muted-foreground">
-              No version snapshots recorded yet. Click "Create Checkpoint" to save your first snapshot.
+              No version snapshots recorded yet. Click &quot;Create Checkpoint&quot; to save your first snapshot.
             </div>
           ) : (
             revisions.map((rev) => (

@@ -542,7 +542,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
     setSlash({ blockId: "", query: "", open: false });
     setFocusedId(null);
     hasMounted.current = false;
-  }, [pageId]);
+  }, [pageId, activeTitle, initialBlocks]);
 
   // Auto-resize title textarea
   useEffect(() => {
@@ -961,14 +961,16 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
         {/* Blocks */}
         <div className="space-y-px">
           {(() => {
-            let numberedSeqCount = 0;
             return items.map((item, index) => {
+              let seqNumber = 1;
               if (item.type === "numbered") {
-                numberedSeqCount++;
-              } else {
-                numberedSeqCount = 0;
+                let count = 0;
+                for (let i = 0; i <= index; i++) {
+                  if (items[i].type === "numbered") count++;
+                  else count = 0;
+                }
+                seqNumber = count;
               }
-              const seqNumber = numberedSeqCount;
 
               return (
                 <div key={item.id} className="relative">

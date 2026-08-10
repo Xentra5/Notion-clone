@@ -55,19 +55,17 @@ export default function PageRoute({ params }: PageRouteProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setPage(null);
-    setNotFound(false);
 
     getPage(pageId)
-      .then((p) => { if (!cancelled) setPage(p); })
-      .catch(() => { if (!cancelled) setNotFound(true); });
+      .then((p) => { if (!cancelled) { setPage(p); setNotFound(false); } })
+      .catch(() => { if (!cancelled) { setPage(null); setNotFound(true); } });
 
     return () => { cancelled = true; };
   }, [pageId]);
 
   const initialBlocks = useMemo(
     () => (page?.blocks ? page.blocks.map(toChecklistItem) : []),
-    [page?.blocks]
+    [page]
   );
 
   // Create a new sub-page and navigate into it

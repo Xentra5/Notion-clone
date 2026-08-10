@@ -113,11 +113,11 @@ function CheckoutContent() {
       });
       const data = await res.json();
       if (data.url) {
-        window.location.href = data.url;
+        window.location.assign(data.url);
       } else {
         await handleDirectUpgrade();
       }
-    } catch (err) {
+    } catch (_err) {
       await handleDirectUpgrade();
     }
   }

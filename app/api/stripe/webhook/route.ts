@@ -16,19 +16,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  let event: any;
+  let event: { type: string; data: { object: Record<string, unknown> } };
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
-  } catch (err: any) {
-    console.error("Stripe Webhook Signature Error:", err?.message);
-    return NextResponse.json({ error: `Webhook Error: ${err?.message}` }, { status: 400 });
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret) as any;
+  } catch (err: unknown) {
+    const error = err as { message?: string };
+    console.error("Stripe Webhook Signature Error:", error?.message);
+    return NextResponse.json({ error: `Webhook Error: ${error?.message}` }, { status: 400 });
   }
 
   await connectToDatabase();
 
   switch (event.type) {
     case "checkout.session.completed": {
-      const session = event.data.object;
+      const session = event.data.object as Record<string, any>;
       const userEmail = session.customer_email || session.metadata?.userEmail;
       if (userEmail) {
         await User.findOneAndUpdate(

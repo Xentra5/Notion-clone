@@ -25,8 +25,11 @@ import {
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { ImportModal } from "@/components/dashboard/modals/import-modal";
 import { HistoryModal } from "@/components/dashboard/modals/history-modal";
+import { ShareModal } from "@/components/dashboard/modals/share-modal";
+import { NotificationsPopover } from "@/components/dashboard/notifications-popover";
 import { CommentsPanel } from "@/components/dashboard/editor/CommentsPanel";
 import { blocksToMarkdown, downloadMarkdownFile, exportToPdfPrint } from "@/lib/export-import";
+import { Bell } from "lucide-react";
 
 function formatRelativeTime(dateInput?: string | Date | null): string {
   if (!dateInput) return "Edited just now";
@@ -85,6 +88,8 @@ export function TopBar({
   // Modals state
   const [showImportModal, setShowImportModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
   const [showCommentsPanel, setShowCommentsPanel] = useState(false);
 
   useEffect(() => {
@@ -96,13 +101,14 @@ export function TopBar({
   }, [activeTitle]);
 
   useEffect(() => {
-    function handlePageUpdate(e: CustomEvent<{ title?: string; updatedAt?: Date | string }>) {
-      if (e.detail?.title) setRenameTitleValue(e.detail.title);
-      setLastEdited(e.detail?.updatedAt || new Date());
+    function handlePageUpdate(e: Event) {
+      const customEvent = e as CustomEvent<{ title?: string; updatedAt?: Date | string }>;
+      if (customEvent.detail?.title) setRenameTitleValue(customEvent.detail.title);
+      setLastEdited(customEvent.detail?.updatedAt || new Date());
     }
-    window.addEventListener("page-updated" as any, handlePageUpdate as EventListener);
+    window.addEventListener("page-updated", handlePageUpdate);
     return () => {
-      window.removeEventListener("page-updated" as any, handlePageUpdate as EventListener);
+      window.removeEventListener("page-updated", handlePageUpdate);
     };
   }, []);
 
@@ -258,6 +264,24 @@ export function TopBar({
             {formatRelativeTime(lastEdited)}
           </span>
 
+          {/* Notifications Bell */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className={`p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] transition relative ${
+                showNotifications ? "text-primary bg-primary/10" : "text-muted-foreground"
+              }`}
+              title="Notifications & Activity"
+            >
+              <Bell className="h-3.5 w-3.5" />
+              <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-blue-500" />
+            </button>
+            <NotificationsPopover
+              isOpen={showNotifications}
+              onClose={() => setShowNotifications(false)}
+            />
+          </div>
+
           {/* Comments Panel Button */}
           <button
             onClick={() => setShowCommentsPanel(!showCommentsPanel)}
@@ -281,37 +305,13 @@ export function TopBar({
           )}
 
           {/* Share Button */}
-          <div className="relative">
-            <button
-              onClick={() => setShowShareMenu(!showShareMenu)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-xs font-semibold text-foreground"
-            >
-              <Lock className="h-3 w-3 text-muted-foreground" />
-              <span>Share</span>
-              <ChevronDown className="h-3 w-3" />
-            </button>
-
-            {showShareMenu && (
-              <div className="absolute right-0 top-full mt-1 w-72 bg-popover border border-border rounded-2xl shadow-2xl p-3.5 z-50 text-xs text-popover-foreground animate-in fade-in duration-100">
-                <div className="flex items-center justify-between pb-2 border-b border-border mb-3">
-                  <span className="font-bold text-foreground">Share page</span>
-                  <span className="text-[10px] text-muted-foreground bg-background border border-border px-2 py-0.5 rounded-full font-medium">
-                    {permission}
-                  </span>
-                </div>
-                <p className="text-[11px] text-muted-foreground mb-3 leading-relaxed">
-                  Only you have access to this page. Invite others to start collaborating.
-                </p>
-                <button
-                  onClick={handleCopyLink}
-                  className="w-full flex items-center justify-center gap-2 bg-[#0078df] hover:bg-[#0067c2] text-white py-2 px-3 rounded-xl font-semibold transition shadow-sm"
-                >
-                  <LinkIcon className="h-3.5 w-3.5" />
-                  <span>{copied ? "Link Copied!" : "Copy link"}</span>
-                </button>
-              </div>
-            )}
-          </div>
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded-md bg-[#2383e2] hover:bg-[#1a73d8] text-white transition text-xs font-semibold shadow-xs"
+          >
+            <Users className="h-3 w-3" />
+            <span>Share</span>
+          </button>
 
           {/* Link Button */}
           <button
@@ -416,6 +416,7 @@ export function TopBar({
       {/* Modals & Slideouts */}
       <ImportModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} />
       <HistoryModal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} pageId={pageId} />
+      <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} pageId={pageId} activeTitle={activeTitle} />
       {showCommentsPanel && (
         <div className="fixed right-0 top-11 bottom-0 z-40">
           <CommentsPanel isOpen={showCommentsPanel} onClose={() => setShowCommentsPanel(false)} pageId={pageId} />

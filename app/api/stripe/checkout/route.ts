@@ -33,10 +33,11 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ url: stripeSession.url });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     console.error("Stripe Checkout error:", error);
     return NextResponse.json(
-      { error: error?.message || "Internal Server Error" },
+      { error: err?.message || "Internal Server Error" },
       { status: 500 }
     );
   }

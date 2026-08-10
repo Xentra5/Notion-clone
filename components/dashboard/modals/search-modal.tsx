@@ -31,11 +31,12 @@ export function SearchModal({ isOpen, onClose, onSelectPage }: SearchModalProps)
 
   useEffect(() => {
     if (!isOpen) return;
-    setLoading(true);
+    let cancelled = false;
     getPages()
-      .then((data) => setPages(data))
+      .then((data) => { if (!cancelled) setPages(data); })
       .catch((err) => console.error("Error fetching pages for search:", err))
-      .finally(() => setLoading(false));
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
   }, [isOpen]);
 
   useEffect(() => {

@@ -30,10 +30,11 @@ export async function POST(request: NextRequest) {
       currency: order.currency,
       keyId: process.env.RAZORPAY_KEY_ID,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
+    const err = error as { message?: string };
     console.error("Razorpay Order Error:", error);
     return NextResponse.json(
-      { error: error?.message || "Internal Server Error" },
+      { error: err?.message || "Internal Server Error" },
       { status: 500 }
     );
   }

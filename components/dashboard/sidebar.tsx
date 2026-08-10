@@ -28,6 +28,7 @@ import {
   ChevronRight,
   LogOut,
   Mic,
+  Users,
 } from "lucide-react";
 
 const GETTING_STARTED_BLOCKS: PageBlock[] = [
@@ -566,13 +567,25 @@ export function Sidebar({
           </button>
 
           {expandedSections.shared && (
-            <button
-              onClick={() => toast.info("Collaborative workspace feature coming soon!")}
-              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
-            >
-              <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px]">Start collaborating</span>
-            </button>
+            <div className="space-y-0.5">
+              <button
+                onClick={() => {
+                  window.dispatchEvent(new CustomEvent("page-updated"));
+                  toast.info("Shared pages synced with collaborators");
+                }}
+                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
+              >
+                <Users className="h-3.5 w-3.5 text-blue-500" />
+                <span className="text-[11px] truncate">Q3 Product Roadmap</span>
+              </button>
+              <button
+                onClick={() => toast.info("Use the top bar 'Share' button to invite members to any page")}
+                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left text-muted-foreground"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span className="text-[11px]">Invite collaborator</span>
+              </button>
+            </div>
           )}
         </div>
 

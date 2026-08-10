@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { MessageSquare, X, Send, User } from "lucide-react";
 import { toast } from "sonner";
 
@@ -22,13 +22,7 @@ export function CommentsPanel({ isOpen, onClose, pageId }: CommentsPanelProps) {
   const [newCommentText, setNewCommentText] = useState("");
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (isOpen && pageId) {
-      fetchComments();
-    }
-  }, [isOpen, pageId]);
-
-  async function fetchComments() {
+  const fetchComments = useCallback(async () => {
     if (!pageId) return;
     setLoading(true);
     try {
@@ -42,7 +36,13 @@ export function CommentsPanel({ isOpen, onClose, pageId }: CommentsPanelProps) {
     } finally {
       setLoading(false);
     }
-  }
+  }, [pageId]);
+
+  useEffect(() => {
+    if (isOpen && pageId) {
+      fetchComments();
+    }
+  }, [isOpen, pageId, fetchComments]);
 
   async function handleAddComment(e: React.FormEvent) {
     e.preventDefault();
