@@ -1,7 +1,7 @@
 export interface LogContext {
   userId?: string;
   route?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export function logError(error: unknown, context: LogContext = {}) {

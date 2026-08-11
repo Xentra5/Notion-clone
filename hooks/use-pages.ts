@@ -23,6 +23,7 @@ export type BlockType =
   | "audio"
   | "code"
   | "file"
+  | "kanban"
   | "web_bookmark";
 
 export interface ChecklistItem {
@@ -39,8 +40,23 @@ export interface ChecklistItem {
   toggleOpen?: boolean;
   toggleChildren?: string;
   tableData?: string[][];
+  subPageId?: string;
   fileSize?: string;
   fileName?: string;
+  kanbanColumns?: KanbanColumn[];
+}
+
+export interface KanbanColumn {
+  id: string;
+  title: string;
+  color: string;
+  cards: KanbanCard[];
+}
+
+export interface KanbanCard {
+  id: string;
+  title: string;
+  description?: string;
 }
 
 export const DEFAULT_ITEMS: ChecklistItem[] = [];

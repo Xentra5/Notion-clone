@@ -1,4 +1,4 @@
-import mongoose, { Schema, models, model } from "mongoose";
+import mongoose, { Schema } from "mongoose";
 
 const BlockSchema = new Schema(
   {
@@ -13,6 +13,8 @@ const BlockSchema = new Schema(
       text: { type: String, default: "" },
       checked: { type: Boolean, default: false },
       language: { type: String, default: "" },
+      subPageId: { type: String, default: "" },
+      kanbanColumns: { type: Schema.Types.Mixed, default: [] },
     },
     content: [{ type: String }],
     parent: { type: String, default: "workspace" },
@@ -31,6 +33,7 @@ const PageSchema = new Schema(
       enum: ["Private", "Shared", "Meetings"],
       default: "Private",
     },
+    parentPageId: { type: String, default: null, index: true },
     isAiMeetingNote: { type: Boolean, default: false },
     blocks: [BlockSchema],
     deletedAt: { type: Date, default: null },
@@ -42,7 +45,12 @@ const PageSchema = new Schema(
 // Text search index for searching across pages
 PageSchema.index({ title: "text", "blocks.properties.text": "text" });
 
-const Page = models.Page || model("Page", PageSchema);
+// In development with HMR, delete stale model to pick up schema changes
+if (process.env.NODE_ENV !== "production" && mongoose.models.Page) {
+  mongoose.deleteModel("Page");
+}
+
+const Page = mongoose.models.Page || mongoose.model("Page", PageSchema);
 
 export default Page;
 

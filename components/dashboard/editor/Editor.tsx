@@ -7,13 +7,13 @@ import {
   useCallback,
   useLayoutEffect,
 } from "react";
-import { useSession } from "next-auth/react";
 import { MeetingNoteView } from "./MeetingNoteView";
 import { EmojiDropdown } from "./EmojiPicker";
 import { CodeBlock } from "./CodeBlock";
+import { KanbanBoard } from "./KanbanBoard";
 import { useAutosave } from "@/hooks/use-autosave";
 import { updatePage } from "@/lib/actions/pages";
-import type { ChecklistItem, BlockType } from "@/hooks/use-pages";
+import type { ChecklistItem, BlockType, KanbanColumn } from "@/hooks/use-pages";
 import {
   Check,
   ChevronRight,
@@ -31,7 +31,7 @@ import {
   Minus,
   MessageSquare,
   FileText,
-  Image,
+  Image as ImageIcon,
   Video,
   Volume2,
   Paperclip,
@@ -48,7 +48,7 @@ export interface EditorProps {
   pageId?: string;
   initialBlocks?: ChecklistItem[];
   onOpenAi: () => void;
-  onSelectSubPage: (title: string) => void;
+  onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
 }
 
 // ── Slash menu items ─────────────────────────────────────────────────────────
@@ -73,12 +73,13 @@ const SLASH_ITEMS: {
   { type: "toggle",       label: "Toggle",        description: "Collapsible section",           icon: ChevronRight,  iconColor: "text-neutral-400",  category: "Basic" },
   { type: "page",         label: "Page",          description: "Embed a sub-page link",         icon: FileText,      iconColor: "text-neutral-400",  category: "Basic" },
   { type: "code",         label: "Code",          description: "Code snippet with copy",        icon: Code,          iconColor: "text-emerald-400",  category: "Media" },
-  { type: "image",        label: "Image",         description: "Upload or embed an image",      icon: Image,         iconColor: "text-indigo-400",   category: "Media" },
+  { type: "image",        label: "Image",         description: "Upload or embed an image",      icon: ImageIcon,     iconColor: "text-indigo-400",   category: "Media" },
   { type: "video",        label: "Video",         description: "Embed YouTube, Vimeo...",       icon: Video,         iconColor: "text-red-400",      category: "Media" },
   { type: "audio",        label: "Audio",         description: "Audio recording or file",       icon: Volume2,       iconColor: "text-purple-400",   category: "Media" },
   { type: "file",         label: "File",          description: "Upload a file",                 icon: Paperclip,     iconColor: "text-neutral-400",  category: "Media" },
   { type: "web_bookmark", label: "Web bookmark",  description: "Save a visual web link",        icon: Bookmark,      iconColor: "text-orange-400",   category: "Media" },
   { type: "table",        label: "Table",         description: "Simple table",                  icon: Table,         iconColor: "text-cyan-400",     category: "Media" },
+  { type: "kanban",       label: "Board view",    description: "Kanban board for task tracking",icon: Table,         iconColor: "text-blue-500",     category: "Media" },
   { type: "link_to_page", label: "Link to page",  description: "Link to an existing page",      icon: Link,          iconColor: "text-blue-400",     category: "Media" },
 ];
 
@@ -120,7 +121,6 @@ function getPlaceholder(type: BlockType | undefined): string {
 // ── Single Block ─────────────────────────────────────────────────────────────
 interface BlockProps {
   item: ChecklistItem;
-  index: number;
   seqNumber?: number;
   isFocused: boolean;
   onFocus: (id: string) => void;
@@ -129,17 +129,18 @@ interface BlockProps {
   onUpdateCalloutIcon?: (id: string, icon: string) => void;
   onUpdateToggleChildren?: (id: string, childrenText: string) => void;
   onUpdateTableData?: (id: string, data: string[][]) => void;
+  onUpdateKanbanColumns?: (id: string, columns: KanbanColumn[]) => void;
   onToggleCheck: (id: string) => void;
   onKeyDown: (e: React.KeyboardEvent, id: string) => void;
   onDelete?: (id: string) => void;
   onAddAfter?: (id: string) => void;
-  onSelectSubPage: (title: string) => void;
+  onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
   registerRef: (id: string, el: HTMLElement | null) => void;
 }
 
 function Block({
-  item, index, seqNumber = 1, isFocused, onFocus, onUpdateText, onUpdateLanguage,
-  onUpdateCalloutIcon, onUpdateToggleChildren, onUpdateTableData,
+  item, seqNumber = 1, isFocused, onFocus, onUpdateText, onUpdateLanguage,
+  onUpdateCalloutIcon, onUpdateToggleChildren, onUpdateTableData, onUpdateKanbanColumns,
   onToggleCheck, onKeyDown, onDelete, onAddAfter, onSelectSubPage, registerRef,
 }: BlockProps) {
   const elRef = useRef<HTMLElement | null>(null);
@@ -360,8 +361,8 @@ function Block({
           <div className="flex items-center gap-2 my-1 group/page">
             <button
               type="button"
-              onClick={() => onSelectSubPage(item.text || "Untitled")}
-              className="flex items-center gap-2.5 flex-1 px-3 py-2.5 rounded-lg border border-foreground/[0.08] hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.03] transition-colors text-left"
+              onClick={() => onSelectSubPage(item.id, item.subPageId && item.subPageId.length > 0 ? item.subPageId : undefined, item.text || "Untitled")}
+              className="flex items-center gap-2.5 flex-1 px-3 py-2.5 rounded-lg border border-foreground/[0.08] hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.03] transition-colors text-left cursor-pointer"
             >
               <span className="text-base select-none">📄</span>
               <div className="flex-1 min-w-0">
@@ -370,11 +371,12 @@ function Block({
                   ref={setRef}
                   className="text-[14px] font-medium text-foreground outline-none w-full empty:before:content-[attr(data-placeholder)] empty:before:text-foreground/30 empty:before:pointer-events-none"
                   data-placeholder="Untitled"
-                  onClick={(e) => e.stopPropagation()}
                 />
-                <div className="text-[11px] text-foreground/40 mt-0.5">Click to open page</div>
+                <div className="text-[11px] text-foreground/40 mt-0.5">
+                  {item.subPageId && item.subPageId.length > 0 ? "Click to open sub-page" : "Click to create sub-page"}
+                </div>
               </div>
-              <span className="text-foreground/20 group-hover/page:text-foreground/40 transition text-xs">↗</span>
+              <span className="text-foreground/20 group-hover/page:text-foreground/40 transition text-xs font-bold">↗</span>
             </button>
           </div>
         )}
@@ -382,7 +384,7 @@ function Block({
         {/* ── Image ── */}
         {item.type === "image" && (
           <div className="my-2 p-8 rounded-lg border-2 border-dashed border-foreground/10 flex flex-col items-center gap-2 text-foreground/40 hover:border-foreground/20 hover:bg-foreground/[0.02] transition cursor-pointer">
-            <Image className="h-6 w-6" />
+            <ImageIcon className="h-6 w-6" />
             <span className="text-sm">Click to add an image</span>
           </div>
         )}
@@ -488,14 +490,23 @@ function Block({
             </div>
           );
         })()}
+
+        {/* ── Kanban Board ── */}
+        {item.type === "kanban" && (
+          <KanbanBoard
+            blockId={item.id}
+            columns={item.kanbanColumns}
+            onColumnsChange={(id, cols) => onUpdateKanbanColumns?.(id, cols)}
+          />
+        )}
       </div>
+
     </div>
   );
 }
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
 export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectSubPage }: EditorProps) {
-  const { data: session } = useSession();
   const [pageEmoji, setPageEmoji] = useState("📄");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(activeTitle);
@@ -536,12 +547,14 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
 
   // Sync when navigating to a new page
   useEffect(() => {
-    setCurrentTitle(activeTitle);
-    setItems(initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]);
-    setShowEmojiPicker(false);
-    setSlash({ blockId: "", query: "", open: false });
-    setFocusedId(null);
-    hasMounted.current = false;
+    queueMicrotask(() => {
+      setCurrentTitle(activeTitle);
+      setItems(initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]);
+      setShowEmojiPicker(false);
+      setSlash({ blockId: "", query: "", open: false });
+      setFocusedId(null);
+      hasMounted.current = false;
+    });
   }, [pageId, activeTitle, initialBlocks]);
 
   // Auto-resize title textarea
@@ -603,6 +616,10 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
 
   const updateTableData = useCallback((id: string, tableData: string[][]) => {
     setItems(prev => prev.map(b => b.id === id ? { ...b, tableData } : b));
+  }, []);
+
+  const updateKanbanColumns = useCallback((id: string, kanbanColumns: KanbanColumn[]) => {
+    setItems(prev => prev.map(b => b.id === id ? { ...b, kanbanColumns } : b));
   }, []);
 
   const slashFiltered = slash.query
@@ -976,7 +993,6 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
                 <div key={item.id} className="relative">
                   <Block
                     item={item}
-                    index={index}
                     seqNumber={seqNumber}
                     isFocused={focusedId === item.id}
                     onFocus={setFocusedId}
@@ -985,6 +1001,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
                     onUpdateCalloutIcon={updateCalloutIcon}
                     onUpdateToggleChildren={updateToggleChildren}
                     onUpdateTableData={updateTableData}
+                    onUpdateKanbanColumns={updateKanbanColumns}
                     onToggleCheck={toggleCheck}
                     onKeyDown={handleKeyDown}
                     onAddAfter={(id) => {

@@ -3,12 +3,8 @@
 import { useState, useEffect } from "react";
 import {
   Search,
-  FileText,
   SlidersHorizontal,
   Plus,
-  Atom,
-  Terminal,
-  FileCode,
   Settings,
   ChevronDown,
 } from "lucide-react";

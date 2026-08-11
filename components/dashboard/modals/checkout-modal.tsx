@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Lock, CheckCircle2, ShieldCheck, ArrowRight, CreditCard, Building2, Globe } from "lucide-react";
+import { X, Lock, CheckCircle2, ArrowRight, CreditCard, Globe } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { toast } from "sonner";
 

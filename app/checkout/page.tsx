@@ -136,7 +136,7 @@ function CheckoutContent() {
       } else {
         await handleDirectUpgrade();
       }
-    } catch (err) {
+    } catch {
       await handleDirectUpgrade();
     }
   }

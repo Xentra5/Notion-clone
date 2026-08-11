@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { title, blocks, category, icon } = body;
+    const { title, blocks, category, icon, parentPageId } = body;
 
     // Build update payload from only the provided fields
     const $set: Record<string, unknown> = {};
@@ -67,12 +67,30 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (blocks !== undefined) $set.blocks = blocks;
     if (category !== undefined) $set.category = category;
     if (icon !== undefined) $set.icon = icon;
+    if (parentPageId !== undefined) {
+      if (parentPageId === id) {
+        return NextResponse.json({ error: "A page cannot be its own parent" }, { status: 400 });
+      }
+      $set.parentPageId = parentPageId || null;
+    }
 
     if (Object.keys($set).length === 0) {
       return NextResponse.json({ error: "No fields to update" }, { status: 400 });
     }
 
     await connectToDatabase();
+
+    // Circular Reference Validation
+    if ($set.parentPageId && typeof $set.parentPageId === "string") {
+      let currentCheck: string | null = $set.parentPageId;
+      while (currentCheck) {
+        if (currentCheck === id) {
+          return NextResponse.json({ error: "Circular parent reference detected" }, { status: 400 });
+        }
+        const parentDoc: { parentPageId?: string | null } | null = await Page.findById(currentCheck).select("parentPageId").lean();
+        currentCheck = parentDoc?.parentPageId || null;
+      }
+    }
 
     const page = await Page.findOneAndUpdate(
       { _id: id, userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] },
@@ -91,7 +109,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// DELETE /api/pages/[id] — move a page to Trash, or permanently delete it when requested.
+// DELETE /api/pages/[id] — move a page and all its sub-tree child pages to Trash, or permanently delete them.
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
     const session = await getSession(request);
@@ -105,15 +123,23 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const isPermanent = new URL(request.url).searchParams.get("permanent") === "true";
     await connectToDatabase();
 
-    const result = isPermanent
-      ? await Page.findOneAndDelete({ _id: id, userId: session.user.email })
-      : await Page.findOneAndUpdate(
-          { _id: id, userId: session.user.email },
-          { $set: { deletedAt: new Date() } },
-          { new: true }
-        );
+    if (isPermanent) {
+      const result = await Page.findOneAndDelete({ _id: id, userId: session.user.email });
+      if (!result) return NextResponse.json({ error: "Page not found" }, { status: 404 });
+      // Delete child sub-tree pages
+      await Page.deleteMany({ parentPageId: id, userId: session.user.email });
+    } else {
+      const now = new Date();
+      const result = await Page.findOneAndUpdate(
+        { _id: id, userId: session.user.email },
+        { $set: { deletedAt: now } },
+        { new: true }
+      );
+      if (!result) return NextResponse.json({ error: "Page not found" }, { status: 404 });
+      // Soft-delete child sub-tree pages
+      await Page.updateMany({ parentPageId: id, userId: session.user.email }, { $set: { deletedAt: now } });
+    }
 
-    if (!result) return NextResponse.json({ error: "Page not found" }, { status: 404 });
     return NextResponse.json({ success: true, permanent: isPermanent });
   } catch (error) {
     console.error("Error deleting page:", error);

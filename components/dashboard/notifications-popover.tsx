@@ -24,14 +24,16 @@ export function NotificationsPopover({
 
   useEffect(() => {
     if (!isOpen) return;
-    setIsLoading(true);
-    fetch("/api/notifications")
-      .then((res) => res.json())
-      .then((data) => {
-        setNotifications(data.notifications || []);
-        setIsLoading(false);
-      })
-      .catch(() => setIsLoading(false));
+    queueMicrotask(() => {
+      setIsLoading(true);
+      fetch("/api/notifications")
+        .then((res) => res.json())
+        .then((data) => {
+          setNotifications(data.notifications || []);
+          setIsLoading(false);
+        })
+        .catch(() => setIsLoading(false));
+    });
   }, [isOpen]);
 
   if (!isOpen) return null;

@@ -35,6 +35,143 @@ const GETTING_STARTED_BLOCKS: PageBlock[] = [
   { id: "getting-started-intro", type: "paragraph", properties: { text: "Welcome! This page shows you the basics. You can edit it, keep it as a reference, or delete it whenever you are ready." } },  { id: "getting-started-write", type: "heading", properties: { text: "Write naturally" } },  { id: "getting-started-write-text", type: "paragraph", properties: { text: "Click anywhere and start typing. Press Enter for a new block. Press Shift + Enter for a line break." } },  { id: "getting-started-blocks", type: "heading", properties: { text: "Use blocks" } },  { id: "getting-started-blocks-text", type: "paragraph", properties: { text: "Type / to open the block menu. Try /heading, /bullet, /todo, /quote, or /code." } },  { id: "getting-started-todo", type: "to_do", properties: { text: "Try checking off this task", checked: false } },  { id: "getting-started-shortcuts", type: "heading", properties: { text: "Useful shortcuts" } },  { id: "getting-started-shortcuts-text", type: "paragraph", properties: { text: "Use Ctrl/Cmd + A to select the page, Backspace or Delete to remove selected blocks, and Ctrl/Cmd + K to search." } },  { id: "getting-started-delete", type: "quote", properties: { text: "You can delete this page later from the trash icon beside its name in the sidebar." } },
 ];
 
+interface PageTreeNodeProps {
+  page: Page;
+  allPages: Page[];
+  depth?: number;
+  pathname: string;
+  renamingPageId: string | null;
+  renameValue: string;
+  onPageClick: (e: React.MouseEvent, page: Page) => void;
+  onBeginRename: (e: React.MouseEvent, page: Page) => void;
+  onFinishRename: (pageId: string) => void;
+  onDeletePage: (e: React.MouseEvent, pageId: string) => void;
+  setRenameValue: (val: string) => void;
+  setRenamingPageId: (id: string | null) => void;
+}
+
+function PageTreeNode({
+  page,
+  allPages,
+  depth = 0,
+  pathname,
+  renamingPageId,
+  renameValue,
+  onPageClick,
+  onBeginRename,
+  onFinishRename,
+  onDeletePage,
+  setRenameValue,
+  setRenamingPageId,
+}: PageTreeNodeProps) {
+  const [isOpen, setIsOpen] = useState(true);
+  const childPages = allPages.filter((c) => c.parentPageId === page._id);
+  const hasChildren = childPages.length > 0;
+
+  return (
+    <div className="space-y-0.5">
+      <div
+        onClick={(e) => onPageClick(e, page)}
+        style={{ paddingLeft: `${depth * 12 + 8}px` }}
+        className={`w-full flex items-center justify-between group py-1.5 pr-2 rounded-lg transition text-left font-medium cursor-pointer ${
+          pathname === `/dashboard/${page._id}`
+            ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
+            : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
+        }`}
+      >
+        <div className="flex items-center gap-1.5 min-w-0 flex-1">
+          {hasChildren ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsOpen(!isOpen);
+              }}
+              className="p-0.5 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground transition shrink-0"
+            >
+              {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+            </button>
+          ) : (
+            <span className="w-3.5 shrink-0" />
+          )}
+          <span className="shrink-0 text-sm">{page.icon || "📄"}</span>
+          {renamingPageId === page._id ? (
+            <input
+              autoFocus
+              value={renameValue}
+              onFocus={(e) => e.target.select()}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onClick={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+              onBlur={() => void onFinishRename(page._id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  e.currentTarget.blur();
+                }
+                if (e.key === "Escape") {
+                  e.preventDefault();
+                  setRenamingPageId(null);
+                }
+              }}
+              className="min-w-0 w-full bg-background border border-primary rounded px-1.5 py-0.5 text-[11px] outline-none font-normal text-foreground shadow-sm"
+            />
+          ) : (
+            <span
+              className="truncate text-[11px] flex-1"
+              onDoubleClick={(e) => onBeginRename(e, page)}
+              title="Double-click to rename"
+            >
+              {page.title}
+            </span>
+          )}
+        </div>
+        {renamingPageId !== page._id && (
+          <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition">
+            <button
+              onClick={(e) => onBeginRename(e, page)}
+              title="Rename page"
+              className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-foreground transition"
+            >
+              <SquarePen className="h-3 w-3" />
+            </button>
+            <button
+              onClick={(e) => onDeletePage(e, page._id)}
+              title="Delete page"
+              className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-red-500 transition"
+            >
+              <Trash2 className="h-3 w-3" />
+            </button>
+          </div>
+        )}
+      </div>
+
+      {/* Recursive Children Sub-Tree */}
+      {isOpen && hasChildren && (
+        <div className="space-y-0.5 border-l border-border/30 ml-3">
+          {childPages.map((child) => (
+            <PageTreeNode
+              key={child._id}
+              page={child}
+              allPages={allPages}
+              depth={depth + 1}
+              pathname={pathname}
+              renamingPageId={renamingPageId}
+              renameValue={renameValue}
+              onPageClick={onPageClick}
+              onBeginRename={onBeginRename}
+              onFinishRename={onFinishRename}
+              onDeletePage={onDeletePage}
+              setRenameValue={setRenameValue}
+              setRenamingPageId={setRenamingPageId}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 interface SidebarProps {
   activePage: string;
   onSelectPage: (title: string) => void;
@@ -47,7 +184,6 @@ interface SidebarProps {
 }
 
 export function Sidebar({
-  activePage,
   onSelectPage,
   onOpenSearch,
   onToggleAi,
@@ -108,7 +244,11 @@ export function Sidebar({
   useEffect(() => {
     const refreshPages = () => { void loadPages(); };
     window.addEventListener("page-updated", refreshPages);
-    return () => window.removeEventListener("page-updated", refreshPages);
+    window.addEventListener("page-created", refreshPages);
+    return () => {
+      window.removeEventListener("page-updated", refreshPages);
+      window.removeEventListener("page-created", refreshPages);
+    };
   }, [loadPages]);
 
   const userName = session?.user?.name || "o";
@@ -474,69 +614,25 @@ export function Sidebar({
 
           {expandedSections.private && (
             <div className="space-y-0.5">
-              {pages.map((page) => (
-                <div
-                  key={page._id}
-                  onClick={(e) => handlePageClick(e, page)}
-                  className={`w-full flex items-center justify-between group px-2 py-1.5 rounded-lg transition text-left font-medium cursor-pointer ${
-                    pathname === `/dashboard/${page._id}`
-                      ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
-                      : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="shrink-0 text-sm">{page.icon}</span>
-                    {renamingPageId === page._id ? (
-                      <input
-                        autoFocus
-                        value={renameValue}
-                        onFocus={(e) => e.target.select()}
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onClick={(e) => e.stopPropagation()}
-                        onMouseDown={(e) => e.stopPropagation()}
-                        onBlur={() => void finishRename(page._id)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter") {
-                            e.preventDefault();
-                            e.currentTarget.blur();
-                          }
-                          if (e.key === "Escape") {
-                            e.preventDefault();
-                            setRenamingPageId(null);
-                          }
-                        }}
-                        className="min-w-0 w-full bg-background border border-primary rounded px-1.5 py-0.5 text-[11px] outline-none font-normal text-foreground shadow-sm"
-                      />
-                    ) : (
-                      <span
-                        className="truncate text-[11px] flex-1"
-                        onDoubleClick={(e) => beginRename(e, page)}
-                        title="Double-click to rename"
-                      >
-                        {page.title}
-                      </span>
-                    )}
-                  </div>
-                  {renamingPageId !== page._id && (
-                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition">
-                      <button
-                        onClick={(e) => beginRename(e, page)}
-                        title="Rename page"
-                        className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-foreground transition"
-                      >
-                        <SquarePen className="h-3 w-3" />
-                      </button>
-                      <button
-                        onClick={(e) => handleDeletePage(e, page._id)}
-                        title="Delete page"
-                        className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-red-500 transition"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ))}
+              {pages
+                .filter((p) => !p.parentPageId)
+                .map((page) => (
+                  <PageTreeNode
+                    key={page._id}
+                    page={page}
+                    allPages={pages}
+                    depth={0}
+                    pathname={pathname}
+                    renamingPageId={renamingPageId}
+                    renameValue={renameValue}
+                    onPageClick={handlePageClick}
+                    onBeginRename={beginRename}
+                    onFinishRename={finishRename}
+                    onDeletePage={handleDeletePage}
+                    setRenameValue={setRenameValue}
+                    setRenamingPageId={setRenamingPageId}
+                  />
+                ))}
               {pages.length === 0 && (
                 <p className="px-2 py-1 text-[11px] text-muted-foreground">No pages yet</p>
               )}

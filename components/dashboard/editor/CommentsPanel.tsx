@@ -40,7 +40,9 @@ export function CommentsPanel({ isOpen, onClose, pageId }: CommentsPanelProps) {
 
   useEffect(() => {
     if (isOpen && pageId) {
-      fetchComments();
+      queueMicrotask(() => {
+        void fetchComments();
+      });
     }
   }, [isOpen, pageId, fetchComments]);
 
@@ -60,7 +62,7 @@ export function CommentsPanel({ isOpen, onClose, pageId }: CommentsPanelProps) {
         setNewCommentText("");
         toast.success("Comment added!");
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to post comment");
     }
   }

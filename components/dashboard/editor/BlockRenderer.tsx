@@ -17,7 +17,6 @@ import {
   Paperclip,
   Bookmark,
   Table as TableIcon,
-  Smile,
 } from "lucide-react";
 import type { ChecklistItem } from "@/hooks/use-pages";
 
@@ -361,7 +360,7 @@ export function BlockRenderer({
                     type="text"
                     placeholder="Paste image URL..."
                     value={item.url || ""}
-                    onChange={(e) =>
+                    onChange={() =>
                       onUpdateText && onUpdateText(item.id, item.text)
                     }
                     className="max-w-xs text-xs px-2.5 py-1.5 rounded-lg bg-background border border-border outline-none focus:border-primary"

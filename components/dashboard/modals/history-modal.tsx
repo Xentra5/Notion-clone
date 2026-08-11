@@ -26,17 +26,19 @@ export function HistoryModal({ isOpen, onClose, pageId, onRestored }: HistoryMod
 
   useEffect(() => {
     if (isOpen && pageId) {
-      setLoading(true);
-      fetch(`/api/pages/${pageId}/revisions`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.revisions) setRevisions(data.revisions);
-          setLoading(false);
-        })
-        .catch((err) => {
-          console.error("Fetch revisions error:", err);
-          setLoading(false);
-        });
+      queueMicrotask(() => {
+        setLoading(true);
+        fetch(`/api/pages/${pageId}/revisions`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.revisions) setRevisions(data.revisions);
+            setLoading(false);
+          })
+          .catch((err) => {
+            console.error("Fetch revisions error:", err);
+            setLoading(false);
+          });
+      });
     }
   }, [isOpen, pageId]);
 
@@ -69,7 +71,7 @@ export function HistoryModal({ isOpen, onClose, pageId, onRestored }: HistoryMod
         toast.success("Version checkpoint created!");
         fetchRevisions();
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to create snapshot");
     }
   }
@@ -90,7 +92,7 @@ export function HistoryModal({ isOpen, onClose, pageId, onRestored }: HistoryMod
         if (onRestored) onRestored();
         window.location.reload();
       }
-    } catch (err) {
+    } catch {
       toast.error("Failed to restore version");
     } finally {
       setRestoringId(null);

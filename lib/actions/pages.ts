@@ -13,6 +13,8 @@ export interface PageBlock {
     text?: string;
     checked?: boolean;
     language?: string;
+    subPageId?: string;
+    kanbanColumns?: unknown[];
   };
   content?: string[];
   parent?: string;
@@ -25,6 +27,7 @@ export interface Page {
   icon: string;
   coverImage?: string;
   category: "Private" | "Shared" | "Meetings";
+  parentPageId?: string;
   isAiMeetingNote: boolean;
   blocks: PageBlock[];
   createdAt: string;
@@ -53,6 +56,7 @@ export async function createPage(data: {
   title?: string;
   icon?: string;
   category?: "Private" | "Shared" | "Meetings";
+  parentPageId?: string;
   isAiMeetingNote?: boolean;
   blocks?: PageBlock[];
 }): Promise<Page> {

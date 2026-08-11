@@ -22,7 +22,7 @@ export function RenameModal({
 
   useEffect(() => {
     if (isOpen) {
-      setTitle(currentTitle);
+      queueMicrotask(() => setTitle(currentTitle));
       const timer = setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();

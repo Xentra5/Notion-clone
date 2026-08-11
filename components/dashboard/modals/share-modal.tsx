@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { X, Globe, Copy, Check, UserPlus, Shield, Trash2, Link as LinkIcon, Users } from "lucide-react";
+import { X, Globe, Copy, Check, Trash2, Users } from "lucide-react";
 import { toast } from "sonner";
 
 interface Collaborator {

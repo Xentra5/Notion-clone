@@ -249,26 +249,28 @@ export default function Strands({
     dispersion,
     glassSize
   });
-  propsRef.current = {
-    colors,
-    count,
-    speed,
-    amplitude,
-    waviness,
-    thickness,
-    glow,
-    taper,
-    spread,
-    hueShift,
-    intensity,
-    saturation,
-    opacity,
-    scale,
-    glass,
-    refraction,
-    dispersion,
-    glassSize
-  };
+  useEffect(() => {
+    propsRef.current = {
+      colors,
+      count,
+      speed,
+      amplitude,
+      waviness,
+      thickness,
+      glow,
+      taper,
+      spread,
+      hueShift,
+      intensity,
+      saturation,
+      opacity,
+      scale,
+      glass,
+      refraction,
+      dispersion,
+      glassSize
+    };
+  });
 
   const ctnDom = useRef<HTMLDivElement>(null);
 

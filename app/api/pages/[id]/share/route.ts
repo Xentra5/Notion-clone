@@ -9,10 +9,10 @@ interface Collaborator {
 
 export async function POST(
   req: Request,
-  { params }: { params: Promise<{ pageId: string }> }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { pageId } = await params;
+    const { id: pageId } = await params;
     const body = await req.json();
     const { email, role, isPublic } = body as {
       email?: string;
@@ -53,7 +53,7 @@ export async function POST(
     const updatedPage = await getPage(pageId);
     return NextResponse.json({ page: updatedPage, success: true });
   } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Failed to share page";
-    return NextResponse.json({ error: message }, { status: 500 });
+    const error = err as { message?: string };
+    return NextResponse.json({ error: error.message || "Failed to share page" }, { status: 500 });
   }
 }

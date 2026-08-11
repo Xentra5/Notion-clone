@@ -13,18 +13,11 @@ import {
   Clock,
   MapPin,
   Tag,
-  Users,
-  MoreHorizontal,
   Calendar,
   List,
   Grid3x3,
   AlignJustify,
-  ChevronDown,
-  Circle,
-  Check,
   Trash2,
-  Edit2,
-  Repeat,
 } from "lucide-react";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
@@ -709,7 +702,7 @@ export function NotionCalendarPage() {
   const [view, setView] = useState<ViewMode>("month");
   const [events, setEvents] = useState<CalendarEvent[]>(seedEvents);
   const [newEventDate, setNewEventDate] = useState<string | undefined>();
-  const [newEventTime, setNewEventTime] = useState<string | undefined>();
+  const [, setNewEventTime] = useState<string | undefined>();
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>();
   const [showModal, setShowModal] = useState(false);
 
@@ -738,7 +731,7 @@ export function NotionCalendarPage() {
       setMonth(d.getMonth());
       setDay(d.getDate());
     }
-  }, [view, year, month, day]);
+  }, [view, year, month, day, setYear, setMonth, setDay]);
 
   const openNewEvent = (date?: string, time?: string) => {
     setNewEventDate(date);

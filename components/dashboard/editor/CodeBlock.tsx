@@ -3,7 +3,8 @@
 import { useState, useRef, useCallback, useEffect } from "react";
 import SyntaxHighlighter from "react-syntax-highlighter";
 import { atomOneDark } from "react-syntax-highlighter/dist/cjs/styles/hljs";
-import { Check, Copy, ChevronDown, MoreHorizontal, Sparkles } from "lucide-react";
+import { Check, Copy, ChevronDown, MoreHorizontal, Sparkles, Play, Loader2, ChevronUp, Terminal } from "lucide-react";
+import { runJavaScript, runPython, type RunResult } from "@/lib/code-runner";
 
 const LANGUAGES = [
   { value: "abap", label: "ABAP" },
@@ -106,6 +107,31 @@ export function CodeBlock({
   const [langMenuOpen, setLangMenuOpen] = useState(false);
   const [moreMenuOpen, setMoreMenuOpen] = useState(false);
   const [langSearch, setLangSearch] = useState("");
+  const [isRunning, setIsRunning] = useState(false);
+  const [runResult, setRunResult] = useState<RunResult | null>(null);
+  const [showOutput, setShowOutput] = useState(false);
+
+  const canRun = language === "javascript" || language === "typescript" || language === "python";
+
+  const handleRunCode = useCallback(async () => {
+    if (!canRun || isRunning || !code.trim()) return;
+    setIsRunning(true);
+    setShowOutput(true);
+    try {
+      let result: RunResult;
+      if (language === "python") {
+        result = await runPython(code);
+      } else {
+        result = await runJavaScript(code);
+      }
+      setRunResult(result);
+    } catch (err: unknown) {
+      const e = err as Error;
+      setRunResult({ output: "", error: e.message, durationMs: 0 });
+    } finally {
+      setIsRunning(false);
+    }
+  }, [canRun, isRunning, code, language]);
 
   // Auto-grow textarea
   const adjustHeight = useCallback(() => {
@@ -239,6 +265,27 @@ export function CodeBlock({
           )}
         </div>
 
+        {/* Run Code button */}
+        {canRun && (
+          <button
+            type="button"
+            onClick={handleRunCode}
+            disabled={isRunning || !code.trim()}
+            title={isRunning ? (language === "python" ? "Loading Python runtime…" : "Running…") : "Run Code"}
+            className={`flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-medium transition-all ${
+              isRunning
+                ? "text-amber-500 bg-amber-500/10 cursor-wait"
+                : "text-emerald-500 hover:text-white hover:bg-emerald-500 cursor-pointer"
+            } disabled:opacity-40 disabled:cursor-not-allowed`}
+          >
+            {isRunning ? (
+              <><Loader2 className="h-3 w-3 animate-spin" />{language === "python" ? "Loading…" : "Running…"}</>
+            ) : (
+              <><Play className="h-3 w-3" />Run</>
+            )}
+          </button>
+        )}
+
         {/* Copy button */}
         <button
           type="button"
@@ -355,6 +402,42 @@ export function CodeBlock({
       {/* Subtle focus ring around the whole block */}
       {isEditing && (
         <div className="absolute inset-0 rounded-md ring-1 ring-[#2383e2]/30 pointer-events-none" />
+      )}
+
+      {/* ── Output Console ── */}
+      {runResult && (
+        <div className="mt-0 rounded-b-md overflow-hidden border border-t-0 border-[#e9e9e7] dark:border-[#434343] bg-[#1e1e1e]">
+          <button
+            type="button"
+            onClick={() => setShowOutput((v) => !v)}
+            className="w-full flex items-center justify-between px-3 py-1.5 bg-[#2d2d2d] hover:bg-[#333] transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              <Terminal className="h-3 w-3 text-[#9b9a97]" />
+              <span className="text-[11px] font-medium text-[#9b9a97]">Output</span>
+              {runResult.error && (
+                <span className="text-[10px] font-medium text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded">Error</span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] text-[#6b6b6b] font-mono">{runResult.durationMs}ms</span>
+              <ChevronUp className={`h-3 w-3 text-[#6b6b6b] transition-transform ${showOutput ? "" : "rotate-180"}`} />
+            </div>
+          </button>
+          {showOutput && (
+            <div className="px-3 py-2 max-h-[200px] overflow-y-auto">
+              {runResult.output && (
+                <pre className="text-[13px] font-mono text-emerald-400 whitespace-pre-wrap leading-relaxed">{runResult.output}</pre>
+              )}
+              {runResult.error && (
+                <pre className="text-[13px] font-mono text-red-400 whitespace-pre-wrap leading-relaxed mt-1">{runResult.error}</pre>
+              )}
+              {!runResult.output && !runResult.error && (
+                <div className="text-[12px] text-[#6b6b6b] italic">No output</div>
+              )}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );

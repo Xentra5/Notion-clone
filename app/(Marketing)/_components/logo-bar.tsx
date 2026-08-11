@@ -14,6 +14,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="Notion"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -28,6 +29,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="Next.js"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -42,6 +44,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="TypeScript"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -56,6 +59,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="React"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -70,6 +74,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="Tailwind CSS"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -84,6 +89,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="Node.js"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -98,6 +104,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="MongoDB"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -112,6 +119,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="Docker"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -126,6 +134,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="JavaScript"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -140,6 +149,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="HTML5"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -154,6 +164,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="CSS3"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -168,6 +179,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="npm"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -182,6 +194,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="Prisma"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>
@@ -196,6 +209,7 @@ const publicSvgLogos: LogoItem[] = [
           alt="Vercel"
           width={36}
           height={36}
+          style={{ width: "auto", height: "auto" }}
           className="h-9 w-9 object-contain"
         />
       </div>

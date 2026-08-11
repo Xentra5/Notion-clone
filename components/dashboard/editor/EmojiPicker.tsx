@@ -7,7 +7,7 @@ interface EmojiPickerProps {
 
 const EMOJIS = ["📱", "📄", "🚀", "⚡", "💡", "🎨", "📝", "✨", "📌", "🌐"];
 
-export function EmojiPicker({ emoji, onSelect }: EmojiPickerProps) {
+export function EmojiPicker({ emoji }: EmojiPickerProps) {
   return (
     <div className="relative group/emoji">
       <button

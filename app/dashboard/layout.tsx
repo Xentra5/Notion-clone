@@ -106,13 +106,13 @@ export default function DashboardLayout({
           // Pass pageId when on a real page route so the sidebar can highlight it.
           // Fall back to activeTitle for special sentinel pages (AI Meeting Note, Home).
           activePage={pageId ?? activeTitle}
-          onSelectPage={(title) => setActiveTitle(title)}
+          onSelectPage={(title: string) => setActiveTitle(title)}
           onOpenSearch={() => setIsSearchOpen(true)}
           onToggleAi={() => setIsAiOpen(!isAiOpen)}
           onOpenCalendar={() => setIsCalendarOpen(true)}
           onOpenSettings={() => setIsSettingsOpen(true)}
           onOpenTrash={() => setIsTrashOpen(true)}
-          onOpenUtility={(page) => { setUtilityPage(page); setActiveTitle(page); }}
+          onOpenUtility={(page: "Library" | "My Tasks" | "Marketplace" | "Help") => { setUtilityPage(page); setActiveTitle(page); }}
         />
       </div>
 

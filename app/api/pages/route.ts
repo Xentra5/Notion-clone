@@ -36,14 +36,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const { title, category, isAiMeetingNote, blocks } = body as {
+    const { title, category, parentPageId, isAiMeetingNote, blocks } = body as {
       title?: unknown;
       category?: unknown;
+      parentPageId?: unknown;
       isAiMeetingNote?: unknown;
       blocks?: unknown;
     };
     const pageTitle = typeof title === "string" && title.trim() ? title.trim() : "Untitled";
     const pageCategory = category === "Private" || category === "Shared" || category === "Meetings" ? category : "Private";
+    const parentId = typeof parentPageId === "string" && parentPageId.trim() ? parentPageId.trim() : null;
 
     if (blocks !== undefined && !Array.isArray(blocks)) {
       return NextResponse.json({ error: "Blocks must be an array" }, { status: 400 });
@@ -75,6 +77,7 @@ export async function POST(request: NextRequest) {
       title: pageTitle,
       icon: "📄",
       category: pageCategory,
+      parentPageId: parentId,
       isAiMeetingNote: !!isAiMeetingNote,
       blocks: pageBlocks,
     });

@@ -11,7 +11,7 @@ export function ThemeToggle() {
 
   // Avoid hydration mismatch by rendering only after mounting
   useEffect(() => {
-    setMounted(true);
+    queueMicrotask(() => setMounted(true));
   }, []);
 
   if (!mounted) {

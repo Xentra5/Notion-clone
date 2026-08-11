@@ -18,7 +18,7 @@ import {
 type SocialProvider = "google" | "apple";
 
 export default function LoginForm() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
 
   const [email, setEmail] = useState("");

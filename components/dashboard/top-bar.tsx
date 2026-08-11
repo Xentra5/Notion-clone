@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
-import { updatePage } from "@/lib/actions/pages";
-import type { PageBlock } from "@/lib/actions/pages";
+import Link from "next/link";
+import { updatePage, getPages, type Page, type PageBlock } from "@/lib/actions/pages";
 import {
   Lock,
   ChevronDown,
@@ -29,6 +29,7 @@ import { HistoryModal } from "@/components/dashboard/modals/history-modal";
 import { ShareModal } from "@/components/dashboard/modals/share-modal";
 import { NotificationsPopover } from "@/components/dashboard/notifications-popover";
 import { CommentsPanel } from "@/components/dashboard/editor/CommentsPanel";
+import { LivePresenceBar } from "@/components/dashboard/editor/LivePresenceBar";
 import { blocksToMarkdown, downloadMarkdownFile, exportToPdfPrint } from "@/lib/export-import";
 import { Bell } from "lucide-react";
 
@@ -78,7 +79,6 @@ export function TopBar({
 }: TopBarProps) {
   const [isStarred, setIsStarred] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [showShareMenu, setShowShareMenu] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
   const [permission, setPermission] = useState("Private");
   const [showPermissionDropdown, setShowPermissionDropdown] = useState(false);
@@ -93,13 +93,42 @@ export function TopBar({
   const [showNotifications, setShowNotifications] = useState(false);
   const [showCommentsPanel, setShowCommentsPanel] = useState(false);
 
+  const [breadcrumbs, setBreadcrumbs] = useState<{ id: string; title: string }[]>([]);
+
   useEffect(() => {
-    setLastEdited(updatedAt || null);
+    queueMicrotask(() => setLastEdited(updatedAt || null));
   }, [updatedAt]);
 
   useEffect(() => {
-    setRenameTitleValue(activeTitle);
+    queueMicrotask(() => setRenameTitleValue(activeTitle));
   }, [activeTitle]);
+
+  useEffect(() => {
+    if (!pageId) {
+      queueMicrotask(() => setBreadcrumbs([]));
+      return;
+    }
+    let cancelled = false;
+    getPages()
+      .then((allPages) => {
+        if (cancelled) return;
+        const chain: { id: string; title: string }[] = [];
+        const current = allPages.find((p) => p._id === pageId);
+        let parentId = current?.parentPageId;
+        while (parentId) {
+          const parentDoc: Page | undefined = allPages.find((p) => p._id === parentId);
+          if (parentDoc) {
+            chain.unshift({ id: parentDoc._id, title: parentDoc.title });
+            parentId = parentDoc.parentPageId;
+          } else {
+            break;
+          }
+        }
+        setBreadcrumbs(chain);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [pageId, activeTitle]);
 
   useEffect(() => {
     function handlePageUpdate(e: Event) {
@@ -162,6 +191,17 @@ export function TopBar({
           )}
 
           <div className="flex items-center gap-1.5 font-medium text-foreground truncate">
+            {breadcrumbs.map((crumb) => (
+              <div key={crumb.id} className="flex items-center gap-1 shrink-0">
+                <Link
+                  href={`/dashboard/${crumb.id}`}
+                  className="text-muted-foreground hover:text-foreground transition truncate max-w-[110px] font-normal"
+                >
+                  {crumb.title}
+                </Link>
+                <span className="text-muted-foreground/30 font-normal">/</span>
+              </div>
+            ))}
             {isRenamingTitle ? (
               <input
                 autoFocus
@@ -261,6 +301,9 @@ export function TopBar({
 
         {/* Right section: Metadata & Page Actions */}
         <div className="flex items-center gap-1 sm:gap-2 shrink-0">
+          {/* Live Collaboration Presence Bar */}
+          <LivePresenceBar pageId={pageId} />
+
           <span className="hidden sm:inline-block text-[11px] text-muted-foreground mr-1">
             {formatRelativeTime(lastEdited)}
           </span>

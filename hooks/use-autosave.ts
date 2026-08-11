@@ -37,6 +37,8 @@ export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutos
               text: item.text,
               checked: !!item.checked,
               language: item.codeLanguage ?? "javascript",
+              subPageId: item.subPageId ?? "",
+              kanbanColumns: item.kanbanColumns ?? [],
             },
           })) as never,
         });

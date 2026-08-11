@@ -1,4 +1,4 @@
-export function trackEvent(eventName: string, properties: Record<string, any> = {}) {
+export function trackEvent(eventName: string, properties: Record<string, unknown> = {}) {
   if (typeof window === "undefined") return;
 
   // Track event in development console or forward to PostHog / Mixpanel
@@ -7,15 +7,17 @@ export function trackEvent(eventName: string, properties: Record<string, any> = 
   }
 
   // Example PostHog / Mixpanel window object check
-  if ((window as any).posthog) {
-    (window as any).posthog.capture(eventName, properties);
+  const win = window as unknown as { posthog?: { capture: (event: string, props: Record<string, unknown>) => void; identify: (id: string, traits: Record<string, unknown>) => void } };
+  if (win.posthog) {
+    win.posthog.capture(eventName, properties);
   }
 }
 
-export function identifyUser(userId: string, traits: Record<string, any> = {}) {
+export function identifyUser(userId: string, traits: Record<string, unknown> = {}) {
   if (typeof window === "undefined") return;
 
-  if ((window as any).posthog) {
-    (window as any).posthog.identify(userId, traits);
+  const win = window as unknown as { posthog?: { capture: (event: string, props: Record<string, unknown>) => void; identify: (id: string, traits: Record<string, unknown>) => void } };
+  if (win.posthog) {
+    win.posthog.identify(userId, traits);
   }
 }
