@@ -30,7 +30,7 @@ export default function DashboardLayout({
 
   const [activeTitle, setActiveTitle] = useState("Getting Started with Notion");
   const [lastEditedAt, setLastEditedAt] = useState<string | Date | undefined>(undefined);
-  const [isAiOpen, setIsAiOpen] = useState(true);
+  const [isAiOpen, setIsAiOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -78,7 +78,7 @@ export default function DashboardLayout({
         setActiveTitle(p.title);
         setLastEditedAt(p.updatedAt);
       })
-      .catch(() => setActiveTitle("Untitled"));
+      .catch(() => setActiveTitle("Page Not Found"));
   }, [pageId]);
 
   async function handleConfirmDelete() {
@@ -150,6 +150,7 @@ export default function DashboardLayout({
         isOpen={isAiOpen}
         onClose={() => setIsAiOpen(false)}
         currentPageTitle={activeTitle}
+        currentPageId={pageId}
       />
 
       {/* Overlay Modals */}

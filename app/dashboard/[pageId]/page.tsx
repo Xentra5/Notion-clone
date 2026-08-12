@@ -155,8 +155,21 @@ export default function PageRoute({ params }: PageRouteProps) {
 
   if (notFound) {
     return (
-      <div className="flex-1 flex items-center justify-center text-muted-foreground text-sm select-none">
-        Page not found or you don&apos;t have access.
+      <div className="flex-1 flex flex-col items-center justify-center p-8 text-center select-none bg-background">
+        <div className="p-4 rounded-2xl bg-foreground/5 text-muted-foreground mb-4">
+          <span className="text-4xl">📄</span>
+        </div>
+        <h2 className="text-lg font-bold text-foreground mb-1">Page Not Found</h2>
+        <p className="text-xs text-muted-foreground max-w-sm mb-6 leading-relaxed">
+          This page does not exist, was deleted, or you don&apos;t have access to view it.
+        </p>
+        <button
+          type="button"
+          onClick={() => router.push("/dashboard")}
+          className="px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition shadow-sm"
+        >
+          Return to Workspace Home
+        </button>
       </div>
     );
   }
@@ -177,7 +190,6 @@ export default function PageRoute({ params }: PageRouteProps) {
       initialBlocks={initialBlocks}
       initialCoverImage={page.coverImage}
       childPages={childPages}
-      onOpenAi={() => window.dispatchEvent(new Event("open-quick-ai"))}
       onSelectSubPage={handleSelectSubPage}
     />
   );

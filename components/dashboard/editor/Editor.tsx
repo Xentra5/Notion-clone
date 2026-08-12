@@ -45,7 +45,6 @@ import {
   Table,
   Link,
   Trash2,
-  Sparkles,
   SquarePen,
 } from "lucide-react";
 
@@ -55,7 +54,6 @@ export interface EditorProps {
   initialBlocks?: ChecklistItem[];
   initialCoverImage?: string;
   childPages?: Page[];
-  onOpenAi: () => void;
   onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
 }
 
@@ -545,7 +543,7 @@ function Block({
 }
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
-export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, childPages, onOpenAi, onSelectSubPage }: EditorProps) {
+export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, childPages, onSelectSubPage }: EditorProps) {
   const router = useRouter();
   const [pageEmoji, setPageEmoji] = useState("📄");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -586,6 +584,26 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   }, [pageId]);
 
   const { scheduleAutosave, cancelAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
+
+  useEffect(() => {
+    const handleAiAppend = (e: Event) => {
+      const detail = (e as CustomEvent<{ text: string; type?: BlockType; language?: string }>).detail;
+      if (detail && detail.text) {
+        const newBlock = makeBlock(detail.type || "paragraph");
+        newBlock.text = detail.text;
+        if (detail.language) {
+          newBlock.codeLanguage = detail.language;
+        }
+        setItems((prev) => {
+          const nextItems = [...prev, newBlock];
+          scheduleAutosave(currentTitle, nextItems);
+          return nextItems;
+        });
+      }
+    };
+    window.addEventListener("ai-append-block", handleAiAppend);
+    return () => window.removeEventListener("ai-append-block", handleAiAppend);
+  }, [currentTitle, scheduleAutosave]);
 
   const handleCoverChange = useCallback(
     async (newCoverUrl?: string) => {
@@ -690,7 +708,9 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
           .then((updated) => {
             window.dispatchEvent(new CustomEvent("page-updated", { detail: updated }));
           })
-          .catch(console.error);
+          .catch(() => {
+            // Ignore if sub-page was already deleted or not found
+          });
       }
       return prev.map(b => b.id === id ? { ...b, text } : b);
     });
@@ -1314,13 +1334,6 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
         </div>
       </div>
 
-      {/* Quick AI control */}
-      <div className="fixed bottom-5 right-5 z-20">
-        <button onClick={onOpenAi}
-          className="h-9 w-9 rounded-full bg-purple-600 hover:bg-purple-500 shadow-xl flex items-center justify-center text-white hover:scale-105 active:scale-95 transition"
-          title="Quick Notion AI">
-          <Sparkles className="h-4 w-4" />
-        </button>
-      </div>   </div>
+    </div>
   );
 }

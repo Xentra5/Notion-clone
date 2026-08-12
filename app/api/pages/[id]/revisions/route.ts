@@ -69,7 +69,7 @@ export async function POST(
           title: revision.title,
           blocks: revision.blocks,
         },
-        { new: true }
+        { returnDocument: "after" }
       );
 
       return NextResponse.json({ success: true, page: updatedPage });

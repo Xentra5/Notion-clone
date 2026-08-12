@@ -76,7 +76,29 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
       if (navigator.mediaDevices?.getUserMedia) {
         mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
       }
-      if (recordingTime === 0) setTranscripts(["Recording initialized… Real-time transcription engine active."]);
+
+      if ("SpeechRecognition" in window || "webkitSpeechRecognition" in window) {
+        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+        const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        const recog = new SpeechRecognition();
+        recog.continuous = true;
+        recog.interimResults = true;
+        recog.lang = "en-US";
+        /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
+        recog.onresult = (event: any) => {
+          for (let i = event.resultIndex; i < event.results.length; i++) {
+            if (event.results[i].isFinal) {
+              const text = event.results[i][0].transcript;
+              if (text.trim()) {
+                setTranscripts((prev) => [...prev, `Speaker: ${text.trim()}`]);
+              }
+            }
+          }
+        };
+        recog.start();
+      }
+
+      if (recordingTime === 0) setTranscripts(["Recording initialized… Real-time speech transcription active."]);
       setIsRecording(true);
     } catch {
       setRecordingError("Microphone access was blocked. Allow microphone access and try again.");

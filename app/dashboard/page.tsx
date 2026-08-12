@@ -33,9 +33,7 @@ export default function DashboardPage() {
   return (
     <DocumentCanvas
       activeTitle={activeTitle}
-      onOpenAi={() => window.dispatchEvent(new Event("open-quick-ai"))}
       onSelectSubPage={handleSelectSubPage}
     />
   );
 }
-

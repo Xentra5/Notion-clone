@@ -61,9 +61,14 @@ A feature-rich, enterprise-grade collaborative workspace application built on **
 - **PDF Export**: Printable PDF engine formatted with custom typography.
 - **Markdown Importer ([import-modal.tsx](file:///d:/notion/components/dashboard/modals/import-modal.tsx))**: Importer parsing `.md` files directly into a new Notion workspace page.
 
-### 🤖 12. Notion AI Assistant & Meeting Notes
-- **AI Assistant Modal ([ai-chat-modal.tsx](file:///d:/notion/components/dashboard/modals/ai-chat-modal.tsx))**: Summarize notes, draft outlines, and answer workspace questions.
-- **AI Meeting Notes View ([MeetingNoteView.tsx](file:///d:/notion/components/dashboard/editor/MeetingNoteView.tsx))**: Digest meeting transcripts and extract action items.
+### 🤖 12. LangChain + FastAPI Vector RAG AI Engine & Live Voice Recorder
+- **6-Step Vector RAG Pipeline ([rag_service/main.py](file:///d:/notion/rag_service/main.py))**: Document Loader → LangChain `RecursiveCharacterTextSplitter` → `SentenceTransformerEmbeddings` (`all-MiniLM-L6-v2`) → `ChromaDB` Vector Store → Similarity Search → Google Gemini 1.5 Flash LLM → Answer with Clickable Page Citations.
+- **Special Commands**:
+  - `/summary`: Executive workspace summaries with Key Takeaways & Action Items.
+  - `/search <query>`: Live web search powered by LangChain's `DuckDuckGoSearchRun` tool.
+  - **Out-of-Context Fallback**: Graceful warning when workspace pages lack sufficient info.
+- **Notion AI Side Panel Integration ([notion-ai-panel.tsx](file:///d:/notion/components/dashboard/notion-ai-panel.tsx))**: Connected right-hand chat drawer with quick command chips and citation links.
+- **🎙️ Live Voice Recording & AI Meeting Notes ([MeetingNoteView.tsx](file:///d:/notion/components/dashboard/editor/MeetingNoteView.tsx))**: Browser Web Speech API (`SpeechRecognition`) speech-to-text recording with WebGL audio waveform visualizer.
 
 ### 💳 13. Multi-Region Payment Gateways (Stripe + Razorpay)
 - **Regional Selection**: Choose between USA / Global (Stripe) and India (Razorpay).

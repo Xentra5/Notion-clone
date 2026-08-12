@@ -11,7 +11,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   const page = await Page.findOneAndUpdate(
     { _id: id, userId: session.user.email },
     { $set: { deletedAt: null } },
-    { new: true }
+    { returnDocument: "after" }
   ).lean();
   if (!page) return NextResponse.json({ error: "Page not found" }, { status: 404 });
   return NextResponse.json({ page });

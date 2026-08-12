@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const page = await Page.findOneAndUpdate(
       { _id: id, userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] },
       { $set },
-      { new: true, lean: true, runValidators: true }
+      { returnDocument: "after", lean: true, runValidators: true }
     );
 
     if (!page) {

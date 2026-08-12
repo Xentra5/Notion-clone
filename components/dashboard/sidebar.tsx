@@ -219,7 +219,17 @@ export function Sidebar({
   const [renameValue, setRenameValue] = useState("");
   const [renameModalPage, setRenameModalPage] = useState<Page | null>(null);
   const isSeedingOnboarding = useRef(false);
-  const onboardingStorageKey = `notion-onboarding-created:${session?.user?.email || "workspace"}`;
+  const pathnameRef = useRef(pathname);
+  useEffect(() => {
+    pathnameRef.current = pathname;
+  }, [pathname]);
+
+  const userEmail = session?.user?.email;
+  const userEmailRef = useRef(userEmail);
+  useEffect(() => {
+    userEmailRef.current = userEmail;
+  }, [userEmail]);
+
   const [expandedSections, setExpandedSections] = useState({
     meetings: true,
     recents: true,
@@ -232,25 +242,24 @@ export function Sidebar({
   const loadPages = useCallback(async () => {
     try {
       const data = await getPages();
-      const onboardingAlreadyCreated = typeof window !== "undefined" && window.localStorage.getItem(onboardingStorageKey) === "1";
+      const storageKey = `notion-onboarding-created:${userEmailRef.current || "workspace"}`;
+      const onboardingAlreadyCreated = typeof window !== "undefined" && window.localStorage.getItem(storageKey) === "1";
       if (data.length === 0 && !isSeedingOnboarding.current && !onboardingAlreadyCreated) {
         isSeedingOnboarding.current = true;
         const onboarding = await createPage({
           title: "Getting Started with Notion",
           blocks: GETTING_STARTED_BLOCKS,
         });
-        window.localStorage.setItem(onboardingStorageKey, "1");
+        window.localStorage.setItem(storageKey, "1");
         setPages([onboarding]);
-        if (pathname === "/dashboard") router.push(`/dashboard/${onboarding._id}`);
+        if (pathnameRef.current === "/dashboard") router.push(`/dashboard/${onboarding._id}`);
         return;
       }
       setPages(data);
-
-
     } catch (e) {
       console.error("Failed to load pages:", e);
     }
-  }, [onboardingStorageKey, pathname, router]);
+  }, [router]);
 
   useEffect(() => { const timer = window.setTimeout(() => { void loadPages(); }, 0); return () => window.clearTimeout(timer); }, [loadPages]);
 
