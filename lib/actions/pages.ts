@@ -77,7 +77,7 @@ export async function createPage(data: {
 // PATCH /api/pages/[id] — update one or more fields on an existing page
 export async function updatePage(
   id: string,
-  data: Partial<Pick<Page, "title" | "blocks" | "category" | "icon">>
+  data: Partial<Pick<Page, "title" | "blocks" | "category" | "icon" | "coverImage">>
 ): Promise<Page> {
   const res = await fetch(`/api/pages/${id}`, {
     method: "PATCH",

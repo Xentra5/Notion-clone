@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { title, blocks, category, icon, parentPageId } = body;
+    const { title, blocks, category, icon, coverImage, parentPageId } = body;
 
     // Build update payload from only the provided fields
     const $set: Record<string, unknown> = {};
@@ -67,6 +67,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (blocks !== undefined) $set.blocks = blocks;
     if (category !== undefined) $set.category = category;
     if (icon !== undefined) $set.icon = icon;
+    if (coverImage !== undefined) $set.coverImage = coverImage;
     if (parentPageId !== undefined) {
       if (parentPageId === id) {
         return NextResponse.json({ error: "A page cannot be its own parent" }, { status: 400 });
@@ -109,6 +110,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 }
 
+async function getDescendantPageIds(parentId: string, userId: string): Promise<string[]> {
+  const children = await Page.find({ parentPageId: parentId, userId }).select("_id").lean();
+  let ids: string[] = children.map((c) => (c._id as mongoose.Types.ObjectId).toString());
+  for (const childId of ids) {
+    const subChildren = await getDescendantPageIds(childId, userId);
+    ids = ids.concat(subChildren);
+  }
+  return ids;
+}
+
 // DELETE /api/pages/[id] — move a page and all its sub-tree child pages to Trash, or permanently delete them.
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {
@@ -123,24 +134,22 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const isPermanent = new URL(request.url).searchParams.get("permanent") === "true";
     await connectToDatabase();
 
+    const descendantIds = await getDescendantPageIds(id, session.user.email);
+    const targetIds = [id, ...descendantIds];
+
     if (isPermanent) {
-      const result = await Page.findOneAndDelete({ _id: id, userId: session.user.email });
-      if (!result) return NextResponse.json({ error: "Page not found" }, { status: 404 });
-      // Delete child sub-tree pages
-      await Page.deleteMany({ parentPageId: id, userId: session.user.email });
+      const result = await Page.deleteMany({ _id: { $in: targetIds }, userId: session.user.email });
+      if (result.deletedCount === 0) return NextResponse.json({ error: "Page not found" }, { status: 404 });
     } else {
       const now = new Date();
-      const result = await Page.findOneAndUpdate(
-        { _id: id, userId: session.user.email },
-        { $set: { deletedAt: now } },
-        { new: true }
+      const result = await Page.updateMany(
+        { _id: { $in: targetIds }, userId: session.user.email },
+        { $set: { deletedAt: now } }
       );
-      if (!result) return NextResponse.json({ error: "Page not found" }, { status: 404 });
-      // Soft-delete child sub-tree pages
-      await Page.updateMany({ parentPageId: id, userId: session.user.email }, { $set: { deletedAt: now } });
+      if (result.matchedCount === 0) return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, permanent: isPermanent });
+    return NextResponse.json({ success: true, permanent: isPermanent, deletedCount: targetIds.length });
   } catch (error) {
     console.error("Error deleting page:", error);
     return NextResponse.json({ error: "Failed to delete page" }, { status: 500 });

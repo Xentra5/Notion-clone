@@ -12,6 +12,7 @@ import { CalendarModal } from "@/components/dashboard/modals/calendar-modal";
 import { SettingsModal } from "@/components/dashboard/modals/settings-modal";
 import { TrashModal } from "@/components/dashboard/modals/trash-modal";
 import { AiChatModal } from "@/components/dashboard/modals/ai-chat-modal";
+import { CommandPalette } from "@/components/dashboard/command-palette";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { getPage, deletePage } from "@/lib/actions/pages";
 import { UtilityPage } from "@/components/dashboard/utility-page";
@@ -31,6 +32,7 @@ export default function DashboardLayout({
   const [lastEditedAt, setLastEditedAt] = useState<string | Date | undefined>(undefined);
   const [isAiOpen, setIsAiOpen] = useState(true);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isTrashOpen, setIsTrashOpen] = useState(false);
@@ -38,6 +40,18 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [utilityPage, setUtilityPage] = useState<"Library" | "My Tasks" | "Marketplace" | "Help" | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  // Global Cmd+K / Ctrl+K keyboard shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
 
   useEffect(() => {
     const openQuickAi = () => setIsQuickAiOpen(true);
@@ -139,6 +153,11 @@ export default function DashboardLayout({
       />
 
       {/* Overlay Modals */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        onOpenAi={() => setIsQuickAiOpen(true)}
+      />
       <SearchModal
         isOpen={isSearchOpen}
         onClose={() => setIsSearchOpen(false)}

@@ -9,7 +9,6 @@ import {
   FileText,
   GripVertical,
   Sparkles,
-  Link as LinkIcon,
   Image as ImageIcon,
   Video as VideoIcon,
   Volume2,
@@ -305,20 +304,15 @@ export function BlockRenderer({
 
             {/* Page & Link to Page */}
             {(item.type === "page" || item.type === "link_to_page") && (
-              <button
-                type="button"
+              <div
                 onClick={() => onSelectSubPage(item.text || "Untitled Page")}
-                className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-card hover:bg-accent border border-border text-xs font-medium text-foreground transition shadow-sm text-left group"
+                className="flex items-center gap-2.5 py-1 px-1 rounded hover:bg-foreground/[0.05] transition cursor-pointer group w-fit max-w-full"
               >
-                {item.type === "link_to_page" ? (
-                  <LinkIcon className="h-4 w-4 text-blue-500 shrink-0" />
-                ) : (
-                  <FileText className="h-4 w-4 text-muted-foreground shrink-0 group-hover:text-foreground" />
-                )}
-                <span className="underline underline-offset-2 decoration-neutral-400 dark:decoration-[#555] group-hover:decoration-foreground">
+                <FileText className="h-5 w-5 text-foreground/80 shrink-0 stroke-[1.75]" />
+                <span className="font-bold text-[15px] text-foreground underline decoration-foreground/40 underline-offset-4 group-hover:decoration-foreground transition-colors truncate">
                   {item.text || "Untitled Page"}
                 </span>
-              </button>
+              </div>
             )}
 
             {/* Table */}

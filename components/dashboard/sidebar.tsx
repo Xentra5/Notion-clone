@@ -46,6 +46,7 @@ interface PageTreeNodeProps {
   onBeginRename: (e: React.MouseEvent, page: Page) => void;
   onFinishRename: (pageId: string) => void;
   onDeletePage: (e: React.MouseEvent, pageId: string) => void;
+  onCreateSubPage: (parentPageId: string) => void;
   setRenameValue: (val: string) => void;
   setRenamingPageId: (id: string | null) => void;
 }
@@ -61,6 +62,7 @@ function PageTreeNode({
   onBeginRename,
   onFinishRename,
   onDeletePage,
+  onCreateSubPage,
   setRenameValue,
   setRenamingPageId,
 }: PageTreeNodeProps) {
@@ -129,6 +131,16 @@ function PageTreeNode({
         {renamingPageId !== page._id && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition">
             <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onCreateSubPage(page._id);
+              }}
+              title="Add sub-page inside"
+              className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-foreground transition"
+            >
+              <Plus className="h-3 w-3" />
+            </button>
+            <button
               onClick={(e) => onBeginRename(e, page)}
               title="Rename page"
               className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-foreground transition"
@@ -162,6 +174,7 @@ function PageTreeNode({
               onBeginRename={onBeginRename}
               onFinishRename={onFinishRename}
               onDeletePage={onDeletePage}
+              onCreateSubPage={onCreateSubPage}
               setRenameValue={setRenameValue}
               setRenamingPageId={setRenamingPageId}
             />
@@ -275,11 +288,29 @@ export function Sidebar({
     try {
       const newPage = await createPage({ title: "Untitled" });
       await loadPages();
+      window.dispatchEvent(new CustomEvent("page-created", { detail: { page: newPage } }));
       toast.success("New page created");
       router.push(`/dashboard/${newPage._id}`);
     } catch (e) {
       toast.error("Failed to create page");
       console.error("Failed to create page:", e);
+    } finally {
+      setIsCreating(false);
+    }
+  }
+
+  async function handleNewSubPage(parentPageId: string) {
+    if (isCreating) return;
+    setIsCreating(true);
+    try {
+      const newPage = await createPage({ title: "Untitled", parentPageId, category: "Private" });
+      await loadPages();
+      window.dispatchEvent(new CustomEvent("page-created", { detail: { page: newPage } }));
+      toast.success("New sub-page created");
+      router.push(`/dashboard/${newPage._id}`);
+    } catch (e) {
+      toast.error("Failed to create sub-page");
+      console.error("Failed to create sub-page:", e);
     } finally {
       setIsCreating(false);
     }
@@ -629,6 +660,7 @@ export function Sidebar({
                     onBeginRename={beginRename}
                     onFinishRename={finishRename}
                     onDeletePage={handleDeletePage}
+                    onCreateSubPage={handleNewSubPage}
                     setRenameValue={setRenameValue}
                     setRenamingPageId={setRenamingPageId}
                   />

@@ -459,7 +459,13 @@ export function TopBar({
 
       {/* Modals & Slideouts */}
       <ImportModal isOpen={showImportModal} onClose={() => setShowImportModal(false)} />
-      <HistoryModal isOpen={showHistoryModal} onClose={() => setShowHistoryModal(false)} pageId={pageId} />
+      <HistoryModal
+        isOpen={showHistoryModal}
+        onClose={() => setShowHistoryModal(false)}
+        pageId={pageId}
+        currentTitle={activeTitle}
+        currentBlocks={blocks}
+      />
       <ShareModal isOpen={showShareModal} onClose={() => setShowShareModal(false)} pageId={pageId} activeTitle={activeTitle} />
       {showCommentsPanel && (
         <div className="fixed right-0 top-11 bottom-0 z-40">

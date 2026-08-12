@@ -10,9 +10,15 @@ import {
 import { MeetingNoteView } from "./MeetingNoteView";
 import { EmojiDropdown } from "./EmojiPicker";
 import { CodeBlock } from "./CodeBlock";
-import { KanbanBoard } from "./KanbanBoard";
+import { DatabaseBlock } from "./DatabaseBlock";
+import { WebBookmarkBlock } from "./WebBookmarkBlock";
+import { FileUploadBlock } from "./FileUploadBlock";
+import { PageCoverBanner } from "./PageCoverBanner";
+import { RemoteCursorOverlay } from "./RemoteCursorOverlay";
 import { useAutosave } from "@/hooks/use-autosave";
-import { updatePage } from "@/lib/actions/pages";
+import { updatePage, deletePage, type Page } from "@/lib/actions/pages";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 import type { ChecklistItem, BlockType, KanbanColumn } from "@/hooks/use-pages";
 import {
   Check,
@@ -47,6 +53,8 @@ export interface EditorProps {
   activeTitle: string;
   pageId?: string;
   initialBlocks?: ChecklistItem[];
+  initialCoverImage?: string;
+  childPages?: Page[];
   onOpenAi: () => void;
   onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
 }
@@ -130,9 +138,12 @@ interface BlockProps {
   onUpdateToggleChildren?: (id: string, childrenText: string) => void;
   onUpdateTableData?: (id: string, data: string[][]) => void;
   onUpdateKanbanColumns?: (id: string, columns: KanbanColumn[]) => void;
+  onUpdateFile?: (id: string, url: string, fileName: string, fileSize?: string) => void;
+  onUpdateUrl?: (id: string, url: string) => void;
   onToggleCheck: (id: string) => void;
   onKeyDown: (e: React.KeyboardEvent, id: string) => void;
   onDelete?: (id: string) => void;
+  onDeleteSubPage?: (subPageId: string) => void;
   onAddAfter?: (id: string) => void;
   onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
   registerRef: (id: string, el: HTMLElement | null) => void;
@@ -141,7 +152,8 @@ interface BlockProps {
 function Block({
   item, seqNumber = 1, isFocused, onFocus, onUpdateText, onUpdateLanguage,
   onUpdateCalloutIcon, onUpdateToggleChildren, onUpdateTableData, onUpdateKanbanColumns,
-  onToggleCheck, onKeyDown, onDelete, onAddAfter, onSelectSubPage, registerRef,
+  onUpdateFile, onUpdateUrl,
+  onToggleCheck, onKeyDown, onDelete, onDeleteSubPage, onAddAfter, onSelectSubPage, registerRef,
 }: BlockProps) {
   const elRef = useRef<HTMLElement | null>(null);
   const [toggleOpen, setToggleOpen] = useState(false);
@@ -358,26 +370,54 @@ function Block({
 
         {/* ── Page / Link to page ── */}
         {(item.type === "page" || item.type === "link_to_page") && (
-          <div className="flex items-center gap-2 my-1 group/page">
-            <button
-              type="button"
-              onClick={() => onSelectSubPage(item.id, item.subPageId && item.subPageId.length > 0 ? item.subPageId : undefined, item.text || "Untitled")}
-              className="flex items-center gap-2.5 flex-1 px-3 py-2.5 rounded-lg border border-foreground/[0.08] hover:bg-foreground/[0.04] dark:hover:bg-foreground/[0.03] transition-colors text-left cursor-pointer"
-            >
-              <span className="text-base select-none">📄</span>
-              <div className="flex-1 min-w-0">
-                <div
-                  {...ce}
-                  ref={setRef}
-                  className="text-[14px] font-medium text-foreground outline-none w-full empty:before:content-[attr(data-placeholder)] empty:before:text-foreground/30 empty:before:pointer-events-none"
-                  data-placeholder="Untitled"
-                />
-                <div className="text-[11px] text-foreground/40 mt-0.5">
-                  {item.subPageId && item.subPageId.length > 0 ? "Click to open sub-page" : "Click to create sub-page"}
-                </div>
+          <div className="flex items-center gap-2.5 my-1 px-1 py-1 rounded hover:bg-foreground/[0.04] transition group/page cursor-pointer w-full">
+            <FileText className="h-5 w-5 text-foreground/80 shrink-0 stroke-[1.75]" />
+            <div className="flex-1 min-w-0 flex items-center gap-2">
+              <div
+                {...ce}
+                ref={setRef}
+                className="font-bold text-[15px] text-foreground underline decoration-foreground/40 underline-offset-4 hover:decoration-foreground outline-none w-full cursor-text empty:before:content-[attr(data-placeholder)] empty:before:text-foreground/30 empty:before:pointer-events-none"
+                data-placeholder="Untitled page"
+              />
+            </div>
+            {item.subPageId ? (
+              <div className="flex items-center gap-1 opacity-0 group-hover/page:opacity-100 transition shrink-0">
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onSelectSubPage(item.id, item.subPageId, item.text || "Untitled");
+                  }}
+                  className="text-xs font-semibold px-2 py-0.5 rounded bg-foreground/10 hover:bg-foreground/20 text-foreground transition"
+                >
+                  Open ↗
+                </button>
+                {onDeleteSubPage && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onDeleteSubPage(item.subPageId!);
+                    }}
+                    title="Delete sub-page"
+                    className="p-1 rounded hover:bg-red-500/10 text-foreground/40 hover:text-red-500 transition"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                )}
               </div>
-              <span className="text-foreground/20 group-hover/page:text-foreground/40 transition text-xs font-bold">↗</span>
-            </button>
+            ) : (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectSubPage(item.id, undefined, item.text || "Untitled");
+                }}
+                className="text-xs font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition shrink-0"
+              >
+                + Create sub-page
+              </button>
+            )}
           </div>
         )}
 
@@ -405,23 +445,22 @@ function Block({
           </div>
         )}
 
-        {/* ── File ── */}
+        {/* ── File Upload ── */}
         {item.type === "file" && (
-          <div className="my-1 px-4 py-3 rounded-lg border border-foreground/10 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <Paperclip className="h-4 w-4 text-foreground/40" />
-              <span className="text-sm font-medium">{item.text || "Attached file"}</span>
-            </div>
-            <span className="text-xs text-foreground/40 border border-foreground/10 px-2 py-0.5 rounded cursor-pointer hover:bg-foreground/5 transition">Choose</span>
-          </div>
+          <FileUploadBlock
+            url={item.url}
+            fileName={item.fileName}
+            fileSize={item.fileSize}
+            onUpdateFile={(fileUrl, name, size) => onUpdateFile?.(item.id, fileUrl, name, size)}
+          />
         )}
 
         {/* ── Web Bookmark ── */}
         {item.type === "web_bookmark" && (
-          <div className="my-1 px-4 py-3 rounded-lg border border-foreground/10 flex items-center gap-3 hover:bg-foreground/[0.02] transition cursor-pointer">
-            <Bookmark className="h-4 w-4 text-orange-400 shrink-0" />
-            <span className="text-sm font-medium">{item.text || "Web Bookmark"}</span>
-          </div>
+          <WebBookmarkBlock
+            url={item.url}
+            onUpdateUrl={(bookmarkUrl) => onUpdateUrl?.(item.id, bookmarkUrl)}
+          />
         )}
 
         {/* ── Table ── */}
@@ -491,9 +530,9 @@ function Block({
           );
         })()}
 
-        {/* ── Kanban Board ── */}
+        {/* ── Database Block (Multi-View) ── */}
         {item.type === "kanban" && (
-          <KanbanBoard
+          <DatabaseBlock
             blockId={item.id}
             columns={item.kanbanColumns}
             onColumnsChange={(id, cols) => onUpdateKanbanColumns?.(id, cols)}
@@ -506,15 +545,18 @@ function Block({
 }
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
-export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectSubPage }: EditorProps) {
+export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, childPages, onOpenAi, onSelectSubPage }: EditorProps) {
+  const router = useRouter();
   const [pageEmoji, setPageEmoji] = useState("📄");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(activeTitle);
+  const [coverUrl, setCoverUrl] = useState<string | undefined>(initialCoverImage);
   const [items, setItems] = useState<ChecklistItem[]>(() =>
     initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]
   );
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
+  const [remoteCursors, setRemoteCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
 
   // Slash command menu
   const [slash, setSlash] = useState<{ blockId: string; query: string; open: boolean }>({ blockId: "", query: "", open: false });
@@ -545,17 +587,63 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
 
   const { scheduleAutosave, cancelAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
 
+  const handleCoverChange = useCallback(
+    async (newCoverUrl?: string) => {
+      setCoverUrl(newCoverUrl);
+      if (!pageId) return;
+      try {
+        await updatePage(pageId, { coverImage: newCoverUrl || "" });
+      } catch (err) {
+        console.error("Failed to update cover image:", err);
+      }
+    },
+    [pageId]
+  );
+
+  // BroadcastChannel multi-cursor collaboration listener
+  useEffect(() => {
+    if (!pageId) return;
+    const channel = new BroadcastChannel(`notion-cursor-${pageId}`);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      channel.postMessage({
+        type: "cursor-move",
+        id: "tab-session",
+        name: "Collaborator",
+        color: "#2383e2",
+        x: e.clientX,
+        y: e.clientY,
+      });
+    };
+
+    const handleMessage = (e: MessageEvent) => {
+      if (e.data && e.data.type === "cursor-move") {
+        setRemoteCursors([e.data]);
+      }
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    channel.addEventListener("message", handleMessage);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      channel.removeEventListener("message", handleMessage);
+      channel.close();
+    };
+  }, [pageId]);
+
   // Sync when navigating to a new page
   useEffect(() => {
     queueMicrotask(() => {
       setCurrentTitle(activeTitle);
+      setCoverUrl(initialCoverImage);
       setItems(initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]);
       setShowEmojiPicker(false);
       setSlash({ blockId: "", query: "", open: false });
       setFocusedId(null);
       hasMounted.current = false;
     });
-  }, [pageId, activeTitle, initialBlocks]);
+  }, [pageId, activeTitle, initialBlocks, initialCoverImage]);
 
   // Auto-resize title textarea
   useEffect(() => {
@@ -595,7 +683,17 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
   }, []);
 
   const updateText = useCallback((id: string, text: string) => {
-    setItems(prev => prev.map(b => b.id === id ? { ...b, text } : b));
+    setItems(prev => {
+      const block = prev.find(b => b.id === id);
+      if (block && (block.type === "page" || block.type === "link_to_page") && block.subPageId) {
+        updatePage(block.subPageId, { title: text.trim() || "Untitled" })
+          .then((updated) => {
+            window.dispatchEvent(new CustomEvent("page-updated", { detail: updated }));
+          })
+          .catch(console.error);
+      }
+      return prev.map(b => b.id === id ? { ...b, text } : b);
+    });
   }, []);
 
   const updateLanguage = useCallback((id: string, codeLanguage: string) => {
@@ -622,6 +720,14 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
     setItems(prev => prev.map(b => b.id === id ? { ...b, kanbanColumns } : b));
   }, []);
 
+  const updateFile = useCallback((id: string, url: string, fileName: string, fileSize?: string) => {
+    setItems(prev => prev.map(b => b.id === id ? { ...b, url, fileName, fileSize } : b));
+  }, []);
+
+  const updateUrl = useCallback((id: string, url: string) => {
+    setItems(prev => prev.map(b => b.id === id ? { ...b, url } : b));
+  }, []);
+
   const slashFiltered = slash.query
     ? SLASH_ITEMS.filter(s =>
         s.label.toLowerCase().includes(slash.query.toLowerCase()) ||
@@ -644,8 +750,15 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
       }
       return next;
     });
-    setTimeout(() => focusBlock(bid, true), 0);
-  }, [slash.blockId, focusBlock]);
+
+    if (type === "page" || type === "link_to_page") {
+      setTimeout(() => {
+        onSelectSubPage(bid, undefined, "Untitled");
+      }, 100);
+    } else {
+      setTimeout(() => focusBlock(bid, true), 0);
+    }
+  }, [slash.blockId, focusBlock, onSelectSubPage]);
 
   // ── Keyboard handler ──────────────────────────────────────────────────────
   const handleKeyDown = useCallback((e: React.KeyboardEvent, id: string) => {
@@ -692,6 +805,19 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
 
       // Code blocks: let the CodeBlock component handle Enter (insert newline)
       if (curType === "code") return;
+
+      // Page / Link to Page blocks: insert a new empty paragraph directly below
+      if (curType === "page" || curType === "link_to_page") {
+        e.preventDefault();
+        const nb = makeBlock("paragraph", "");
+        setItems((prev) => {
+          const next = [...prev];
+          next.splice(idx + 1, 0, nb);
+          return next;
+        });
+        setTimeout(() => focusBlock(nb.id), 0);
+        return;
+      }
 
       e.preventDefault();
       const sel = window.getSelection();
@@ -916,7 +1042,25 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 text-[11px] text-emerald-500">✓ Saved</div>
       )}
 
-      <div id="editor-page-container" className="max-w-[720px] mx-auto px-24 pt-[15vh] pb-60 select-text">
+      {/* Remote Multi-Cursor Overlay */}
+      <RemoteCursorOverlay cursors={remoteCursors} />
+
+      {/* Full-width Page Cover Banner */}
+      <PageCoverBanner url={coverUrl} onUpdateCover={handleCoverChange} />
+
+      <div id="editor-page-container" className="max-w-[720px] mx-auto px-24 pt-12 pb-60 select-text">
+        {/* Cover & Icon Action Controls Header */}
+        {!coverUrl && (
+          <div className="mb-2 opacity-0 hover:opacity-100 transition-opacity">
+            <button
+              type="button"
+              onClick={() => handleCoverChange("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop")}
+              className="text-xs text-muted-foreground hover:text-foreground font-medium px-2 py-1 rounded hover:bg-foreground/5 transition"
+            >
+              🖼️ Add cover
+            </button>
+          </div>
+        )}
 
         {/* Emoji */}
         <div className="relative mb-3">
@@ -1002,6 +1146,8 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
                     onUpdateToggleChildren={updateToggleChildren}
                     onUpdateTableData={updateTableData}
                     onUpdateKanbanColumns={updateKanbanColumns}
+                    onUpdateFile={updateFile}
+                    onUpdateUrl={updateUrl}
                     onToggleCheck={toggleCheck}
                     onKeyDown={handleKeyDown}
                     onAddAfter={(id) => {
@@ -1018,6 +1164,17 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
                         if (prev) setTimeout(() => focusBlock(prev.id, true), 0);
                       } else {
                         setItems([makeBlock("paragraph")]);
+                      }
+                    }}
+                    onDeleteSubPage={async (subPageId) => {
+                      try {
+                        await deletePage(subPageId);
+                        toast.success("Sub-page deleted");
+                        setItems((prev) => prev.filter((b) => b.subPageId !== subPageId));
+                        window.dispatchEvent(new CustomEvent("page-deleted", { detail: { pageId: subPageId } }));
+                      } catch (err) {
+                        console.error("Failed to delete sub-page:", err);
+                        toast.error("Failed to delete sub-page");
                       }
                     }}
                     onSelectSubPage={onSelectSubPage}
@@ -1095,16 +1252,59 @@ export function Editor({ activeTitle, pageId, initialBlocks, onOpenAi, onSelectS
             </p>
           )}
 
-          {/* Click-to-add area below all blocks — ensures user can always write after code/media blocks */}
+          {/* Sub-pages / Child pages section (only for sub-pages not already embedded inline as document blocks) */}
+          {(() => {
+            const unlinkedChildPages = (childPages || []).filter(
+              (child) => !items.some((item) => item.subPageId === child._id)
+            );
+            if (unlinkedChildPages.length === 0) return null;
+            return (
+              <div className="mt-8 pt-4 border-t border-foreground/15 space-y-1.5 select-none">
+                {unlinkedChildPages.map((child) => (
+                  <div
+                    key={child._id}
+                    className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-foreground/[0.05] transition cursor-pointer group"
+                    onClick={() => router.push(`/dashboard/${child._id}`)}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <FileText className="h-5 w-5 text-foreground/80 shrink-0 stroke-[1.75]" />
+                      <span className="font-bold text-[15px] text-foreground underline decoration-foreground/40 underline-offset-4 group-hover:decoration-foreground transition-colors truncate">
+                        {child.title || "Untitled"}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async (e) => {
+                        e.stopPropagation();
+                        try {
+                          await deletePage(child._id);
+                          toast.success("Sub-page deleted");
+                          setItems((prev) => prev.filter((b) => b.subPageId !== child._id));
+                          window.dispatchEvent(new CustomEvent("page-deleted", { detail: { pageId: child._id } }));
+                        } catch (err) {
+                          console.error("Failed to delete sub-page:", err);
+                          toast.error("Failed to delete sub-page");
+                        }
+                      }}
+                      title="Delete sub-page"
+                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-foreground/40 hover:text-red-500 transition shrink-0"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+
+          {/* Click-to-add area below all blocks — ensures user can always write after page/media blocks */}
           <div
-            className="h-40 cursor-text"
+            className="min-h-40 cursor-text py-4"
             onClick={() => {
               const last = items[items.length - 1];
-              if (!last) return;
-              if (!last.text || last.type === "code" || last.type === "image" || last.type === "video" || last.type === "audio" || last.type === "divider" || last.type === "table") {
-                // After non-text blocks, always create a new empty paragraph
+              if (!last || last.text !== "" || last.type !== "paragraph") {
                 const newBlock = makeBlock("paragraph");
-                setItems(prev => [...prev, newBlock]);
+                setItems((prev) => [...prev, newBlock]);
                 setTimeout(() => focusBlock(newBlock.id), 0);
               } else {
                 focusBlock(last.id, true);

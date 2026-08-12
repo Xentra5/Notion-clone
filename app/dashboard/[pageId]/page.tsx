@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { DocumentCanvas } from "@/components/dashboard/document-canvas";
-import { getPage, createPage, updatePage, type Page, type PageBlock } from "@/lib/actions/pages";
+import { getPage, getPages, createPage, updatePage, type Page, type PageBlock } from "@/lib/actions/pages";
 import type { ChecklistItem } from "@/hooks/use-pages";
 
 interface PageRouteProps {
@@ -46,6 +46,9 @@ function toChecklistItem(block: PageBlock): ChecklistItem {
     codeLanguage: block.properties?.language ?? "javascript",
     subPageId: block.properties?.subPageId ?? "",
     kanbanColumns: (block.properties?.kanbanColumns as never) ?? [],
+    url: (block.properties as { url?: string })?.url ?? "",
+    fileName: (block.properties as { fileName?: string })?.fileName ?? "",
+    fileSize: (block.properties as { fileSize?: string })?.fileSize ?? "",
   };
 }
 
@@ -54,7 +57,18 @@ export default function PageRoute({ params }: PageRouteProps) {
   const { pageId } = use(params);
   const router = useRouter();
   const [page, setPage] = useState<Page | null>(null);
+  const [childPages, setChildPages] = useState<Page[]>([]);
   const [notFound, setNotFound] = useState(false);
+
+  const fetchChildPages = useCallback(async () => {
+    try {
+      const all = await getPages();
+      const children = all.filter((p) => p.parentPageId === pageId && !p.deletedAt);
+      setChildPages(children);
+    } catch (err) {
+      console.error("Failed to load child pages:", err);
+    }
+  }, [pageId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,8 +77,25 @@ export default function PageRoute({ params }: PageRouteProps) {
       .then((p) => { if (!cancelled) { setPage(p); setNotFound(false); } })
       .catch(() => { if (!cancelled) { setPage(null); setNotFound(true); } });
 
-    return () => { cancelled = true; };
-  }, [pageId]);
+    queueMicrotask(() => {
+      fetchChildPages();
+    });
+
+    const handleRefresh = () => {
+      fetchChildPages();
+    };
+
+    window.addEventListener("page-created", handleRefresh);
+    window.addEventListener("page-updated", handleRefresh);
+    window.addEventListener("page-deleted", handleRefresh);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener("page-created", handleRefresh);
+      window.removeEventListener("page-updated", handleRefresh);
+      window.removeEventListener("page-deleted", handleRefresh);
+    };
+  }, [pageId, fetchChildPages]);
 
   const initialBlocks = useMemo(
     () => (page?.blocks ? page.blocks.map(toChecklistItem) : []),
@@ -74,10 +105,17 @@ export default function PageRoute({ params }: PageRouteProps) {
   // Handle sub-page click / creation
   const handleSelectSubPage = useCallback(
     async (blockId: string, subPageId?: string, title?: string) => {
-      // If the sub-page already exists, open it directly!
+      const pageTitle = title && title.trim() ? title.trim() : "Untitled";
+
+      // If subPageId exists, verify it actually exists in DB before navigating!
       if (subPageId && subPageId.length > 0) {
-        router.push(`/dashboard/${subPageId}`);
-        return;
+        try {
+          await getPage(subPageId);
+          router.push(`/dashboard/${subPageId}`);
+          return;
+        } catch {
+          console.warn(`Sub-page ${subPageId} not found in DB. Auto-creating...`);
+        }
       }
 
       if (!page) return;
@@ -85,7 +123,7 @@ export default function PageRoute({ params }: PageRouteProps) {
       try {
         // 1. Create the child page with parentPageId linking to current page
         const newPage = await createPage({
-          title: title || "Untitled",
+          title: pageTitle,
           parentPageId: pageId,
           category: "Private",
         });
@@ -93,17 +131,17 @@ export default function PageRoute({ params }: PageRouteProps) {
         // 2. Build updated blocks with the subPageId link
         const updatedBlocks = page.blocks.map((b) =>
           b.id === blockId
-            ? { ...b, properties: { ...b.properties, subPageId: newPage._id } }
+            ? { ...b, properties: { ...b.properties, subPageId: newPage._id, text: pageTitle } }
             : b
         );
 
-        // 3. AWAIT save to DB before navigating — prevents autosave race condition
+        // 3. AWAIT save to DB before navigating — prevents race condition
         await updatePage(pageId, { blocks: updatedBlocks as never });
 
-        // 4. Update local state so if autosave fires it won't lose subPageId
-        setPage((prev) => prev ? { ...prev, blocks: updatedBlocks } : prev);
+        // 4. Update local state
+        setPage((prev) => (prev ? { ...prev, blocks: updatedBlocks } : prev));
 
-        // 5. Notify sidebar to refresh its page list
+        // 5. Notify sidebar and components to refresh page lists
         window.dispatchEvent(new CustomEvent("page-created", { detail: { page: newPage } }));
 
         // 6. Navigate AFTER everything is saved
@@ -137,6 +175,8 @@ export default function PageRoute({ params }: PageRouteProps) {
       activeTitle={page.title}
       pageId={pageId}
       initialBlocks={initialBlocks}
+      initialCoverImage={page.coverImage}
+      childPages={childPages}
       onOpenAi={() => window.dispatchEvent(new Event("open-quick-ai"))}
       onSelectSubPage={handleSelectSubPage}
     />

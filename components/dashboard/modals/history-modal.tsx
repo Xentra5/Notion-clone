@@ -1,28 +1,33 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { History, X, RotateCcw, Clock } from "lucide-react";
+import { History, X, RotateCcw, Clock, GitCompare } from "lucide-react";
 import { toast } from "sonner";
+import { VersionDiffModal } from "./version-diff-modal";
+import type { PageBlock } from "@/lib/actions/pages";
 
 interface RevisionItem {
   _id: string;
   title: string;
   createdAt: string;
   createdBy: string;
-  blocks: Record<string, unknown>[];
+  blocks: PageBlock[];
 }
 
 interface HistoryModalProps {
   isOpen: boolean;
   onClose: () => void;
   pageId?: string;
+  currentTitle?: string;
+  currentBlocks?: PageBlock[];
   onRestored?: () => void;
 }
 
-export function HistoryModal({ isOpen, onClose, pageId, onRestored }: HistoryModalProps) {
+export function HistoryModal({ isOpen, onClose, pageId, currentTitle = "Current Version", currentBlocks = [], onRestored }: HistoryModalProps) {
   const [revisions, setRevisions] = useState<RevisionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
+  const [diffRevision, setDiffRevision] = useState<RevisionItem | null>(null);
 
   useEffect(() => {
     if (isOpen && pageId) {
@@ -164,19 +169,51 @@ export function HistoryModal({ isOpen, onClose, pageId, onRestored }: HistoryMod
                     {new Date(rev.createdAt).toLocaleString()} • {rev.createdBy}
                   </div>
                 </div>
-                <button
-                  onClick={() => handleRestore(rev._id)}
-                  disabled={restoringId === rev._id}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent hover:bg-accent/80 text-foreground transition border border-border"
-                >
-                  <RotateCcw className="h-3.5 w-3.5" />
-                  <span>{restoringId === rev._id ? "Restoring..." : "Restore"}</span>
-                </button>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setDiffRevision(rev)}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium hover:bg-accent text-muted-foreground hover:text-foreground transition border border-border"
+                    title="Compare with current version"
+                  >
+                    <GitCompare className="h-3.5 w-3.5" />
+                    <span>Diff</span>
+                  </button>
+                  <button
+                    onClick={() => handleRestore(rev._id)}
+                    disabled={restoringId === rev._id}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-accent hover:bg-accent/80 text-foreground transition border border-border"
+                  >
+                    <RotateCcw className="h-3.5 w-3.5" />
+                    <span>{restoringId === rev._id ? "Restoring..." : "Restore"}</span>
+                  </button>
+                </div>
               </div>
             ))
           )}
         </div>
       </div>
+
+      <VersionDiffModal
+        isOpen={!!diffRevision}
+        onClose={() => setDiffRevision(null)}
+        currentTitle={currentTitle}
+        currentBlocks={currentBlocks}
+        revision={
+          diffRevision
+            ? {
+                id: diffRevision._id,
+                title: diffRevision.title,
+                savedAt: diffRevision.createdAt,
+                blocksCount: diffRevision.blocks?.length || 0,
+                blocks: diffRevision.blocks,
+              }
+            : null
+        }
+        onRestore={(id) => {
+          setDiffRevision(null);
+          handleRestore(id);
+        }}
+      />
     </div>
   );
 }
