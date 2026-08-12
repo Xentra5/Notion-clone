@@ -34,7 +34,7 @@ export async function POST(request: NextRequest) {
 
   let event: StripeEvent;
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret) as StripeEvent;
+    event = stripe.webhooks.constructEvent(body, signature, webhookSecret) as unknown as StripeEvent;
   } catch (err: unknown) {
     const error = err as { message?: string };
     console.error("Stripe Webhook Signature Error:", error?.message);
