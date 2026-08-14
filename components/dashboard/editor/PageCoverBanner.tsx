@@ -51,7 +51,6 @@ export function PageCoverBanner({ url, onUpdateCover }: PageCoverBannerProps) {
   return (
     <div className="relative group/cover w-full h-44 sm:h-52 md:h-64 overflow-hidden select-none bg-foreground/5">
       {/* Cover Image */}
-      {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={url}
         alt="Page Cover Banner"
@@ -159,7 +158,6 @@ export function PageCoverBanner({ url, onUpdateCover }: PageCoverBannerProps) {
                       }}
                       className="group/item relative h-24 rounded-xl overflow-hidden border border-foreground/10 hover:border-primary transition focus:outline-none"
                     >
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={item.thumb}
                         alt={item.alt}

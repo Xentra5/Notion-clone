@@ -39,6 +39,12 @@ interface ChatMessage {
   timestamp?: string;
 }
 
+let msgSeq = 0;
+function createMessageId(role: "user" | "assistant"): string {
+  msgSeq += 1;
+  return `${role}-${msgSeq}`;
+}
+
 interface SlashCmdItem {
   cmd: string;
   label: string;
@@ -301,7 +307,7 @@ export function NotionAiPanel({
 
   async function handleSend(promptText?: string, explicitCmd?: SlashCmdItem | null) {
     const cmdToUse = explicitCmd !== undefined ? explicitCmd : activeCommand;
-    let rawText = (promptText || input).trim();
+    const rawText = (promptText || input).trim();
 
     let textToSend = rawText;
     if (cmdToUse) {
@@ -319,7 +325,7 @@ export function NotionAiPanel({
     }
 
     const userMsg: ChatMessage = {
-      id: Date.now().toString(),
+      id: createMessageId("user"),
       role: "user",
       text: textToSend,
     };
@@ -369,7 +375,7 @@ export function NotionAiPanel({
 
       const answerText = data.answer || "I processed your request.";
       const assistantMsg: ChatMessage = {
-        id: (Date.now() + 1).toString(),
+        id: createMessageId("assistant"),
         role: "assistant",
         text: answerText,
         citations: data.citations || [],

@@ -109,7 +109,6 @@ export function WebBookmarkBlock({ url, onUpdateUrl }: WebBookmarkBlockProps) {
           </div>
           <div className="flex items-center gap-2 mt-2 pt-1 text-[11px] text-muted-foreground">
             {favicon ? (
-              /* eslint-disable-next-line @next/next/no-img-element */
               <img src={favicon} alt="" className="h-3.5 w-3.5 rounded shrink-0 object-contain" />
             ) : (
               <Globe className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60" />
@@ -122,7 +121,6 @@ export function WebBookmarkBlock({ url, onUpdateUrl }: WebBookmarkBlockProps) {
         {/* Optional Right Cover Image */}
         {image && (
           <div className="w-36 sm:w-44 shrink-0 bg-foreground/5 relative overflow-hidden border-l border-foreground/10">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={image} alt={title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
           </div>
         )}

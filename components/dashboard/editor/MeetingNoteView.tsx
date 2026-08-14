@@ -519,7 +519,7 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
                 <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-border bg-card/30 p-12 text-center">
                   <Sparkles className="h-8 w-8 text-purple-500/50" />
                   <p className="text-sm font-semibold text-foreground/60">No summary yet</p>
-                  <p className="text-xs text-muted-foreground">Record a meeting and click "Stop &amp; Summarize" to generate your AI summary</p>
+                  <p className="text-xs text-muted-foreground">Record a meeting and click &quot;Stop &amp; Summarize&quot; to generate your AI summary</p>
                 </div>
               )}
 

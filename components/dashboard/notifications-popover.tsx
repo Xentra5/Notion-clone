@@ -172,7 +172,6 @@ export function NotificationsPopover({
                 {/* Avatar / Icon */}
                 <div className="relative shrink-0 mt-0.5">
                   {item.actorAvatar ? (
-                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={item.actorAvatar}
                       alt={item.actorName}
