@@ -68,6 +68,16 @@ export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutos
     [save, delayMs]
   );
 
+  /** Save immediately — no debounce. Used for AI-generated content that must persist right away. */
+  const immediatelySave = useCallback(
+    (title: string, blocks: ChecklistItem[]) => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = null;
+      void save(title, blocks);
+    },
+    [save]
+  );
+
   const cancelAutosave = useCallback(() => {
     if (timerRef.current) {
       clearTimeout(timerRef.current);
@@ -75,5 +85,5 @@ export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutos
     }
   }, []);
 
-  return { scheduleAutosave, cancelAutosave };
+  return { scheduleAutosave, immediatelySave, cancelAutosave };
 }

@@ -29,6 +29,7 @@ import {
   LogOut,
   Mic,
   Users,
+  CornerUpLeft,
 } from "lucide-react";
 
 const GETTING_STARTED_BLOCKS: PageBlock[] = [
@@ -47,6 +48,7 @@ interface PageTreeNodeProps {
   onFinishRename: (pageId: string) => void;
   onDeletePage: (e: React.MouseEvent, pageId: string) => void;
   onCreateSubPage: (parentPageId: string) => void;
+  onMoveInto: (pageId: string, newParentId: string | null) => void;
   setRenameValue: (val: string) => void;
   setRenamingPageId: (id: string | null) => void;
 }
@@ -63,12 +65,55 @@ function PageTreeNode({
   onFinishRename,
   onDeletePage,
   onCreateSubPage,
+  onMoveInto,
   setRenameValue,
   setRenamingPageId,
 }: PageTreeNodeProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [moveMenuPos, setMoveMenuPos] = useState<{ top: number; left: number } | null>(null);
   const childPages = allPages.filter((c) => c.parentPageId === page._id);
   const hasChildren = childPages.length > 0;
+
+  // Collect ALL descendant IDs so we never offer them as move targets (would create cycles)
+  function getDescendantIds(id: string): Set<string> {
+    const result = new Set<string>();
+    const stack = [id];
+    while (stack.length) {
+      const cur = stack.pop()!;
+      allPages.forEach((p) => {
+        if (p.parentPageId === cur && !result.has(p._id)) {
+          result.add(p._id);
+          stack.push(p._id);
+        }
+      });
+    }
+    return result;
+  }
+
+  const descendantIds = getDescendantIds(page._id);
+
+  // Valid move targets: any Private non-meeting page that isn't this page or a descendant
+  const candidateParents = allPages.filter(
+    (p) =>
+      p._id !== page._id &&
+      !descendantIds.has(p._id) &&
+      p.category === "Private" &&
+      !p.isAiMeetingNote
+  );
+
+  // Close move menu on outside click
+  useEffect(() => {
+    if (!moveMenuPos) return;
+    function close() { setMoveMenuPos(null); }
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [moveMenuPos]);
+
+  function openMoveMenu(e: React.MouseEvent<HTMLButtonElement>) {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    setMoveMenuPos({ top: rect.bottom + 4, left: rect.left });
+  }
 
   return (
     <div className="space-y-0.5">
@@ -85,10 +130,7 @@ function PageTreeNode({
           {hasChildren ? (
             <button
               type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsOpen(!isOpen);
-              }}
+              onClick={(e) => { e.stopPropagation(); setIsOpen(!isOpen); }}
               className="p-0.5 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground transition shrink-0"
             >
               {isOpen ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
@@ -107,14 +149,8 @@ function PageTreeNode({
               onMouseDown={(e) => e.stopPropagation()}
               onBlur={() => void onFinishRename(page._id)}
               onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  e.currentTarget.blur();
-                }
-                if (e.key === "Escape") {
-                  e.preventDefault();
-                  setRenamingPageId(null);
-                }
+                if (e.key === "Enter") { e.preventDefault(); e.currentTarget.blur(); }
+                if (e.key === "Escape") { e.preventDefault(); setRenamingPageId(null); }
               }}
               className="min-w-0 w-full bg-background border border-primary rounded px-1.5 py-0.5 text-[11px] outline-none font-normal text-foreground shadow-sm"
             />
@@ -128,18 +164,26 @@ function PageTreeNode({
             </span>
           )}
         </div>
+
         {renamingPageId !== page._id && (
           <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition">
+            {/* Add child page */}
             <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onCreateSubPage(page._id);
-              }}
+              onClick={(e) => { e.stopPropagation(); onCreateSubPage(page._id); }}
               title="Add sub-page inside"
               className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-foreground transition"
             >
               <Plus className="h-3 w-3" />
             </button>
+            {/* Move into another page */}
+            <button
+              onClick={openMoveMenu}
+              title="Move into another page"
+              className="p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-blue-500 transition"
+            >
+              <CornerUpLeft className="h-3 w-3" />
+            </button>
+            {/* Rename */}
             <button
               onClick={(e) => onBeginRename(e, page)}
               title="Rename page"
@@ -147,6 +191,7 @@ function PageTreeNode({
             >
               <SquarePen className="h-3 w-3" />
             </button>
+            {/* Delete */}
             <button
               onClick={(e) => onDeletePage(e, page._id)}
               title="Delete page"
@@ -157,6 +202,45 @@ function PageTreeNode({
           </div>
         )}
       </div>
+
+      {/* Move-into dropdown — fixed-position so it never clips inside scrollable sidebar */}
+      {moveMenuPos && typeof window !== "undefined" && (
+        <div
+          className="fixed z-[9999] bg-popover border border-border rounded-xl shadow-2xl p-1.5 min-w-[210px] animate-in fade-in duration-100"
+          style={{ top: moveMenuPos.top, left: Math.min(moveMenuPos.left, window.innerWidth - 225) }}
+          onMouseDown={(e) => e.stopPropagation()}
+        >
+          <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
+            Move &quot;{page.title}&quot; into…
+          </p>
+          {/* "Move to top level" shown only if this page is already nested */}
+          {page.parentPageId && (
+            <button
+              onClick={() => { onMoveInto(page._id, null); setMoveMenuPos(null); }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent text-[11px] text-foreground transition font-medium"
+            >
+              <span>📂</span>
+              <span>↑ Move to top level</span>
+            </button>
+          )}
+          {candidateParents.length === 0 && !page.parentPageId && (
+            <p className="px-2 py-2 text-[11px] text-muted-foreground italic">No other pages available.</p>
+          )}
+          {candidateParents.map((p) => (
+            <button
+              key={p._id}
+              onClick={() => { onMoveInto(page._id, p._id); setMoveMenuPos(null); }}
+              className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent text-[11px] text-foreground transition"
+            >
+              <span className="shrink-0">{p.icon || "📄"}</span>
+              <span className="truncate flex-1">{p.title}</span>
+              {p.parentPageId && (
+                <span className="ml-auto text-[9px] text-muted-foreground shrink-0 italic">nested</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Recursive Children Sub-Tree */}
       {isOpen && hasChildren && (
@@ -175,6 +259,7 @@ function PageTreeNode({
               onFinishRename={onFinishRename}
               onDeletePage={onDeletePage}
               onCreateSubPage={onCreateSubPage}
+              onMoveInto={onMoveInto}
               setRenameValue={setRenameValue}
               setRenamingPageId={setRenamingPageId}
             />
@@ -280,7 +365,7 @@ export function Sidebar({
     if (isCreating) return;
     setIsCreating(true);
     try {
-      const meetingPage = await createPage({ title: "AI Meeting Note", isAiMeetingNote: true });
+      const meetingPage = await createPage({ title: "AI Meeting Note", isAiMeetingNote: true, category: "Meetings" });
       await loadPages();
       toast.success("AI Meeting Note created");
       router.push(`/dashboard/${meetingPage._id}`);
@@ -295,7 +380,7 @@ export function Sidebar({
     if (isCreating) return;
     setIsCreating(true);
     try {
-      const newPage = await createPage({ title: "Untitled" });
+      const newPage = await createPage({ title: "Untitled", category: "Private" });
       await loadPages();
       window.dispatchEvent(new CustomEvent("page-created", { detail: { page: newPage } }));
       toast.success("New page created");
@@ -322,6 +407,18 @@ export function Sidebar({
       console.error("Failed to create sub-page:", e);
     } finally {
       setIsCreating(false);
+    }
+  }
+
+  async function handleMoveInto(pageId: string, newParentId: string | null) {
+    try {
+      await updatePage(pageId, { parentPageId: newParentId ?? "" });
+      await loadPages();
+      window.dispatchEvent(new CustomEvent("page-updated"));
+      toast.success(newParentId ? "Page moved" : "Page moved to top level");
+    } catch (err) {
+      toast.error("Failed to move page");
+      console.error("Failed to move page:", err);
     }
   }
 
@@ -532,9 +629,37 @@ export function Sidebar({
                 <Plus className="h-3.5 w-3.5 text-muted-foreground" />
                 <span className="text-[11px]">New AI meeting note</span>
               </button>
+
+              {/* List existing meeting note pages */}
+              {pages
+                .filter((p) => p.isAiMeetingNote)
+                .map((page) => (
+                  <div
+                    key={page._id}
+                    onClick={(e) => handlePageClick(e, page)}
+                    className={`w-full flex items-center justify-between group px-2 py-1.5 rounded-lg transition text-left font-medium cursor-pointer ${
+                      pathname === `/dashboard/${page._id}`
+                        ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
+                        : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                      <Mic className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                      <span className="truncate text-[11px] flex-1">{page.title}</span>
+                    </div>
+                    <button
+                      onClick={(e) => handleDeletePage(e, page._id)}
+                      title="Delete meeting note"
+                      className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-muted-foreground hover:text-red-500 transition shrink-0"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
             </div>
           )}
         </div>
+
 
         {/* Recents Section */}
         <div className="space-y-1">
@@ -552,7 +677,10 @@ export function Sidebar({
 
           {expandedSections.recents && (
             <div className="space-y-0.5">
-              {pages.slice(0, 3).map((page) => (
+              {pages
+                .filter((p) => !p.isAiMeetingNote)
+                .slice(0, 3)
+                .map((page) => (
                 <div
                   key={page._id}
                   onClick={(e) => handlePageClick(e, page)}
@@ -655,7 +783,7 @@ export function Sidebar({
           {expandedSections.private && (
             <div className="space-y-0.5">
               {pages
-                .filter((p) => !p.parentPageId)
+                .filter((p) => !p.parentPageId && p.category === "Private" && !p.isAiMeetingNote)
                 .map((page) => (
                   <PageTreeNode
                     key={page._id}
@@ -670,6 +798,7 @@ export function Sidebar({
                     onFinishRename={finishRename}
                     onDeletePage={handleDeletePage}
                     onCreateSubPage={handleNewSubPage}
+                    onMoveInto={handleMoveInto}
                     setRenameValue={setRenameValue}
                     setRenamingPageId={setRenamingPageId}
                   />

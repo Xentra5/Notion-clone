@@ -135,7 +135,7 @@ def query_rag(req: QueryRequest):
             }
         context = "\n\n".join(relevant) or "No existing workspace context was found."
         content = _llm(
-            system="You are a Notion writing assistant. Return only the content requested by the user, without commentary.",
+            system="You are a Notion writing assistant. Write clean, structured content for the user's page based on their instruction. Use workspace context if relevant. Return only the content to append, no preamble or commentary.",
             context=context,
             user_query=instruction,
             api_key=req.geminiApiKey,
@@ -181,17 +181,15 @@ def query_rag(req: QueryRequest):
 
     # 4. Normal conversational Q&A
     if not relevant:
-        relevant = ["No workspace note is relevant to this conversation. Answer normally and honestly."]
-    if not relevant:
         return {
-            "answer": "⚠️ I don't have enough context in your workspace pages to answer this question.\n\nTry `/search <query>` to search the web instead.",
+            "answer": f"🔍 I don't have enough context in your workspace pages to answer **\"{q}\"**.\n\n💡 Try:\n- **`/search {q}`** — live web search\n- **`/write {q}`** — have AI write content about it directly to this page\n- Add notes about this topic to your workspace first.",
             "citations": [],
-            "source": "out_of_context_fallback",
+            "source": "out_of_context",
         }
 
     context = "\n\n".join(relevant)
     answer  = _llm(
-        system="You are Notion AI, a helpful conversational assistant. Respond naturally to the user. Use workspace context when it helps, but never invent facts from it.",
+        system="You are Notion AI, a workspace assistant. You ONLY answer questions using the provided workspace context below. If the user's question cannot be answered from the context, say: \"I don't have notes on this in your workspace. Try `/search <query>` to search the web.\" — do NOT make up or generate information from general knowledge.",
         context=context,
         user_query=q,
         api_key=req.geminiApiKey,
@@ -217,3 +215,88 @@ def _llm(system: str, context: str, user_query: str, api_key: Optional[str], his
     # Fallback: synthesise from context chunks
     lines = [c.split("]: ", 1)[-1].strip() for c in context.split("\n\n") if "]: " in c]
     return "Based on your workspace notes:\n\n" + "\n".join(f"• {l}" for l in lines[:5])
+
+
+# ─── Meeting Summary ──────────────────────────────────────────────────────────
+class MeetingSummaryRequest(BaseModel):
+    transcript: str
+    title: str = "Meeting"
+    geminiApiKey: Optional[str] = None
+
+class MeetingSummaryResponse(BaseModel):
+    summary: str
+    keyDecisions: List[str]
+    actionItems: List[str]
+    topics: List[str]
+
+@app.post("/meeting-summary", response_model=MeetingSummaryResponse)
+def meeting_summary(req: MeetingSummaryRequest):
+    """
+    Takes a raw meeting transcript and returns a structured AI-generated summary.
+    Uses Gemini 2.5 Flash via LangChain when an API key is provided.
+    """
+    transcript = req.transcript.strip()
+    if not transcript:
+        return MeetingSummaryResponse(
+            summary="No transcript was provided.",
+            keyDecisions=[],
+            actionItems=[],
+            topics=[],
+        )
+
+    SYSTEM = """You are an expert meeting note-taker. Given the raw transcript of a meeting, output EXACTLY the following JSON structure (no markdown, no code fences, just raw JSON):
+{
+  "summary": "<2-4 sentence plain-english summary of the full meeting>",
+  "keyDecisions": ["<decision 1>", "<decision 2>"],
+  "actionItems": ["<action item 1>", "<action item 2>"],
+  "topics": ["<topic 1>", "<topic 2>", "<topic 3>"]
+}
+
+Rules:
+- summary: concise, no filler. Describe what was discussed and concluded.
+- keyDecisions: concrete decisions that were made. Max 5.
+- actionItems: tasks someone needs to do. Include owner if mentioned. Max 6.
+- topics: short keyword labels for subjects covered. Max 6.
+- If a section has nothing, return an empty array [].
+- ONLY output valid JSON. No explanation before or after."""
+
+    if req.geminiApiKey and req.geminiApiKey.strip():
+        try:
+            import json
+            from langchain_google_genai import ChatGoogleGenerativeAI
+            llm = ChatGoogleGenerativeAI(
+                model="gemini-2.5-flash",
+                google_api_key=req.geminiApiKey.strip(),
+            )
+            prompt = f"{SYSTEM}\n\nMeeting Title: {req.title}\n\nFull Transcript:\n{transcript}"
+            raw = llm.invoke(prompt).content.strip()
+
+            # Strip markdown code fences if the model added them
+            if raw.startswith("```"):
+                raw = raw.split("```")[1]
+                if raw.startswith("json"):
+                    raw = raw[4:]
+                raw = raw.strip()
+            if raw.endswith("```"):
+                raw = raw[:-3].strip()
+
+            parsed = json.loads(raw)
+            return MeetingSummaryResponse(
+                summary=parsed.get("summary", ""),
+                keyDecisions=parsed.get("keyDecisions", []),
+                actionItems=parsed.get("actionItems", []),
+                topics=parsed.get("topics", []),
+            )
+        except Exception as e:
+            print(f"[meeting-summary Gemini error] {e}")
+
+    # ── Fallback: naive parse without LLM ────────────────────────────────────
+    lines = [l.strip() for l in transcript.split("\n") if l.strip()]
+    words = transcript.split()
+    summary = " ".join(words[:60]) + ("…" if len(words) > 60 else "")
+    return MeetingSummaryResponse(
+        summary=f"Meeting transcript captured ({len(lines)} entries). {summary}",
+        keyDecisions=["Review transcript and add decisions manually."],
+        actionItems=["Review the transcript in the Live Transcript tab."],
+        topics=["Meeting recording"],
+    )

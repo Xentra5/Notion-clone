@@ -1,5 +1,9 @@
 import { NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import GoogleProvider from 'next-auth/providers/google'
+import AppleProvider from 'next-auth/providers/apple'
+import FacebookProvider from 'next-auth/providers/facebook'
+import EmailProvider from 'next-auth/providers/email'
 import bcryptjs from 'bcryptjs'
 
 import { connectToDatabase } from '@/lib/mongodb'
@@ -7,6 +11,26 @@ import User from '@/lib/models/user'
 
 export const authOptions: NextAuthOptions = {
   providers: [
+    // --- OAuth Providers ---
+    GoogleProvider({
+      clientId: process.env.GOOGLE_ID ?? '',
+      clientSecret: process.env.GOOGLE_SECRET ?? '',
+    }),
+    AppleProvider({
+      clientId: process.env.APPLE_ID ?? '',
+      clientSecret: process.env.APPLE_SECRET ?? '',
+    }),
+    FacebookProvider({
+      clientId: process.env.FACEBOOK_ID ?? '',
+      clientSecret: process.env.FACEBOOK_SECRET ?? '',
+    }),
+
+    // --- Passwordless / Email Provider ---
+    EmailProvider({
+      server: process.env.MAIL_SERVER ?? '',
+      from: process.env.EMAIL_FROM ?? 'Notion <no-reply@example.com>',
+    }),
+
     // --- Credentials Provider ---
     CredentialsProvider({
       name: 'Credentials',
@@ -62,19 +86,6 @@ export const authOptions: NextAuthOptions = {
         session.user.id = (token.id as string) || token.sub;
         if (token.name) {
           session.user.name = token.name;
-        }
-
-        try {
-          await connectToDatabase();
-          const dbUser = await User.findOne({ email: session.user.email });
-          if (dbUser) {
-            session.user.plan = dbUser.plan || "free";
-            session.user.aiUsageCount = dbUser.aiUsageCount || 0;
-          }
-        } catch (e) {
-          console.error("Session sync database error:", e);
-          session.user.plan = "free";
-          session.user.aiUsageCount = 0;
         }
       }
       return session;

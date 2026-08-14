@@ -34,6 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const q = question.trim();
+    const activePageId = typeof pageId === "string" && pageId.trim() ? pageId.trim() : null;
 
     // Fetch user's active workspace pages for in-memory fallback & indexing
     await connectToDatabase();
@@ -253,6 +254,62 @@ export async function POST(request: NextRequest) {
 
     // /summary command
     if (q.toLowerCase().startsWith("/summary")) {
+      // ── Page-specific summary (user is on a real page) ────────────────────────
+      if (activePageId) {
+        const activePage = pages.find((p) => p._id.toString() === activePageId);
+        if (!activePage) {
+          return NextResponse.json({
+            answer: "⚠️ The current page could not be found. Try navigating to a page first.",
+            citations: [],
+            source: "empty_page",
+          });
+        }
+
+        const pageTextBlocks = (activePage.blocks || [])
+          .filter((b: RawBlock) => b.properties?.text?.trim())
+          .map((b: RawBlock) => b.properties?.text || "")
+          .join("\n");
+
+        if (!pageTextBlocks.trim()) {
+          return NextResponse.json({
+            answer: `📄 **"${activePage.title || "Untitled"}"** has no written content yet. Start adding notes, then run \`/summary\` again.`,
+            citations: [],
+            source: "empty_page",
+          });
+        }
+
+        if (GEMINI_API_KEY) {
+          const geminiAnswer = await callGemini(
+            `You are Notion AI. Summarize the following page concisely with these sections:
+## 📌 Key Topics
+## ✅ Action Items
+## 💡 Key Insights
+
+Previous conversation:
+${conversationContext || "(none)"}
+
+Page title: "${activePage.title || "Untitled"}"
+Page content:
+${pageTextBlocks.slice(0, 4000)}`,
+            GEMINI_API_KEY
+          );
+          return NextResponse.json({
+            answer: `📝 **Page Summary: "${activePage.title || "Untitled"}"**\n\n${geminiAnswer}`,
+            citations: [{ pageId: activePage._id.toString(), title: activePage.title || "Untitled" }],
+            source: "gemini_summary",
+            action: "append_block",
+            blockType: "callout",
+            content: geminiAnswer,
+          });
+        }
+
+        return NextResponse.json({
+          answer: `📝 **Page Summary: "${activePage.title || "Untitled"}"**\n\nThis page contains:\n\n${pageTextBlocks.slice(0, 600)}${pageTextBlocks.length > 600 ? "\n\n…" : ""}\n\n💡 Add a GEMINI_API_KEY to .env.local for AI-powered summaries.`,
+          citations: [{ pageId: activePage._id.toString(), title: activePage.title || "Untitled" }],
+        });
+      }
+
+      // ── Workspace-wide summary (no active page) ───────────────────────────────
       if (contentCount === 0) {
         return NextResponse.json({
           answer: "There is no written content to summarize yet. Add some notes first, then try `/summary` again.",
@@ -260,7 +317,7 @@ export async function POST(request: NextRequest) {
           source: "empty_workspace",
         });
       }
-      if (pageCount === 0 || contentCount === 0) {
+      if (pageCount === 0) {
         return NextResponse.json({
           answer: "⚠️ Your workspace has no pages yet. Create some pages with content first!",
           citations: [],
@@ -298,22 +355,30 @@ ${workspaceContext}`,
       });
     }
 
-    // Normal Q&A with Gemini
+    // Normal Q&A with Gemini — strictly workspace-grounded
     if (GEMINI_API_KEY) {
+      // If the workspace has no relevant content, skip Gemini and give a helpful redirect
+      if (contentCount === 0) {
+        return NextResponse.json({
+          answer: `🔍 I don't have enough context in your workspace pages to answer **"${q}"**.\n\n💡 Try:\n- **\`/search ${q}\`** — live web search\n- **\`/write ${q}\`** — have AI write content about it directly to this page\n- Add notes about this topic to your workspace first.`,
+          citations: [],
+          source: "out_of_context",
+        });
+      }
+
       const geminiAnswer = await callGemini(
-        `You are Notion AI, a helpful conversational assistant. Respond naturally to the user. The workspace is optional context, never a restriction.
+        `You are Notion AI, a workspace assistant. You ONLY answer questions using the workspace notes below.
+If the question cannot be answered from the workspace content, respond EXACTLY with:
+"🔍 I don't have notes on this in your workspace. Try \`/search ${q}\` to search the web."
+Do NOT answer general knowledge questions. Do NOT make up or generate information.
 
 Previous conversation:
 ${conversationContext || "(none)"}
 
-The user's workspace has ${pageCount} pages: ${pageTitles.slice(0, 5).join(", ")}.
-
-Workspace context:
+Workspace pages (${pageCount} pages):
 ${workspaceContext}
 
-User question: ${q}
-
-Answer concisely based on the workspace content. If the answer is not in the workspace, say "I don't have enough context in your workspace to answer this. Try /search <query> to search the web."`,
+User question: ${q}`,
         GEMINI_API_KEY
       );
       return NextResponse.json({

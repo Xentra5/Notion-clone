@@ -42,9 +42,9 @@ const rag = start(pythonCommand, [
   ragDir,
 ]);
 
-console.log("[dev] Starting Next.js...");
+console.log("[dev] Starting Next.js (Webpack mode for Windows stability)...");
 const nextBin = resolve(root, "node_modules", "next", "dist", "bin", "next");
-const next = start(process.execPath, [nextBin, "dev"]);
+const next = start(process.execPath, [nextBin, "dev", "--webpack"]);
 
 function stop() {
   if (shuttingDown) return;

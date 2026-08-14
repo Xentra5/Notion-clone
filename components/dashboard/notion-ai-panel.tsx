@@ -50,8 +50,8 @@ interface SlashCmdItem {
 const AI_SLASH_COMMANDS: SlashCmdItem[] = [
   {
     cmd: "/summary",
-    label: "Summarize Workspace",
-    desc: "Executive summary of notes & page content",
+    label: "Summarize Page",
+    desc: "AI summary of the current page (or full workspace)",
     icon: "📝",
     badgeClass: "bg-purple-600 text-white",
   },
@@ -493,7 +493,7 @@ export function NotionAiPanel({
               >
                 <span className="text-base">📝</span>
                 <span className="group-hover:text-foreground transition flex items-center gap-2">
-                  Summarize Workspace
+                  Summarize this page
                   <span className="bg-purple-600 text-white text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider">
                     /summary
                   </span>

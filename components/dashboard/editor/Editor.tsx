@@ -368,27 +368,50 @@ function Block({
 
         {/* ── Page / Link to page ── */}
         {(item.type === "page" || item.type === "link_to_page") && (
-          <div className="flex items-center gap-2.5 my-1 px-1 py-1 rounded hover:bg-foreground/[0.04] transition group/page cursor-pointer w-full">
-            <FileText className="h-5 w-5 text-foreground/80 shrink-0 stroke-[1.75]" />
-            <div className="flex-1 min-w-0 flex items-center gap-2">
+          <div
+            className="flex items-center justify-between gap-3 my-1.5 px-2.5 py-2 rounded-xl bg-foreground/[0.02] hover:bg-foreground/[0.06] border border-foreground/[0.06] hover:border-foreground/15 transition-all group/page cursor-pointer w-full shadow-xs"
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              // If not clicking inside the contentEditable or delete button, open the subpage
+              if (!target.isContentEditable && !target.closest("button")) {
+                onSelectSubPage(item.id, item.subPageId, item.text || "Untitled");
+              }
+            }}
+          >
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <div
-                {...ce}
-                ref={setRef}
-                className="font-bold text-[15px] text-foreground underline decoration-foreground/40 underline-offset-4 hover:decoration-foreground outline-none w-full cursor-text empty:before:content-[attr(data-placeholder)] empty:before:text-foreground/30 empty:before:pointer-events-none"
-                data-placeholder="Untitled page"
-              />
+                className="h-6 w-6 rounded-md bg-foreground/5 flex items-center justify-center text-foreground/80 shrink-0 group-hover/page:text-primary transition"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectSubPage(item.id, item.subPageId, item.text || "Untitled");
+                }}
+                title="Open sub-page"
+              >
+                <FileText className="h-4 w-4 stroke-[1.8]" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <div
+                  {...ce}
+                  ref={setRef}
+                  className="font-bold text-[14px] text-foreground hover:text-primary outline-none w-full cursor-text empty:before:content-[attr(data-placeholder)] empty:before:text-foreground/30 empty:before:pointer-events-none transition-colors"
+                  data-placeholder="Untitled page"
+                />
+              </div>
             </div>
+
             {item.subPageId ? (
-              <div className="flex items-center gap-1 opacity-0 group-hover/page:opacity-100 transition shrink-0">
+              <div className="flex items-center gap-1.5 opacity-0 group-hover/page:opacity-100 transition shrink-0">
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
                     onSelectSubPage(item.id, item.subPageId, item.text || "Untitled");
                   }}
-                  className="text-xs font-semibold px-2 py-0.5 rounded bg-foreground/10 hover:bg-foreground/20 text-foreground transition"
+                  className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-foreground/10 hover:bg-primary hover:text-primary-foreground text-foreground transition shadow-2xs"
+                  title="Open this sub-page"
                 >
-                  Open ↗
+                  <span>Open</span>
+                  <ChevronRight className="h-3 w-3" />
                 </button>
                 {onDeleteSubPage && (
                   <button
@@ -398,7 +421,7 @@ function Block({
                       onDeleteSubPage(item.subPageId!);
                     }}
                     title="Delete sub-page"
-                    className="p-1 rounded hover:bg-red-500/10 text-foreground/40 hover:text-red-500 transition"
+                    className="p-1 rounded-lg hover:bg-red-500/10 text-foreground/40 hover:text-red-500 transition"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -411,9 +434,10 @@ function Block({
                   e.stopPropagation();
                   onSelectSubPage(item.id, undefined, item.text || "Untitled");
                 }}
-                className="text-xs font-semibold px-2 py-0.5 rounded bg-primary/10 text-primary hover:bg-primary/20 transition shrink-0"
+                className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition shadow-xs shrink-0"
               >
-                + Create sub-page
+                <Plus className="h-3 w-3" />
+                <span>Create page</span>
               </button>
             )}
           </div>
@@ -564,6 +588,9 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   const titleRef = useRef<HTMLTextAreaElement>(null);
   const titleTimerRef = useRef<NodeJS.Timeout | null>(null);
   const hasMounted = useRef(false);
+  // Keep a ref in sync with currentTitle so event handlers always see the latest value
+  const currentTitleRef = useRef(activeTitle);
+  useEffect(() => { currentTitleRef.current = currentTitle; }, [currentTitle]);
 
   const handleTitleChange = useCallback((newTitle: string) => {
     setCurrentTitle(newTitle);
@@ -583,7 +610,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     }, 300);
   }, [pageId]);
 
-  const { scheduleAutosave, cancelAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
+  const { scheduleAutosave, immediatelySave, cancelAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
 
   useEffect(() => {
     const handleAiAppend = (e: Event) => {
@@ -596,14 +623,15 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
         }
         setItems((prev) => {
           const nextItems = [...prev, newBlock];
-          scheduleAutosave(currentTitle, nextItems);
+          // Use immediatelySave (no debounce) so AI content is persisted right away
+          immediatelySave(currentTitleRef.current, nextItems);
           return nextItems;
         });
       }
     };
     window.addEventListener("ai-append-block", handleAiAppend);
     return () => window.removeEventListener("ai-append-block", handleAiAppend);
-  }, [currentTitle, scheduleAutosave]);
+  }, [immediatelySave]);
 
   const handleCoverChange = useCallback(
     async (newCoverUrl?: string) => {
@@ -1069,18 +1097,29 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       <PageCoverBanner url={coverUrl} onUpdateCover={handleCoverChange} />
 
       <div id="editor-page-container" className="max-w-[720px] mx-auto px-24 pt-12 pb-60 select-text">
-        {/* Cover & Icon Action Controls Header */}
-        {!coverUrl && (
-          <div className="mb-2 opacity-0 hover:opacity-100 transition-opacity">
+        {/* Cover & Quick Actions Header */}
+        <div className="mb-2 flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity">
+          {!coverUrl && (
             <button
               type="button"
               onClick={() => handleCoverChange("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop")}
-              className="text-xs text-muted-foreground hover:text-foreground font-medium px-2 py-1 rounded hover:bg-foreground/5 transition"
+              className="text-xs text-muted-foreground hover:text-foreground font-medium px-2 py-1 rounded-md hover:bg-foreground/5 transition cursor-pointer"
             >
               🖼️ Add cover
             </button>
-          </div>
-        )}
+          )}
+          <button
+            type="button"
+            onClick={() => {
+              const newBlock = makeBlock("page", "Untitled");
+              setItems((prev) => [...prev, newBlock]);
+              setTimeout(() => onSelectSubPage(newBlock.id, undefined, "Untitled"), 50);
+            }}
+            className="text-xs text-muted-foreground hover:text-foreground font-medium px-2 py-1 rounded-md hover:bg-foreground/5 transition cursor-pointer"
+          >
+            📄 Add sub-page
+          </button>
+        </div>
 
         {/* Emoji */}
         <div className="relative mb-3">
@@ -1272,47 +1311,75 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
             </p>
           )}
 
-          {/* Sub-pages / Child pages section (only for sub-pages not already embedded inline as document blocks) */}
+          {/* Sub-pages / Child pages shelf */}
           {(() => {
             const unlinkedChildPages = (childPages || []).filter(
               (child) => !items.some((item) => item.subPageId === child._id)
             );
             if (unlinkedChildPages.length === 0) return null;
             return (
-              <div className="mt-8 pt-4 border-t border-foreground/15 space-y-1.5 select-none">
-                {unlinkedChildPages.map((child) => (
-                  <div
-                    key={child._id}
-                    className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-foreground/[0.05] transition cursor-pointer group"
-                    onClick={() => router.push(`/dashboard/${child._id}`)}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <FileText className="h-5 w-5 text-foreground/80 shrink-0 stroke-[1.75]" />
-                      <span className="font-bold text-[15px] text-foreground underline decoration-foreground/40 underline-offset-4 group-hover:decoration-foreground transition-colors truncate">
-                        {child.title || "Untitled"}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={async (e) => {
-                        e.stopPropagation();
-                        try {
-                          await deletePage(child._id);
-                          toast.success("Sub-page deleted");
-                          setItems((prev) => prev.filter((b) => b.subPageId !== child._id));
-                          window.dispatchEvent(new CustomEvent("page-deleted", { detail: { pageId: child._id } }));
-                        } catch (err) {
-                          console.error("Failed to delete sub-page:", err);
-                          toast.error("Failed to delete sub-page");
-                        }
-                      }}
-                      title="Delete sub-page"
-                      className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-red-500/10 text-foreground/40 hover:text-red-500 transition shrink-0"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+              <div className="mt-10 pt-6 border-t border-foreground/10 space-y-3 select-none">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <FileText className="h-3.5 w-3.5 text-primary" />
+                    <span>Nested Subpages ({unlinkedChildPages.length})</span>
                   </div>
-                ))}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newBlock = makeBlock("page", "Untitled");
+                      setItems((prev) => [...prev, newBlock]);
+                      setTimeout(() => onSelectSubPage(newBlock.id, undefined, "Untitled"), 50);
+                    }}
+                    className="flex items-center gap-1 text-[11px] font-semibold text-primary hover:underline cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>New subpage</span>
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {unlinkedChildPages.map((child) => (
+                    <div
+                      key={child._id}
+                      className="flex items-center justify-between p-2.5 rounded-xl border border-foreground/10 bg-foreground/[0.02] hover:bg-foreground/[0.05] hover:border-foreground/20 transition-all cursor-pointer group shadow-2xs"
+                      onClick={() => router.push(`/dashboard/${child._id}`)}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <span className="text-base shrink-0">{child.icon || "📄"}</span>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold text-[13px] text-foreground truncate group-hover:text-primary transition-colors">
+                            {child.title || "Untitled"}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground">
+                            {child.updatedAt ? `Edited ${new Date(child.updatedAt).toLocaleDateString()}` : "Subpage"}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition shrink-0" />
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              await deletePage(child._id);
+                              toast.success("Sub-page deleted");
+                              setItems((prev) => prev.filter((b) => b.subPageId !== child._id));
+                              window.dispatchEvent(new CustomEvent("page-deleted", { detail: { pageId: child._id } }));
+                            } catch (err) {
+                              console.error("Failed to delete sub-page:", err);
+                              toast.error("Failed to delete sub-page");
+                            }
+                          }}
+                          title="Delete sub-page"
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-md hover:bg-red-500/10 text-foreground/40 hover:text-red-500 transition shrink-0 ml-1"
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })()}
