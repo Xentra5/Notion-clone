@@ -7,8 +7,9 @@
 [![FastAPI](https://img.shields.io/badge/RAG_Service-FastAPI-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![LangChain](https://img.shields.io/badge/AI-LangChain-1C3C3C?style=flat-square)](https://www.langchain.com/)
 [![Python WASM](https://img.shields.io/badge/Sandbox-Pyodide_WASM-3776AB?style=flat-square&logo=python)](https://pyodide.org/)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?style=flat-square&logo=githubactions)](https://github.com/Xentra5/Notion/actions)
 
-An enterprise-grade, high-performance collaborative workspace application built on **Next.js 16 (App Router)** and **MongoDB**. Designed to faithfully deliver the modern Notion experience with real-time block editing, in-browser polyglot code execution, database multi-views (Kanban, Timeline, Table), AI vector RAG assistance, voice-to-text meeting summaries with WebGL waveform visualizers, version diff rollback, multi-region billing (Stripe & Razorpay), and collaborative multi-cursor presence.
+An enterprise-grade, high-performance collaborative workspace application built on **Next.js 16 (App Router)** and **MongoDB**. Faithfully engineered to deliver the full Notion experience with real-time block editing, in-browser polyglot code execution, database multi-views (Kanban, Timeline, Table), AI vector RAG assistance, voice-to-text meeting summaries with WebGL waveform visualizers, version diff rollback, document import/export, multi-region billing (Stripe & Razorpay), and collaborative multi-cursor presence.
 
 ---
 
@@ -17,16 +18,21 @@ An enterprise-grade, high-performance collaborative workspace application built 
 - [🌟 Key Features & Capabilities](#-key-features--capabilities)
   - [1. Block Editor & Dynamic Canvas](#1-block-editor--dynamic-canvas)
   - [2. Multi-View Database Boards](#2-multi-view-database-boards)
-  - [3. In-Browser Code Runner Sandbox Engine](#3-in-browser-code-runner-sandbox-engine)
+  - [3. In-Browser Polyglot Code Runner Sandbox](#3-in-browser-polyglot-code-runner-sandbox)
   - [4. Vector RAG AI Assistant & Voice Meeting Transcriber](#4-vector-rag-ai-assistant--voice-meeting-transcriber)
-  - [5. Real-Time Multi-Cursor Collaboration & Presence](#5-real-time-multi-cursor-collaboration--presence)
+  - [5. Real-Time Multi-Cursor Collaboration & Inline Comments](#5-real-time-multi-cursor-collaboration--inline-comments)
   - [6. Version History & Visual Diff Comparison](#6-version-history--visual-diff-comparison)
   - [7. Notion Calendar Workspace](#7-notion-calendar-workspace)
   - [8. Recursive Hierarchical Sub-Pages](#8-recursive-hierarchical-sub-pages)
-  - [9. OpenGraph Web Bookmarks & Media Uploader](#9-opengraph-web-bookmarks--media-uploader)
-  - [10. Global Spotlight Command Palette](#10-global-spotlight-command-palette)
-  - [11. Multi-Region Billing & Subscriptions](#11-multi-region-billing--subscriptions)
+  - [9. Document Export & Import Engine](#9-document-export--import-engine)
+  - [10. Trash Management & Safety Controls](#10-trash-management--safety-controls)
+  - [11. OpenGraph Web Bookmarks & Media Uploader](#11-opengraph-web-bookmarks--media-uploader)
+  - [12. Global Spotlight Command Palette](#12-global-spotlight-command-palette)
+  - [13. Multi-Region Billing & Subscriptions](#13-multi-region-billing--subscriptions)
+  - [14. Marketing & Landing Page Suite](#14-marketing--landing-page-suite)
+  - [15. Enterprise Security & Rate Limiting](#15-enterprise-security--rate-limiting)
 - [🏗️ System Architecture & Tech Stack](#️-system-architecture--tech-stack)
+- [🔌 API Routes & Services Reference](#-api-routes--services-reference)
 - [📁 Project Directory Structure](#-project-directory-structure)
 - [⚙️ Quick Start & Local Setup](#️-quick-start--local-setup)
   - [Prerequisites](#prerequisites)
@@ -34,7 +40,9 @@ An enterprise-grade, high-performance collaborative workspace application built 
   - [Running the Dual Dev Server](#running-the-dual-dev-server)
 - [🔐 Environment Configuration Matrix](#-environment-configuration-matrix)
 - [🐳 Docker Deployment](#-docker-deployment)
+- [🔄 CI/CD Automation Pipeline](#-cicd-automation-pipeline)
 - [📜 Available Scripts](#-available-scripts)
+- [📄 License](#-license)
 
 ---
 
@@ -52,7 +60,7 @@ An enterprise-grade, high-performance collaborative workspace application built 
   - **Timeline / Gantt Chart ([components/dashboard/editor/TimelineView.tsx](file:///d:/notion/components/dashboard/editor/TimelineView.tsx))**: Visual Gantt timeline displaying task spans, progress durations, and date intervals across calendar dates.
   - **Data Table View ([components/dashboard/editor/TableView.tsx](file:///d:/notion/components/dashboard/editor/TableView.tsx))**: Grid view supporting inline cell editing, multi-type column schemas, status selectors, and row operations.
 
-### 3. In-Browser Code Runner Sandbox Engine
+### 3. In-Browser Polyglot Code Runner Sandbox
 - **Client-Side Polyglot Execution ([lib/code-runner.ts](file:///d:/notion/lib/code-runner.ts))**:
   - **JavaScript Sandbox**: Sandboxed `Function` evaluation engine with intercepted `console.log` streams.
   - **Python Sandbox**: Full Pyodide WebAssembly (WASM) execution environment running authentic Python code directly inside the browser.
@@ -70,15 +78,16 @@ An enterprise-grade, high-performance collaborative workspace application built 
 - **Executive Slash Commands**:
   - `/summary` — Extracts high-level workspace summaries, core takeaways, and action items.
   - `/search <query>` — Performs live web search via LangChain `DuckDuckGoSearchRun`.
-- **AI Copilot Side Panel ([components/dashboard/notion-ai-panel.tsx](file:///d:/notion/components/dashboard/notion-ai-panel.tsx))**: Collapsible intelligent assistant drawer with suggested prompt chips and clickable source citations.
+- **AI Copilot Side Panel & Chat Modal ([components/dashboard/notion-ai-panel.tsx](file:///d:/notion/components/dashboard/notion-ai-panel.tsx) & [components/dashboard/modals/ai-chat-modal.tsx](file:///d:/notion/components/dashboard/modals/ai-chat-modal.tsx))**: Collapsible intelligent assistant drawer with suggested prompt chips and clickable source citations.
 - **🎙️ Live Voice Recording & AI Meeting Notes ([components/dashboard/editor/MeetingNoteView.tsx](file:///d:/notion/components/dashboard/editor/MeetingNoteView.tsx))**: Integrated speech-to-text audio recording using the browser Web Speech API paired with an animated WebGL audio waveform visualizer ([components/dashboard/Strands.tsx](file:///d:/notion/components/dashboard/Strands.tsx)).
 
-### 5. Real-Time Multi-Cursor Collaboration & Presence
+### 5. Real-Time Multi-Cursor Collaboration & Inline Comments
 - **Remote Cursor Flags ([components/dashboard/editor/RemoteCursorOverlay.tsx](file:///d:/notion/components/dashboard/editor/RemoteCursorOverlay.tsx))**: Broadcasts collaborator mouse movements with user name tags and distinct color highlights across active documents.
 - **Live Presence Bar ([components/dashboard/editor/LivePresenceBar.tsx](file:///d:/notion/components/dashboard/editor/LivePresenceBar.tsx))**: Real-time collaborator avatars with online status pulse badges.
+- **Inline Comment Threads ([components/dashboard/editor/CommentsPanel.tsx](file:///d:/notion/components/dashboard/editor/CommentsPanel.tsx))**: Threaded discussions directly on workspace pages with user attribution and timestamps.
 
 ### 6. Version History & Visual Diff Comparison
-- **Visual Revision Comparator ([components/dashboard/modals/version-diff-modal.tsx](file:///d:/notion/components/dashboard/modals/version-diff-modal.tsx))**: Compare historical snapshots against current document states.
+- **Visual Revision Comparator ([components/dashboard/modals/version-diff-modal.tsx](file:///d:/notion/components/dashboard/modals/version-diff-modal.tsx) & [components/dashboard/modals/history-modal.tsx](file:///d:/notion/components/dashboard/modals/history-modal.tsx))**: Compare historical snapshots against current document states.
 - **Unified & Side-by-Side Diffs**: Highlights line and block insertions (green) and deletions (red).
 - **One-Click Snapshot Rollback**: Revert any previous document version directly back to the live editor canvas.
 
@@ -90,20 +99,36 @@ An enterprise-grade, high-performance collaborative workspace application built 
 - **Infinite Nesting Tree ([components/dashboard/sidebar.tsx](file:///d:/notion/components/dashboard/sidebar.tsx))**: Create nested `/page` blocks to construct deep multi-level workspaces (`Parent → Child → Grandchild`).
 - **Circular Reference Protection ([app/api/pages/[id]/route.ts](file:///d:/notion/app/api/pages/[id]/route.ts))**: Graph validation prevents infinite parent-child loop assignments.
 
-### 9. OpenGraph Web Bookmarks & Media Uploader
+### 9. Document Export & Import Engine
+- **Export Formats ([lib/export-import.ts](file:///d:/notion/lib/export-import.ts))**: Export workspace pages to formatted **Markdown (`.md`)** or structured **JSON schema**.
+- **Import Modal ([components/dashboard/modals/import-modal.tsx](file:///d:/notion/components/dashboard/modals/import-modal.tsx))**: Seamlessly import external Markdown or JSON files to generate ready-to-edit Notion pages.
+
+### 10. Trash Management & Safety Controls
+- **Soft Deletion & Recovery ([components/dashboard/modals/trash-modal.tsx](file:///d:/notion/components/dashboard/modals/trash-modal.tsx))**: Move pages to trash with one-click restore ([app/api/pages/[id]/restore/route.ts](file:///d:/notion/app/api/pages/[id]/restore/route.ts)) or permanent wipe.
+- **Dynamic Renaming & Confirm Modals ([components/ui/rename-modal.tsx](file:///d:/notion/components/ui/rename-modal.tsx) & [components/ui/confirm-modal.tsx](file:///d:/notion/components/ui/confirm-modal.tsx))**: Safe modal dialogues for destructive operations and quick page title updates.
+
+### 11. OpenGraph Web Bookmarks & Media Uploader
 - **OpenGraph Metadata Scraper ([app/api/scrape-og/route.ts](file:///d:/notion/app/api/scrape-og/route.ts))**: Automatically extracts page titles, descriptions, banner previews, and favicons from pasted URLs.
 - **Rich Bookmark Cards ([components/dashboard/editor/WebBookmarkBlock.tsx](file:///d:/notion/components/dashboard/editor/WebBookmarkBlock.tsx))**: Clean, interactive bookmark preview cards.
 - **File Upload & Storage ([app/api/upload/route.ts](file:///d:/notion/app/api/upload/route.ts) & [components/dashboard/editor/FileUploadBlock.tsx](file:///d:/notion/components/dashboard/editor/FileUploadBlock.tsx))**: Direct file attachments with size formatting and download handlers.
 
-### 10. Global Spotlight Command Palette
+### 12. Global Spotlight Command Palette
 - **Universal Quick-Access ([components/dashboard/command-palette.tsx](file:///d:/notion/components/dashboard/command-palette.tsx))**: Triggered with `Cmd + K` or `Ctrl + K`.
 - **Fuzzy Search & Actions**: Search document contents, jump to recent pages, trigger theme toggling, open modals, or invoke Notion AI commands.
 
-### 11. Multi-Region Billing & Subscriptions
+### 13. Multi-Region Billing & Subscriptions
 - **Dual Payment Gateways ([app/api/stripe/checkout/route.ts](file:///d:/notion/app/api/stripe/checkout/route.ts) & [app/api/razorpay/order/route.ts](file:///d:/notion/app/api/razorpay/order/route.ts))**:
   - **Stripe**: International & US subscriptions (USD / Global currencies).
   - **Razorpay**: Domestic Indian payment methods (UPI, NetBanking, Cards in INR).
 - **Checkout & Pricing Modal ([components/dashboard/pricing-modal.tsx](file:///d:/notion/components/dashboard/pricing-modal.tsx) & [components/dashboard/modals/checkout-modal.tsx](file:///d:/notion/components/dashboard/modals/checkout-modal.tsx))**: Transparent regional fee breakdowns, upgrade tiers (`Free`, `Pro`, `Ultimate`), and webhook reconciliation.
+
+### 14. Marketing & Landing Page Suite
+- **Complete SaaS Showcase ([app/(marketing)/](file:///d:/notion/app/(marketing)/))**: High-conversion landing page with interactive hero sections, dynamic infinite Logo Loop carousel with physics-based drag interactions ([components/ui/logo-loop.tsx](file:///d:/notion/components/ui/logo-loop.tsx)), Solutions, Developers, Enterprise, Pricing, Product, Resources, and Request Demo pages.
+
+### 15. Enterprise Security & Rate Limiting
+- **Rate Limiting Engine ([lib/ratelimit.ts](file:///d:/notion/lib/ratelimit.ts))**: Upstash Redis token bucket rate limiting protecting public and authenticated API endpoints.
+- **Structured JSON Logging ([lib/logger.ts](file:///d:/notion/lib/logger.ts))**: Production-ready structured logging with contextual request tracing.
+- **NextAuth Authentication ([app/api/auth/[...nextauth]/route.ts](file:///d:/notion/app/api/auth/[...nextauth]/route.ts))**: Credentials auth + Google, GitHub, Apple, and Facebook OAuth integrations.
 
 ---
 
@@ -119,14 +144,16 @@ graph TD
         Views["Kanban / Timeline / Table"]
         Calendar["Notion Calendar"]
         Audio["Web Speech API & WebGL Visualizer"]
+        Presence["Multi-Cursor Presence Overlay"]
     end
 
     subgraph Backend["Next.js 16 API Layer"]
         AuthAPI["NextAuth (OAuth + Credentials)"]
-        PagesAPI["Pages CRUD & Versioning Engine"]
+        PagesAPI["Pages CRUD, Versioning & Comments"]
         UploadAPI["Local File Storage Engine"]
         ScrapeAPI["OpenGraph Scraper"]
         PayAPI["Stripe & Razorpay Gateways"]
+        RateLimit["Upstash Redis Rate Limiting"]
     end
 
     subgraph RAGService["Python FastAPI RAG Microservice (:8000)"]
@@ -160,7 +187,32 @@ graph TD
 | **Code Execution** | Pyodide (WASM) + Sandboxed Eval | In-browser isolated execution for Python and JavaScript |
 | **Payments** | Stripe Node SDK + Razorpay API | Global multi-currency subscription and checkout engine |
 | **Graphics & Audio** | OGL (WebGL) + Web Speech API | 3D audio waveform canvas and speech transcription |
+| **Rate Limiting** | Upstash Redis REST | Distributed token-bucket API rate limiting |
 | **Notifications** | Sonner | Modern toast notification manager |
+
+---
+
+## 🔌 API Routes & Services Reference
+
+| Category | Endpoint | Method | Purpose |
+| :--- | :--- | :---: | :--- |
+| **Pages** | `/api/pages` | `GET` / `POST` | Retrieve workspace page list or create a new page |
+| **Pages** | `/api/pages/[id]` | `GET` / `PATCH` / `DELETE` | Retrieve, update, or soft-delete specific page |
+| **Pages** | `/api/pages/[id]/restore` | `POST` | Restore a page from trash |
+| **Pages** | `/api/pages/[id]/comments` | `GET` / `POST` | Manage inline comment threads on pages |
+| **Pages** | `/api/pages/[id]/versions` | `GET` | Retrieve version snapshot timeline for diff inspection |
+| **Trash** | `/api/pages/trash` | `GET` / `DELETE` | List trashed pages or permanently wipe trash |
+| **AI / RAG** | `/api/ai/chat` | `POST` | Forward queries to FastAPI RAG or internal Gemini fallback |
+| **AI / RAG** | `/api/ai/meeting-summary` | `POST` | Generate structured meeting summaries from audio transcripts |
+| **Scraper** | `/api/scrape-og` | `POST` | Extract OpenGraph metadata for live web bookmarks |
+| **Media** | `/api/unsplash` | `GET` | Search Unsplash high-res cover photos |
+| **Media** | `/api/upload` | `POST` / `GET` | Upload and serve attached files and assets |
+| **Billing** | `/api/stripe/checkout` | `POST` | Create Stripe checkout sessions for global users |
+| **Billing** | `/api/stripe/webhook` | `POST` | Stripe webhook verification and plan status sync |
+| **Billing** | `/api/razorpay/order` | `POST` | Create Razorpay order for Indian payment methods (UPI/Cards) |
+| **Billing** | `/api/razorpay/webhook` | `POST` | Razorpay webhook event verification |
+| **User** | `/api/user/profile` | `GET` / `PATCH` | Manage user name, avatar, and workspace preferences |
+| **User** | `/api/user/plan` | `GET` | Query current plan tier and usage limits |
 
 ---
 
@@ -168,20 +220,21 @@ graph TD
 
 ```text
 notion/
+├── .github/workflows/                # CI/CD automation pipelines (lint, typecheck, build)
 ├── app/                              # Next.js App Router root
 │   ├── (auth)/                       # Authentication routes (login, register, forgot-password)
-│   ├── (marketing)/                  # Marketing landing & promotional pages
+│   ├── (marketing)/                  # Marketing landing & promotional pages (solutions, enterprise, etc.)
 │   ├── api/                          # Next.js Serverless API endpoints
 │   │   ├── ai/                       # AI fallback and generation endpoints
 │   │   ├── auth/                     # NextAuth authentication handlers
 │   │   ├── notifications/            # User notification endpoints
-│   │   ├── pages/                    # Page CRUD, sub-pages, versions & comments
+│   │   ├── pages/                    # Page CRUD, sub-pages, versions, comments, trash & restore
 │   │   ├── razorpay/                 # Razorpay order generation & webhook handlers
 │   │   ├── scrape-og/                # OpenGraph link preview metadata scraper
 │   │   ├── stripe/                   # Stripe checkout session & webhook handlers
 │   │   ├── unsplash/                 # Unsplash image search & preset gateway
 │   │   ├── upload/                   # Local file upload & retrieval endpoints
-│   │   └── user/                     # User profile and preference handlers
+│   │   └── user/                     # User profile, settings and plan handlers
 │   ├── checkout/                     # Subscription checkout checkout page
 │   ├── dashboard/                    # Main app workspace & dynamic page routes
 │   │   ├── [pageId]/                 # Dynamic Notion page document canvas
@@ -191,22 +244,22 @@ notion/
 ├── components/                       # Reusable React components
 │   ├── auth/                         # Login and registration form cards
 │   ├── dashboard/                    # Workspace interface components
-│   │   ├── editor/                   # Block editor, Kanban, Timeline, Table, CodeBlock, etc.
-│   │   ├── modals/                   # Diff viewer, settings, share, trash, AI chat, checkout
+│   │   ├── editor/                   # Block editor, Kanban, Timeline, Table, CodeBlock, Comments, etc.
+│   │   ├── modals/                   # Diff viewer, history, settings, share, trash, AI chat, import, checkout
 │   │   ├── command-palette.tsx       # Global Cmd+K spotlight search overlay
 │   │   ├── notion-ai-panel.tsx       # RAG AI assistant drawer
 │   │   ├── notion-calendar.tsx       # Interactive multi-view calendar
 │   │   ├── pricing-modal.tsx         # Multi-region pricing and upgrade dialog
 │   │   ├── sidebar.tsx               # Recursive navigation tree sidebar
-│   │   └── top-bar.tsx               # Document breadcrumbs, presence, and action bar
-│   └── ui/                           # Base UI atomic components (buttons, dialogs, dropdowns)
-├── hooks/                            # Custom React hooks (use-autosave, use-media-query, etc.)
-├── lib/                              # Shared utility libraries, DB connection, code runner
+│   │   └── top-bar.tsx               # Document breadcrumbs, presence, export/import, and action bar
+│   └── ui/                           # Base UI atomic components (buttons, dialogs, dropdowns, logo-loop)
+├── hooks/                            # Custom React hooks (use-autosave, use-pages, use-media-query)
+├── lib/                              # Shared utilities, DB connection, code runner, logger, rate limiter
 ├── rag_service/                      # Python FastAPI LangChain Vector RAG service
 │   ├── chroma_db/                    # ChromaDB vector index directory
 │   ├── main.py                       # FastAPI application & RAG query pipelines
 │   └── requirements.txt              # Python dependencies
-├── public/                           # Static assets and uploads
+├── public/                           # Static assets, SVG icons, and uploads
 ├── scripts/                          # Orchestration and database testing scripts
 │   ├── dev.mjs                       # Unified Next.js + Python RAG dev process runner
 │   └── test-db.mjs                   # MongoDB connection diagnostic script
@@ -222,7 +275,7 @@ notion/
 ### Prerequisites
 
 Ensure the following runtimes are installed on your machine:
-- **Node.js**: `v20.x` or higher
+- **Node.js**: `v20.x` or `v22.x` (recommended)
 - **npm**: `v10.x` or higher
 - **Python**: `v3.10+` (optional, for the FastAPI Vector RAG service)
 - **MongoDB**: Local MongoDB instance or MongoDB Atlas cluster connection string
@@ -231,8 +284,8 @@ Ensure the following runtimes are installed on your machine:
 
 1. **Clone the Repository**:
    ```bash
-   git clone https://github.com/your-username/notion.git
-   cd notion
+   git clone https://github.com/Xentra5/Notion.git
+   cd Notion
    ```
 
 2. **Install Node.js Dependencies**:
@@ -271,7 +324,7 @@ npm run dev
 - **FastAPI RAG Docs**: `http://localhost:8000/docs`
 
 > [!NOTE]
-> If Python or the RAG service dependencies are not installed, the Next.js frontend will still start normally and utilize internal AI fallback routes.
+> If Python or the RAG service dependencies are not installed, the Next.js frontend will still start normally and gracefully utilize internal AI fallback routes.
 
 ---
 
@@ -300,7 +353,7 @@ Refer to [.env.example](file:///d:/notion/.env.example) for a full template. Key
 
 ## 🐳 Docker Deployment
 
-A multi-stage [Dockerfile](file:///d:/notion/Dockerfile) is provided for optimized production containerization.
+A multi-stage [Dockerfile](file:///d:/notion/Dockerfile) is provided for optimized standalone production containerization.
 
 ### 1. Build the Docker Image
 ```bash
@@ -315,6 +368,16 @@ docker run -p 3000:3000 \
   -e MONGODB_URI="your-mongodb-uri" \
   notion-workspace:latest
 ```
+
+---
+
+## 🔄 CI/CD Automation Pipeline
+
+Automated continuous integration and delivery is configured using GitHub Actions ([.github/workflows/ci-cd.yml](file:///.github/workflows/ci-cd.yml)):
+
+- **Lint & Type Check**: Validates ESLint 9 rules and runs `npx tsc --noEmit` on Node.js 22.
+- **Production Build Validation**: Compiles the Next.js standalone bundle to ensure zero build errors.
+- **Automated Deployment**: Dispatches deployments to staging and production targets upon merge to `staging` or `main`.
 
 ---
 
