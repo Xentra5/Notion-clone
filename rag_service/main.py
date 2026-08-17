@@ -1,8 +1,20 @@
 import os
-from typing import List, Optional
+import re
+import json
+from typing import List, Optional, Dict, Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+
+# ─── Load Environment Variables ───────────────────────────────────────────────
+try:
+    from dotenv import load_dotenv
+    parent_dir = os.path.dirname(os.path.dirname(__file__))
+    load_dotenv(os.path.join(parent_dir, ".env.local"))
+    load_dotenv(os.path.join(parent_dir, ".env"))
+    load_dotenv()
+except Exception:
+    pass
 
 # ─── LangChain Modern Imports ─────────────────────────────────────────────────
 from langchain_text_splitters import RecursiveCharacterTextSplitter
@@ -33,6 +45,23 @@ vector_store = Chroma(
 )
 print("ChromaDB vector store ready.")
 
+
+# ─── Helper Functions ─────────────────────────────────────────────────────────
+def _build_chroma_filter(workspace_id: str, page_id: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Constructs a ChromaDB-compliant metadata filter.
+    ChromaDB requires the '$and' operator when querying multiple metadata fields.
+    """
+    if page_id:
+        return {
+            "$and": [
+                {"workspaceId": {"$eq": workspace_id}},
+                {"pageId": {"$eq": page_id}}
+            ]
+        }
+    return {"workspaceId": {"$eq": workspace_id}}
+
+
 # ─── Request Schemas ──────────────────────────────────────────────────────────
 class BlockItem(BaseModel):
     id: str
@@ -45,6 +74,10 @@ class IndexPageRequest(BaseModel):
     title: str
     blocks: List[BlockItem]
 
+class DeletePageRequest(BaseModel):
+    workspaceId: str = "default"
+    pageId: str
+
 class QueryRequest(BaseModel):
     question: str
     workspaceId: str = "default"
@@ -52,10 +85,23 @@ class QueryRequest(BaseModel):
     geminiApiKey: Optional[str] = None
     history: List[dict] = Field(default_factory=list)
 
+class MeetingSummaryRequest(BaseModel):
+    transcript: str
+    title: str = "Meeting"
+    geminiApiKey: Optional[str] = None
+
+class MeetingSummaryResponse(BaseModel):
+    summary: str
+    keyDecisions: List[str]
+    actionItems: List[str]
+    topics: List[str]
+
+
 # ─── Health Check ─────────────────────────────────────────────────────────────
 @app.get("/health")
 def health_check():
     return {"status": "healthy", "service": "Notion LangChain RAG Microservice"}
+
 
 # ─── Index Page ───────────────────────────────────────────────────────────────
 @app.post("/index-page")
@@ -74,7 +120,12 @@ def index_page(req: IndexPageRequest):
         chunks = splitter.split_text(combined)
 
         # Re-indexing is idempotent; remove stale chunks before writing the new ones.
-        vector_store.delete(where={"workspaceId": req.workspaceId, "pageId": req.pageId})
+        delete_filter = _build_chroma_filter(req.workspaceId, req.pageId)
+        try:
+            vector_store.delete(where=delete_filter)
+        except Exception as del_err:
+            print(f"[index-page delete warning] {del_err}")
+
         metas = [{"workspaceId": req.workspaceId, "pageId": req.pageId, "title": req.title, "chunkIndex": i} for i in range(len(chunks))]
         ids   = [f"{req.pageId}-chunk-{i}" for i in range(len(chunks))]
 
@@ -84,6 +135,21 @@ def index_page(req: IndexPageRequest):
         print(f"[index-page error] {e}")
         return {"status": "error", "message": str(e)}
 
+
+# ─── Delete Page Endpoint ─────────────────────────────────────────────────────
+@app.delete("/delete-page")
+@app.post("/delete-page")
+def delete_page(req: DeletePageRequest):
+    """Remove all indexed chunks for a deleted or trashed page."""
+    try:
+        delete_filter = _build_chroma_filter(req.workspaceId, req.pageId)
+        vector_store.delete(where=delete_filter)
+        return {"status": "success", "message": f"Deleted page {req.pageId} from vector store"}
+    except Exception as e:
+        print(f"[delete-page error] {e}")
+        return {"status": "error", "message": str(e)}
+
+
 # ─── Query ────────────────────────────────────────────────────────────────────
 @app.post("/query")
 def query_rag(req: QueryRequest):
@@ -91,7 +157,9 @@ def query_rag(req: QueryRequest):
     if not q:
         return {"answer": "Please ask a question or type `/summary` or `/search <query>`.", "citations": []}
 
-    # 1. /search command — live web search
+    api_key = req.geminiApiKey or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+
+    # 1. /search command — live web search via DuckDuckGo
     if q.lower().startswith("/search"):
         search_q = q[7:].strip()
         if not search_q:
@@ -108,14 +176,18 @@ def query_rag(req: QueryRequest):
         except Exception as e:
             return {"answer": f"Web search error: {str(e)}", "citations": []}
 
-    # 2. Vector similarity search
-    search_filter = {"workspaceId": req.workspaceId}
-    if req.pageId:
-        search_filter["pageId"] = req.pageId
-    search_results = vector_store.similarity_search_with_score(q, k=4, filter=search_filter)
+    # 2. Vector similarity search with ChromaDB-compliant filter
+    search_filter = _build_chroma_filter(req.workspaceId, req.pageId)
+    search_results = []
+    try:
+        search_results = vector_store.similarity_search_with_score(q, k=4, filter=search_filter)
+    except Exception as search_err:
+        print(f"[Chroma similarity_search error] {search_err}")
+
     relevant, citations_set, citations = [], set(), []
     for doc, score in search_results:
-        if score < 1.3:
+        # Distance score threshold (accept relevant matches)
+        if score < 1.35:
             pid   = doc.metadata.get("pageId", "")
             title = doc.metadata.get("title", "Untitled")
             relevant.append(f"[{title}]: {doc.page_content}")
@@ -123,8 +195,9 @@ def query_rag(req: QueryRequest):
                 citations_set.add(pid)
                 citations.append({"pageId": pid, "title": title})
 
-    # /write command: generate content through LangChain and tell the frontend
-    # to append it to the active page.
+    context = "\n\n".join(relevant) if relevant else "No specific workspace notes found."
+
+    # 3. /write command: generate content to append directly to page
     if q.lower().startswith("/write"):
         instruction = q[6:].strip()
         if not instruction:
@@ -133,12 +206,11 @@ def query_rag(req: QueryRequest):
                 "citations": [],
                 "source": "write_help",
             }
-        context = "\n\n".join(relevant) or "No existing workspace context was found."
         content = _llm(
             system="You are a Notion writing assistant. Write clean, structured content for the user's page based on their instruction. Use workspace context if relevant. Return only the content to append, no preamble or commentary.",
             context=context,
             user_query=instruction,
-            api_key=req.geminiApiKey,
+            api_key=api_key,
             history=req.history,
         )
         return {
@@ -149,91 +221,118 @@ def query_rag(req: QueryRequest):
             "content": content,
         }
 
+    # 4. /code command: generate formatted code block
     if q.lower().startswith("/code"):
         instruction = q[5:].strip()
         if not instruction:
-            return {"answer": "Tell me what code to create after `/code`, for example: `/code React button with loading state`.", "citations": [], "source": "code_help"}
+            return {
+                "answer": "Tell me what code to create after `/code`, for example: `/code React button with loading state`.",
+                "citations": [],
+                "source": "code_help",
+            }
         answer = _llm(
             system="You are an expert programming assistant. Provide a concise explanation and a complete, well-formatted code block.",
-            context="Relevant workspace context:\n" + ("\n\n".join(relevant) or "(none)"),
+            context=f"Relevant workspace context:\n{context}",
             user_query=instruction,
-            api_key=req.geminiApiKey,
+            api_key=api_key,
             history=req.history,
         )
         return {"answer": answer, "citations": citations, "source": "code"}
 
-    # 3. /summary command
+    # 5. /action-items command: extract todos / tasks
+    if q.lower().startswith("/action-items") or q.lower().startswith("/todo"):
+        if not relevant:
+            return {
+                "answer": "⚠️ No notes found in your current workspace to extract action items from.",
+                "citations": [],
+            }
+        answer = _llm(
+            system="You are Notion AI. Extract concrete action items, todos, and deliverables from the provided workspace context. Format each item as a markdown checkbox (- [ ] Task description with owner if mentioned).",
+            context=context,
+            user_query="Extract all action items and tasks.",
+            api_key=api_key,
+            history=req.history,
+        )
+        return {"answer": f"📋 **Action Items & Deliverables**\n\n{answer}", "citations": citations, "source": "action_items"}
+
+    # 6. /translate command: translate context or text
+    if q.lower().startswith("/translate"):
+        instruction = q[10:].strip()
+        if not instruction:
+            return {"answer": "Specify the target language after `/translate`, for example: `/translate into Spanish`.", "citations": []}
+        answer = _llm(
+            system="You are a professional translator. Translate the text accurately while preserving tone, formatting, and markdown structures.",
+            context=context,
+            user_query=f"Translate: {instruction}",
+            api_key=api_key,
+            history=req.history,
+        )
+        return {"answer": answer, "citations": citations, "source": "translation"}
+
+    # 7. /summary command
     if q.lower().startswith("/summary"):
         if not relevant:
             return {
                 "answer": "⚠️ I don't have enough context in your workspace pages to generate a summary. Add some text blocks to your pages first, or use `/search <query>` to search the web.",
                 "citations": [],
             }
-        context = "\n\n".join(relevant)
         answer  = _llm(
             system="You are Notion AI. Write a structured executive summary with headings: Key Takeaways, Key Decisions, and Action Items. Use ONLY the provided context.",
             context=context,
             user_query="Summarize this workspace content.",
-            api_key=req.geminiApiKey,
+            api_key=api_key,
             history=req.history,
         )
         return {"answer": f"📝 **Workspace Executive Summary**\n\n{answer}", "citations": citations}
 
-    # 4. Normal conversational Q&A
+    # 8. Normal conversational Q&A
     if not relevant:
         return {
-            "answer": f"🔍 I don't have enough context in your workspace pages to answer **\"{q}\"**.\n\n💡 Try:\n- **`/search {q}`** — live web search\n- **`/write {q}`** — have AI write content about it directly to this page\n- Add notes about this topic to your workspace first.",
+            "answer": f"🔍 I don't have enough context in your workspace pages to answer **\"{q}\"**.\n\n💡 Try:\n- **`/search {q}`** — live web search\n- **`/write {q}`** — have AI write content about it directly to this page\n- **`/action-items`** — extract tasks\n- Add notes about this topic to your workspace first.",
             "citations": [],
             "source": "out_of_context",
         }
 
-    context = "\n\n".join(relevant)
-    answer  = _llm(
+    answer = _llm(
         system="You are Notion AI, a workspace assistant. You ONLY answer questions using the provided workspace context below. If the user's question cannot be answered from the context, say: \"I don't have notes on this in your workspace. Try `/search <query>` to search the web.\" — do NOT make up or generate information from general knowledge.",
         context=context,
         user_query=q,
-        api_key=req.geminiApiKey,
+        api_key=api_key,
         history=req.history,
     )
     return {"answer": answer, "citations": citations, "source": "workspace_rag"}
 
-# ─── LLM helper ───────────────────────────────────────────────────────────────
+
+# ─── LLM Helper ───────────────────────────────────────────────────────────────
 def _llm(system: str, context: str, user_query: str, api_key: Optional[str], history: Optional[List[dict]] = None) -> str:
     if api_key and api_key.strip():
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
-            llm    = ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=api_key.strip())
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key.strip())
             prior_turns = "\n".join(
                 f"{turn.get('role', 'user').title()}: {str(turn.get('text', ''))[:4000]}"
                 for turn in (history or [])[-12:]
             )
             prompt = f"{system}\n\nPrevious conversation:\n{prior_turns or '(none)'}\n\nWorkspace Context:\n{context}\n\nUser Question: {user_query}"
-            return llm.invoke(prompt).content
+            res = llm.invoke(prompt)
+            return str(res.content)
         except Exception as e:
             print(f"[Gemini error] {e}")
 
-    # Fallback: synthesise from context chunks
+    # Fallback: synthesise directly from context chunks when LLM fails or API key is absent
     lines = [c.split("]: ", 1)[-1].strip() for c in context.split("\n\n") if "]: " in c]
-    return "Based on your workspace notes:\n\n" + "\n".join(f"• {l}" for l in lines[:5])
+    if lines:
+        return "Based on your workspace notes:\n\n" + "\n".join(f"• {l}" for l in lines[:5])
+    return "No content available to answer the query."
 
 
 # ─── Meeting Summary ──────────────────────────────────────────────────────────
-class MeetingSummaryRequest(BaseModel):
-    transcript: str
-    title: str = "Meeting"
-    geminiApiKey: Optional[str] = None
-
-class MeetingSummaryResponse(BaseModel):
-    summary: str
-    keyDecisions: List[str]
-    actionItems: List[str]
-    topics: List[str]
-
 @app.post("/meeting-summary", response_model=MeetingSummaryResponse)
 def meeting_summary(req: MeetingSummaryRequest):
     """
     Takes a raw meeting transcript and returns a structured AI-generated summary.
-    Uses Gemini 2.5 Flash via LangChain when an API key is provided.
+    Uses Gemini via LangChain when an API key is provided.
     """
     transcript = req.transcript.strip()
     if not transcript:
@@ -260,32 +359,32 @@ Rules:
 - If a section has nothing, return an empty array [].
 - ONLY output valid JSON. No explanation before or after."""
 
-    if req.geminiApiKey and req.geminiApiKey.strip():
+    api_key = req.geminiApiKey or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    if api_key and api_key.strip():
         try:
-            import json
             from langchain_google_genai import ChatGoogleGenerativeAI
+            model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
             llm = ChatGoogleGenerativeAI(
-                model="gemini-2.5-flash",
-                google_api_key=req.geminiApiKey.strip(),
+                model=model_name,
+                google_api_key=api_key.strip(),
             )
             prompt = f"{SYSTEM}\n\nMeeting Title: {req.title}\n\nFull Transcript:\n{transcript}"
-            raw = llm.invoke(prompt).content.strip()
+            raw = str(llm.invoke(prompt).content).strip()
 
-            # Strip markdown code fences if the model added them
-            if raw.startswith("```"):
-                raw = raw.split("```")[1]
-                if raw.startswith("json"):
-                    raw = raw[4:]
-                raw = raw.strip()
-            if raw.endswith("```"):
-                raw = raw[:-3].strip()
+            # Robust JSON extraction handling fences or raw text
+            json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
+            if json_match:
+                raw_json = json_match.group(1)
+            else:
+                bare_match = re.search(r"(\{.*\})", raw, re.DOTALL)
+                raw_json = bare_match.group(1) if bare_match else raw
 
-            parsed = json.loads(raw)
+            parsed = json.loads(raw_json)
             return MeetingSummaryResponse(
                 summary=parsed.get("summary", ""),
-                keyDecisions=parsed.get("keyDecisions", []),
-                actionItems=parsed.get("actionItems", []),
-                topics=parsed.get("topics", []),
+                keyDecisions=parsed.get("keyDecisions", []) if isinstance(parsed.get("keyDecisions"), list) else [],
+                actionItems=parsed.get("actionItems", []) if isinstance(parsed.get("actionItems"), list) else [],
+                topics=parsed.get("topics", []) if isinstance(parsed.get("topics"), list) else [],
             )
         except Exception as e:
             print(f"[meeting-summary Gemini error] {e}")

@@ -7,4 +7,5 @@ chromadb
 sentence-transformers
 pydantic
 requests
-ddgs
+duckduckgo-search
+python-dotenv
