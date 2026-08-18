@@ -2,7 +2,7 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { signIn, useSession } from "next-auth/react";
 import {
   AlertCircle,
@@ -20,12 +20,26 @@ type SocialProvider = "google" | "apple";
 export default function LoginForm() {
   const { status } = useSession();
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [message, setMessage] = useState("");
+
+  useEffect(() => {
+    const error = searchParams.get("error");
+    if (error === "AccountExists") {
+      setMessage("You already have an account created with email & password. Please log in with your password below.");
+    } else if (error === "OAuthAccountNotLinked" || error === "OAuthAccountAlreadyExists") {
+      setMessage("An account already exists with this email address. Please log in with your email and password.");
+    } else if (error === "OAuthCallback" || error === "OAuthError") {
+      setMessage("Google sign-in could not be completed. Please try again or use your password.");
+    } else if (searchParams.get("signup") === "success") {
+      setMessage("Account created successfully! Please sign in below.");
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     if (status === "authenticated") {

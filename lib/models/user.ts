@@ -16,7 +16,15 @@ const UserSchema = new Schema(
     },
     password: {
       type: String,
-      required: true,
+      required: false,
+    },
+    image: {
+      type: String,
+      default: "",
+    },
+    provider: {
+      type: String,
+      default: "credentials",
     },
     plan: {
       type: String,
