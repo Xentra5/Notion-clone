@@ -45,6 +45,16 @@ const UserSchema = new Schema(
     razorpaySubscriptionId: { type: String, default: null },
     razorpayOrderId: { type: String, default: null },
     razorpayPaymentId: { type: String, default: null },
+    // Connected Integrations
+    connections: {
+      google: { type: Boolean, default: false },
+      outlook: { type: Boolean, default: false },
+    },
+    // User Workspace Preferences
+    preferences: {
+      type: Schema.Types.Mixed,
+      default: {},
+    },
   },
   { timestamps: true }
 );

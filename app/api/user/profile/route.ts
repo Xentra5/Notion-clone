@@ -8,7 +8,9 @@ export async function GET(request: NextRequest) {
   const session = await getSession(request);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   await connectToDatabase();
-  const user = await User.findOne({ email: session.user.email }).select("name email plan createdAt").lean();
+  const user = await User.findOne({ email: session.user.email })
+    .select("name email plan connections preferences createdAt")
+    .lean();
   return NextResponse.json({ user });
 }
 
@@ -32,6 +34,27 @@ export async function PATCH(request: NextRequest) {
     if (!cleanName) return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
     user.name = cleanName;
   }
+  if (body.connections && typeof body.connections === "object") {
+    user.connections = {
+      google: Boolean(body.connections.google),
+      outlook: Boolean(body.connections.outlook),
+    };
+  }
+  if (body.preferences && typeof body.preferences === "object") {
+    user.preferences = {
+      ...(user.preferences || {}),
+      ...body.preferences,
+    };
+  }
   await user.save();
-  return NextResponse.json({ user: { name: user.name, email: user.email, plan: user.plan, createdAt: user.createdAt } });
+  return NextResponse.json({
+    user: {
+      name: user.name,
+      email: user.email,
+      plan: user.plan,
+      connections: user.connections,
+      preferences: user.preferences,
+      createdAt: user.createdAt,
+    },
+  });
 }

@@ -24,11 +24,13 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
   const { theme, setTheme } = useTheme();
   const [query, setQuery] = useState("");
   const [pages, setPages] = useState<Page[]>([]);
+  const [selectedIndex, setSelectedIndex] = useState(0);
 
   useEffect(() => {
     if (!isOpen) return;
     queueMicrotask(() => {
       setQuery("");
+      setSelectedIndex(0);
     });
 
     let isCancelled = false;
@@ -44,7 +46,7 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
   }, [isOpen]);
 
   const filteredPages = useMemo(() => {
-    if (!query.trim()) return pages.slice(0, 5);
+    if (!query.trim()) return pages.slice(0, 8);
     const q = query.toLowerCase();
     return pages.filter(
       (p) =>
@@ -52,6 +54,14 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
         p.blocks?.some((b) => b.properties?.text?.toLowerCase().includes(q))
     );
   }, [pages, query]);
+
+  // Combined selectable list (quick actions + pages)
+  const totalQuickActions = !query ? 3 : 0;
+  const totalItems = totalQuickActions + filteredPages.length;
+
+  useEffect(() => {
+    setSelectedIndex(0);
+  }, [query]);
 
   const handleSelectPage = useCallback(
     (pageId: string) => {
@@ -75,6 +85,40 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Escape") {
       onClose();
+      return;
+    }
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (totalItems > 0) {
+        setSelectedIndex((prev) => (prev + 1) % totalItems);
+      }
+      return;
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      if (totalItems > 0) {
+        setSelectedIndex((prev) => (prev - 1 + totalItems) % totalItems);
+      }
+      return;
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      if (!query && selectedIndex === 0) {
+        void handleCreateNewPage();
+      } else if (!query && selectedIndex === 1) {
+        onClose();
+        onOpenAi();
+      } else if (!query && selectedIndex === 2) {
+        setTheme(theme === "dark" ? "light" : "dark");
+        onClose();
+      } else {
+        const pageIdx = !query ? selectedIndex - 3 : selectedIndex;
+        if (filteredPages[pageIdx]) {
+          handleSelectPage(filteredPages[pageIdx]._id);
+        } else if (query.trim()) {
+          void handleCreateNewPage();
+        }
+      }
     }
   };
 
@@ -116,7 +160,12 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
                 <button
                   type="button"
                   onClick={handleCreateNewPage}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-foreground hover:bg-foreground/5 transition text-left"
+                  onMouseEnter={() => setSelectedIndex(0)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition text-left cursor-pointer ${
+                    selectedIndex === 0
+                      ? "bg-accent text-accent-foreground ring-1 ring-primary/30 shadow-xs"
+                      : "text-foreground hover:bg-foreground/5"
+                  }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
@@ -133,7 +182,12 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
                     onClose();
                     onOpenAi();
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-foreground hover:bg-foreground/5 transition text-left"
+                  onMouseEnter={() => setSelectedIndex(1)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition text-left cursor-pointer ${
+                    selectedIndex === 1
+                      ? "bg-accent text-accent-foreground ring-1 ring-primary/30 shadow-xs"
+                      : "text-foreground hover:bg-foreground/5"
+                  }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="p-1.5 rounded-lg bg-purple-500/10 text-purple-500">
@@ -150,7 +204,12 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
                     setTheme(theme === "dark" ? "light" : "dark");
                     onClose();
                   }}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-foreground hover:bg-foreground/5 transition text-left"
+                  onMouseEnter={() => setSelectedIndex(2)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition text-left cursor-pointer ${
+                    selectedIndex === 2
+                      ? "bg-accent text-accent-foreground ring-1 ring-primary/30 shadow-xs"
+                      : "text-foreground hover:bg-foreground/5"
+                  }`}
                 >
                   <div className="flex items-center gap-2.5">
                     <div className="p-1.5 rounded-lg bg-amber-500/10 text-amber-500">
@@ -170,22 +229,33 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
               {query ? "Matching Pages" : "Recent Pages"}
             </div>
             <div className="space-y-0.5">
-              {filteredPages.map((page) => (
-                <button
-                  key={page._id}
-                  type="button"
-                  onClick={() => handleSelectPage(page._id)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium text-foreground hover:bg-foreground/5 transition text-left group"
-                >
-                  <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base select-none shrink-0">{page.icon || "📄"}</span>
-                    <span className="truncate">{page.title}</span>
-                  </div>
-                  <span className="text-[10px] text-muted-foreground opacity-0 group-hover:opacity-100 transition shrink-0 ml-2">
-                    Jump to page ↗
-                  </span>
-                </button>
-              ))}
+              {filteredPages.map((page, idx) => {
+                const itemIdx = !query ? idx + 3 : idx;
+                const isSelected = selectedIndex === itemIdx;
+                return (
+                  <button
+                    key={page._id}
+                    type="button"
+                    onClick={() => handleSelectPage(page._id)}
+                    onMouseEnter={() => setSelectedIndex(itemIdx)}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition text-left group cursor-pointer ${
+                      isSelected
+                        ? "bg-accent text-accent-foreground ring-1 ring-primary/30 shadow-xs"
+                        : "text-foreground hover:bg-foreground/5"
+                    }`}
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="text-base select-none shrink-0">{page.icon || "📄"}</span>
+                      <span className="truncate font-semibold">{page.title}</span>
+                    </div>
+                    <span className={`text-[10px] text-muted-foreground transition shrink-0 ml-2 ${
+                      isSelected ? "opacity-100 text-primary font-bold" : "opacity-0 group-hover:opacity-100"
+                    }`}>
+                      Jump to page ↗
+                    </span>
+                  </button>
+                );
+              })}
 
               {filteredPages.length === 0 && query && (
                 <div className="p-6 text-center text-xs text-muted-foreground space-y-2">

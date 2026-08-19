@@ -41,6 +41,12 @@ const PageSchema = new Schema(
     },
     parentPageId: { type: String, default: null, index: true },
     isAiMeetingNote: { type: Boolean, default: false },
+    isStarred: { type: Boolean, default: false },
+    permission: {
+      type: String,
+      enum: ["Private", "Workspace", "Public"],
+      default: "Private",
+    },
     blocks: [BlockSchema],
     deletedAt: { type: Date, default: null },
   },

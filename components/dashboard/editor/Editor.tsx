@@ -55,6 +55,7 @@ export interface EditorProps {
   pageId?: string;
   initialBlocks?: ChecklistItem[];
   initialCoverImage?: string;
+  initialIcon?: string;
   isAiMeetingNote?: boolean;
   childPages?: Page[];
   onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
@@ -576,9 +577,9 @@ function Block({
 }
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
-export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, isAiMeetingNote, childPages, onSelectSubPage }: EditorProps) {
+export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, initialIcon, isAiMeetingNote, childPages, onSelectSubPage }: EditorProps) {
   const router = useRouter();
-  const [pageEmoji, setPageEmoji] = useState("📄");
+  const [pageEmoji, setPageEmoji] = useState(initialIcon || "📄");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(activeTitle);
   const [coverUrl, setCoverUrl] = useState<string | undefined>(initialCoverImage);
@@ -588,6 +589,27 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
   const [remoteCursors, setRemoteCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
+
+  useEffect(() => {
+    if (initialIcon) setPageEmoji(initialIcon);
+  }, [initialIcon]);
+
+  const handleEmojiChange = useCallback(
+    async (newEmoji: string) => {
+      setPageEmoji(newEmoji);
+      setShowEmojiPicker(false);
+      if (!pageId) return;
+      try {
+        await updatePage(pageId, { icon: newEmoji });
+        window.dispatchEvent(
+          new CustomEvent("page-updated", { detail: { icon: newEmoji, updatedAt: new Date() } })
+        );
+      } catch (err) {
+        console.error("Failed to update page icon:", err);
+      }
+    },
+    [pageId]
+  );
 
   // Slash command menu
   const [slash, setSlash] = useState<{ blockId: string; query: string; open: boolean }>({ blockId: "", query: "", open: false });
@@ -1212,14 +1234,15 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
         {/* Emoji */}
         <div className="relative mb-3">
           <button
+            type="button"
             onClick={e => { e.stopPropagation(); setShowEmojiPicker(!showEmojiPicker); }}
-            className="text-5xl rounded-lg p-1 hover:bg-foreground/5 transition select-none inline-block"
+            className="text-5xl rounded-xl p-1.5 hover:bg-foreground/5 hover:scale-105 active:scale-95 transition select-none inline-block cursor-pointer"
             title="Change icon"
           >
             {pageEmoji}
           </button>
           {showEmojiPicker && (
-            <EmojiDropdown onSelect={setPageEmoji} onClose={() => setShowEmojiPicker(false)} />
+            <EmojiDropdown onSelect={handleEmojiChange} onClose={() => setShowEmojiPicker(false)} />
           )}
         </div>
 

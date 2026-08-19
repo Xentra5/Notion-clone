@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { title, blocks, category, icon, coverImage, parentPageId } = body;
+    const { title, blocks, category, icon, coverImage, parentPageId, isStarred, permission } = body;
 
     // Build update payload from only the provided fields
     const $set: Record<string, unknown> = {};
@@ -68,6 +68,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (category !== undefined) $set.category = category;
     if (icon !== undefined) $set.icon = icon;
     if (coverImage !== undefined) $set.coverImage = coverImage;
+    if (isStarred !== undefined) $set.isStarred = Boolean(isStarred);
+    if (permission !== undefined) $set.permission = permission;
     if (parentPageId !== undefined) {
       if (parentPageId === id) {
         return NextResponse.json({ error: "A page cannot be its own parent" }, { status: 400 });

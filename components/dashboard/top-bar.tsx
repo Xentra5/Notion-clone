@@ -112,8 +112,12 @@ export function TopBar({
     getPages()
       .then((allPages) => {
         if (cancelled) return;
-        const chain: { id: string; title: string }[] = [];
         const current = allPages.find((p) => p._id === pageId);
+        if (current) {
+          setIsStarred(Boolean(current.isStarred));
+          if (current.permission) setPermission(current.permission);
+        }
+        const chain: { id: string; title: string }[] = [];
         let parentId = current?.parentPageId;
         while (parentId) {
           const parentDoc: Page | undefined = allPages.find((p) => p._id === parentId);
@@ -132,8 +136,10 @@ export function TopBar({
 
   useEffect(() => {
     function handlePageUpdate(e: Event) {
-      const customEvent = e as CustomEvent<{ title?: string; updatedAt?: Date | string }>;
+      const customEvent = e as CustomEvent<{ title?: string; updatedAt?: Date | string; isStarred?: boolean; permission?: string }>;
       if (customEvent.detail?.title) setRenameTitleValue(customEvent.detail.title);
+      if (typeof customEvent.detail?.isStarred === "boolean") setIsStarred(customEvent.detail.isStarred);
+      if (customEvent.detail?.permission) setPermission(customEvent.detail.permission);
       setLastEdited(customEvent.detail?.updatedAt || new Date());
     }
     window.addEventListener("page-updated", handlePageUpdate);
@@ -264,31 +270,52 @@ export function TopBar({
               {showPermissionDropdown && (
                 <div className="absolute left-0 top-full mt-1 w-44 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 text-xs text-popover-foreground">
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setPermission("Private");
                       setShowPermissionDropdown(false);
+                      if (pageId) {
+                        try {
+                          await updatePage(pageId, { permission: "Private" });
+                          window.dispatchEvent(new CustomEvent("page-updated", { detail: { permission: "Private" } }));
+                          toast.success("Page set to Private");
+                        } catch { toast.error("Failed to update permission"); }
+                      }
                     }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-left transition"
                   >
                     <Lock className="h-3.5 w-3.5 text-muted-foreground" />
                     <span>Private</span>
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setPermission("Workspace");
                       setShowPermissionDropdown(false);
+                      if (pageId) {
+                        try {
+                          await updatePage(pageId, { permission: "Workspace" });
+                          window.dispatchEvent(new CustomEvent("page-updated", { detail: { permission: "Workspace" } }));
+                          toast.success("Page shared with Workspace");
+                        } catch { toast.error("Failed to update permission"); }
+                      }
                     }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-left transition"
                   >
                     <Users className="h-3.5 w-3.5 text-muted-foreground" />
                     <span>Workspace</span>
                   </button>
                   <button
-                    onClick={() => {
+                    onClick={async () => {
                       setPermission("Public");
                       setShowPermissionDropdown(false);
+                      if (pageId) {
+                        try {
+                          await updatePage(pageId, { permission: "Public" });
+                          window.dispatchEvent(new CustomEvent("page-updated", { detail: { permission: "Public" } }));
+                          toast.success("Page published to Public Web");
+                        } catch { toast.error("Failed to update permission"); }
+                      }
                     }}
-                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-neutral-100 dark:hover:bg-[#2c2c2c] text-left"
+                    className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-accent text-left transition"
                   >
                     <Globe className="h-3.5 w-3.5 text-muted-foreground" />
                     <span>Public Web</span>
@@ -372,9 +399,23 @@ export function TopBar({
 
           {/* Favorite / Star */}
           <button
-            onClick={() => setIsStarred(!isStarred)}
-            className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground"
-            title="Favorite page"
+            onClick={async () => {
+              if (!pageId) return;
+              const nextStarred = !isStarred;
+              setIsStarred(nextStarred);
+              try {
+                await updatePage(pageId, { isStarred: nextStarred });
+                window.dispatchEvent(
+                  new CustomEvent("page-updated", { detail: { isStarred: nextStarred, updatedAt: new Date() } })
+                );
+                toast.success(nextStarred ? "Added to Starred" : "Removed from Starred");
+              } catch {
+                setIsStarred(!nextStarred);
+                toast.error("Failed to update favorite status");
+              }
+            }}
+            className="p-1.5 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] hover:text-foreground transition text-muted-foreground cursor-pointer"
+            title={isStarred ? "Remove from Starred" : "Add to Starred"}
           >
             <Star
               className={`h-3.5 w-3.5 transition-colors ${

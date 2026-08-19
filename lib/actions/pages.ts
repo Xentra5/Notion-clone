@@ -36,6 +36,8 @@ export interface Page {
   category: "Private" | "Shared" | "Meetings";
   parentPageId?: string;
   isAiMeetingNote: boolean;
+  isStarred?: boolean;
+  permission?: "Private" | "Workspace" | "Public";
   blocks: PageBlock[];
   createdAt: string;
   updatedAt: string;
@@ -59,18 +61,21 @@ export async function getPage(id: string): Promise<Page> {
 }
 
 // POST /api/pages — create a new page and return it (with _id)
-export async function createPage(data: {
+export async function createPage(data?: {
   title?: string;
   icon?: string;
+  coverImage?: string;
   category?: "Private" | "Shared" | "Meetings";
   parentPageId?: string;
   isAiMeetingNote?: boolean;
+  isStarred?: boolean;
+  permission?: "Private" | "Workspace" | "Public";
   blocks?: PageBlock[];
 }): Promise<Page> {
   const res = await fetch("/api/pages", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
+    body: JSON.stringify(data || {}),
   });
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({} as { detail?: string; error?: string }));
@@ -84,7 +89,9 @@ export async function createPage(data: {
 // PATCH /api/pages/[id] — update one or more fields on an existing page
 export async function updatePage(
   id: string,
-  data: Partial<Pick<Page, "title" | "blocks" | "category" | "icon" | "coverImage">> & { parentPageId?: string }
+  data: Partial<Pick<Page, "title" | "blocks" | "category" | "icon" | "coverImage" | "isStarred" | "permission">> & {
+    parentPageId?: string;
+  }
 ): Promise<Page> {
   const res = await fetch(`/api/pages/${id}`, {
     method: "PATCH",

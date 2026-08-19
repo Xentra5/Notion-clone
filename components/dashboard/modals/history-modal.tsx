@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { History, X, RotateCcw, Clock, GitCompare } from "lucide-react";
 import { toast } from "sonner";
 import { VersionDiffModal } from "./version-diff-modal";
@@ -24,6 +25,7 @@ interface HistoryModalProps {
 }
 
 export function HistoryModal({ isOpen, onClose, pageId, currentTitle = "Current Version", currentBlocks = [], onRestored }: HistoryModalProps) {
+  const router = useRouter();
   const [revisions, setRevisions] = useState<RevisionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [restoringId, setRestoringId] = useState<string | null>(null);
@@ -95,7 +97,8 @@ export function HistoryModal({ isOpen, onClose, pageId, currentTitle = "Current 
         toast.success("Page restored to selected version!");
         onClose();
         if (onRestored) onRestored();
-        window.location.reload();
+        window.dispatchEvent(new CustomEvent("page-updated", { detail: { updatedAt: new Date() } }));
+        router.refresh();
       }
     } catch {
       toast.error("Failed to restore version");

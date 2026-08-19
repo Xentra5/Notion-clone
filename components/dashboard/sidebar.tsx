@@ -30,6 +30,7 @@ import {
   Mic,
   Users,
   CornerUpLeft,
+  Star,
 } from "lucide-react";
 
 const GETTING_STARTED_BLOCKS: PageBlock[] = [
@@ -316,6 +317,7 @@ export function Sidebar({
   }, [userEmail]);
 
   const [expandedSections, setExpandedSections] = useState({
+    starred: true,
     meetings: true,
     recents: true,
     agents: true,
@@ -575,7 +577,7 @@ export function Sidebar({
             className="p-1.5 rounded-md hover:bg-sidebar-accent hover:text-purple-600 dark:hover:text-purple-300 transition"
             title="Notion AI"
           >
-            <Bell className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" />
           </button>
           <button
             onClick={onOpenSettings}
@@ -585,6 +587,67 @@ export function Sidebar({
             <Settings className="h-4 w-4" />
           </button>
         </div>
+
+        {/* Starred / Favorites Section */}
+        {pages.some((p) => p.isStarred) && (
+          <div className="space-y-1">
+            <button
+              onClick={() => toggleSection("starred")}
+              className="w-full flex items-center justify-between px-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition text-left"
+            >
+              <span className="flex items-center gap-1.5">
+                <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                <span>Favorites</span>
+              </span>
+              {expandedSections.starred ? (
+                <ChevronDown className="h-3 w-3" />
+              ) : (
+                <ChevronRight className="h-3 w-3" />
+              )}
+            </button>
+
+            {expandedSections.starred && (
+              <div className="space-y-0.5">
+                {pages
+                  .filter((p) => p.isStarred)
+                  .map((page) => (
+                    <div
+                      key={page._id}
+                      onClick={(e) => handlePageClick(e, page)}
+                      className={`w-full flex items-center justify-between group px-2 py-1.5 rounded-lg transition text-left font-medium cursor-pointer ${
+                        pathname === `/dashboard/${page._id}`
+                          ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
+                          : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                        <span className="shrink-0 text-sm">{page.icon || "📄"}</span>
+                        <span className="truncate text-[11px] flex-1">{page.title}</span>
+                      </div>
+                      <button
+                        onClick={async (e) => {
+                          e.stopPropagation();
+                          try {
+                            await updatePage(page._id, { isStarred: false });
+                            window.dispatchEvent(
+                              new CustomEvent("page-updated", { detail: { isStarred: false, updatedAt: new Date() } })
+                            );
+                            toast.success("Removed from Favorites");
+                          } catch {
+                            toast.error("Failed to unstar page");
+                          }
+                        }}
+                        title="Remove from favorites"
+                        className="opacity-0 group-hover:opacity-100 p-1 hover:bg-neutral-300 dark:hover:bg-[#383838] rounded text-amber-500 transition shrink-0"
+                      >
+                        <Star className="h-3 w-3 fill-amber-500 text-amber-500" />
+                      </button>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Meetings Section */}
         <div className="space-y-1">
