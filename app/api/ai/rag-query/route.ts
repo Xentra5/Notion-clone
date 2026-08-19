@@ -27,7 +27,13 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { question, pageId, history } = body as { question?: unknown; pageId?: unknown; history?: { role: "user" | "assistant"; text: string }[] };
+    const { question, pageId, pageTitle, pageContent, history } = body as {
+      question?: unknown;
+      pageId?: unknown;
+      pageTitle?: unknown;
+      pageContent?: unknown;
+      history?: { role: "user" | "assistant"; text: string }[];
+    };
 
     if (typeof question !== "string" || !question.trim()) {
       return NextResponse.json({ error: "Question is required" }, { status: 400 });
@@ -35,6 +41,8 @@ export async function POST(request: NextRequest) {
 
     const q = question.trim();
     const activePageId = typeof pageId === "string" && pageId.trim() ? pageId.trim() : null;
+    const providedTitle = typeof pageTitle === "string" && pageTitle.trim() ? pageTitle.trim() : "";
+    const providedContent = typeof pageContent === "string" && pageContent.trim() ? pageContent.trim() : "";
 
     // Fetch user's active workspace pages for in-memory fallback & indexing
     await connectToDatabase();
@@ -42,38 +50,29 @@ export async function POST(request: NextRequest) {
       userId: session.user.email,
       $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }],
     }).lean()) as RawPage[];
-    const workspaceContentCount = pages.reduce(
-      (total, page) => total + (page.blocks || []).filter((block) => Boolean(block.properties?.text?.trim())).length,
-      0
-    );
-    if (q.toLowerCase().startsWith("/summary") && workspaceContentCount === 0) {
-      return NextResponse.json({
-        answer: "There is no written content to summarize yet. Add some notes first, then try `/summary` again.",
-        citations: [],
-        source: "empty_workspace",
-      });
-    }
 
     const workspaceId = session.user.email;
-    const indexRequests = pages.map((p) =>
-      fetch(`${PYTHON_RAG_SERVICE_URL}/index-page`, {
+    // Batch index in the background without flooding parallel requests
+    if (pages.length > 0) {
+      void fetch(`${PYTHON_RAG_SERVICE_URL}/index-pages-batch`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           workspaceId,
-          pageId: p._id.toString(),
-          title: p.title || "Untitled",
-          blocks: (p.blocks || []).map((b: RawBlock) => ({
-            id: b.id,
-            type: b.type,
-            text: b.properties?.text || "",
+          pages: pages.map((p) => ({
+            workspaceId,
+            pageId: p._id.toString(),
+            title: p.title || "Untitled",
+            blocks: (p.blocks || []).map((b: RawBlock) => ({
+              id: b.id,
+              type: b.type,
+              text: b.properties?.text || "",
+            })),
           })),
         }),
-        signal: AbortSignal.timeout(5000),
-      }).catch(() => null)
-    );
-    // Keep indexing fresh without making the chat wait for every workspace page.
-    void Promise.all(indexRequests);
+        signal: AbortSignal.timeout(10000),
+      }).catch(() => null);
+    }
 
     // ─── Build workspace & conversation context (used by slash cmds AND fallback) ───
     const pageTitles = pages.map((p) => p.title || "Untitled");
@@ -98,8 +97,12 @@ export async function POST(request: NextRequest) {
 
     // ─── Slash command detection ─────────────────────────────────────────────────
     // Slash commands are ALWAYS handled in-process (not by the Python RAG service)
-    // so that they correctly return action: "append_block" for page insertion.
-    const isSlashCommand = /^\/(write|code|kanban|table|search|summary)\b/i.test(q);
+    const isSummaryCmd =
+      /^\/(summary|summery|summarize)\b/i.test(q) ||
+      /^(summarize(\s+this\s+page|\s+page|\s+note|\s+workspace)?|summary)$/i.test(q);
+    const isSlashCommand =
+      isSummaryCmd ||
+      /^\/(write|code|kanban|table|search)\b/i.test(q);
 
     // ─── Normal Q&A: try Python RAG service first ────────────────────────────────
     if (!isSlashCommand) {
@@ -252,82 +255,69 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // /summary command
-    if (q.toLowerCase().startsWith("/summary")) {
-      // ── Page-specific summary (user is on a real page) ────────────────────────
-      if (activePageId) {
-        const activePage = pages.find((p) => p._id.toString() === activePageId);
-        if (!activePage) {
-          return NextResponse.json({
-            answer: "⚠️ The current page could not be found. Try navigating to a page first.",
-            citations: [],
-            source: "empty_page",
-          });
-        }
+    // /summary / /summery / /summarize command
+    if (isSummaryCmd) {
+      // Find database active page if activePageId was provided
+      const activePage = activePageId ? pages.find((p) => p._id.toString() === activePageId) : null;
+      const targetTitle = providedTitle || activePage?.title || "Active Page";
 
-        const pageTextBlocks = (activePage.blocks || [])
-          .filter((b: RawBlock) => b.properties?.text?.trim())
+      // 1. Prioritize live pageContent passed from client editor
+      let pageText = providedContent;
+
+      // 2. Fall back to database blocks for activePage if client didn't pass content
+      if (!pageText && activePage) {
+        pageText = (activePage.blocks || [])
+          .filter((b: RawBlock) => Boolean(b.properties?.text?.trim()))
           .map((b: RawBlock) => b.properties?.text || "")
           .join("\n");
+      }
 
-        if (!pageTextBlocks.trim()) {
-          return NextResponse.json({
-            answer: `📄 **"${activePage.title || "Untitled"}"** has no written content yet. Start adding notes, then run \`/summary\` again.`,
-            citations: [],
-            source: "empty_page",
-          });
-        }
-
+      // If active page has content, summarize it directly
+      if (pageText.trim()) {
         if (GEMINI_API_KEY) {
           const geminiAnswer = await callGemini(
-            `You are Notion AI. Summarize the following page concisely with these sections:
-## 📌 Key Topics
-## ✅ Action Items
-## 💡 Key Insights
+            `You are Notion AI, an expert workspace assistant. Write a comprehensive, well-structured executive summary of the following note with clear sections:
 
-Previous conversation:
-${conversationContext || "(none)"}
+## 📌 Executive Summary
+(2-3 clear sentences summarizing the core idea)
 
-Page title: "${activePage.title || "Untitled"}"
-Page content:
-${pageTextBlocks.slice(0, 4000)}`,
+## 🔑 Key Points & Highlights
+(bullet points of key information)
+
+## ✅ Action Items & Next Steps
+(extracted or suggested action items, or "None specified")
+
+## 💡 Key Insights & Takeaways
+(concluding thoughts or recommendations)
+
+Page Title: "${targetTitle}"
+Page Content:
+${pageText.slice(0, 10000)}`,
             GEMINI_API_KEY
           );
           return NextResponse.json({
-            answer: `📝 **Page Summary: "${activePage.title || "Untitled"}"**\n\n${geminiAnswer}`,
-            citations: [{ pageId: activePage._id.toString(), title: activePage.title || "Untitled" }],
+            answer: `📝 **Page Summary: "${targetTitle}"**\n\n${geminiAnswer}`,
+            citations: activePage ? [{ pageId: activePage._id.toString(), title: targetTitle }] : [],
             source: "gemini_summary",
-            action: "append_block",
-            blockType: "callout",
-            content: geminiAnswer,
           });
         }
 
+        // Local summary without API key
+        const lines = pageText.split("\n").map((l) => l.trim()).filter(Boolean);
+        const wordCount = pageText.split(/\s+/).filter(Boolean).length;
+        const excerpt = lines.slice(0, 8).map((l) => `• ${l}`).join("\n");
         return NextResponse.json({
-          answer: `📝 **Page Summary: "${activePage.title || "Untitled"}"**\n\nThis page contains:\n\n${pageTextBlocks.slice(0, 600)}${pageTextBlocks.length > 600 ? "\n\n…" : ""}\n\n💡 Add a GEMINI_API_KEY to .env.local for AI-powered summaries.`,
-          citations: [{ pageId: activePage._id.toString(), title: activePage.title || "Untitled" }],
+          answer: `📝 **Page Summary: "${targetTitle}"** (${wordCount} words)\n\n## 📌 Highlights\n${excerpt}${lines.length > 8 ? "\n\n*(and more)*" : ""}\n\n💡 *Tip: Add GEMINI_API_KEY to your .env.local file for deep AI-generated insights.*`,
+          citations: activePage ? [{ pageId: activePage._id.toString(), title: targetTitle }] : [],
+          source: "local_summary",
         });
       }
 
-      // ── Workspace-wide summary (no active page) ───────────────────────────────
-      if (contentCount === 0) {
-        return NextResponse.json({
-          answer: "There is no written content to summarize yet. Add some notes first, then try `/summary` again.",
-          citations: [],
-          source: "empty_workspace",
-        });
-      }
-      if (pageCount === 0) {
-        return NextResponse.json({
-          answer: "⚠️ Your workspace has no pages yet. Create some pages with content first!",
-          citations: [],
-          source: "empty_workspace",
-        });
-      }
-
-      if (GEMINI_API_KEY) {
-        const geminiAnswer = await callGemini(
-          `You are Notion AI. Based on these workspace pages, write a concise executive summary with:
+      // 3. If active page has no text, check if workspace has other pages with content
+      if (contentCount > 0 && pageCount > 0) {
+        if (GEMINI_API_KEY) {
+          const geminiAnswer = await callGemini(
+            `You are Notion AI. Based on these workspace pages, write a concise workspace executive summary:
 ## 📌 Key Topics
 ## ✅ Action Items
 ## 💡 Key Insights
@@ -337,21 +327,26 @@ ${conversationContext || "(none)"}
 
 Workspace pages:
 ${workspaceContext}`,
-          GEMINI_API_KEY
-        );
+            GEMINI_API_KEY
+          );
+          return NextResponse.json({
+            answer: `📝 **Workspace Executive Summary** (${pageCount} pages)\n\n${geminiAnswer}`,
+            citations: pages.slice(0, 4).map((p) => ({ pageId: p._id.toString(), title: p.title || "Untitled" })),
+            source: "gemini_summary",
+          });
+        }
+
         return NextResponse.json({
-          answer: `📝 **Workspace Executive Summary** (${pageCount} pages)\n\n${geminiAnswer}`,
+          answer: `📝 **Workspace Summary** (${pageCount} pages)\n\nYour workspace contains: **${pageTitles.join(", ")}**.\n\n💡 Add a GEMINI_API_KEY to .env.local for AI-powered summaries, or start the Python RAG service.`,
           citations: pages.slice(0, 4).map((p) => ({ pageId: p._id.toString(), title: p.title || "Untitled" })),
-          source: "gemini_summary",
-          action: "append_block",
-          blockType: "callout",
-          content: geminiAnswer,
         });
       }
 
+      // 4. Truly empty page and empty workspace
       return NextResponse.json({
-        answer: `📝 **Workspace Summary** (${pageCount} pages)\n\nYour workspace contains: **${pageTitles.join(", ")}**.\n\n💡 Add a GEMINI_API_KEY to .env.local for AI-powered summaries, or start the Python RAG service.`,
-        citations: pages.slice(0, 4).map((p) => ({ pageId: p._id.toString(), title: p.title || "Untitled" })),
+        answer: `📄 **"${targetTitle}"** has no written content yet.\n\nStart typing notes on the page, then ask \`/summary\` again!`,
+        citations: [],
+        source: "empty_page",
       });
     }
 

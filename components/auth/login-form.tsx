@@ -26,20 +26,23 @@ export default function LoginForm() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState("");
+  const [customMessage, setCustomMessage] = useState("");
 
-  useEffect(() => {
-    const error = searchParams.get("error");
-    if (error === "AccountExists") {
-      setMessage("You already have an account created with email & password. Please log in with your password below.");
-    } else if (error === "OAuthAccountNotLinked" || error === "OAuthAccountAlreadyExists") {
-      setMessage("An account already exists with this email address. Please log in with your email and password.");
-    } else if (error === "OAuthCallback" || error === "OAuthError") {
-      setMessage("Google sign-in could not be completed. Please try again or use your password.");
-    } else if (searchParams.get("signup") === "success") {
-      setMessage("Account created successfully! Please sign in below.");
-    }
-  }, [searchParams]);
+  const errorParam = searchParams.get("error");
+  const signupParam = searchParams.get("signup");
+  const computedMessage =
+    errorParam === "AccountExists"
+      ? "You already have an account created with email & password. Please log in with your password below."
+      : errorParam === "OAuthAccountNotLinked" || errorParam === "OAuthAccountAlreadyExists"
+      ? "An account already exists with this email address. Please log in with your email and password."
+      : errorParam === "OAuthCallback" || errorParam === "OAuthError"
+      ? "Google sign-in could not be completed. Please try again or use your password."
+      : signupParam === "success"
+      ? "Account created successfully! Please sign in below."
+      : "";
+
+  const message = customMessage || computedMessage;
+  const setMessage = setCustomMessage;
 
   useEffect(() => {
     if (status === "authenticated") {

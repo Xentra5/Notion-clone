@@ -1,6 +1,7 @@
 import os
 import re
 import json
+import threading
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -16,7 +17,10 @@ try:
 except Exception:
     pass
 
-# ─── LangChain Modern Imports ─────────────────────────────────────────────────
+# ─── LangChain Imports ────────────────────────────────────────────────────────
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
+warnings.filterwarnings("ignore", message=".*langchain.*", category=DeprecationWarning)
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_community.vectorstores import Chroma
@@ -30,6 +34,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global mutex lock to ensure SQLite write serialization
+db_lock = threading.Lock()
 
 # ─── Vector Store Setup ───────────────────────────────────────────────────────
 CHROMA_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
@@ -74,6 +81,10 @@ class IndexPageRequest(BaseModel):
     title: str
     blocks: List[BlockItem]
 
+class IndexPagesBatchRequest(BaseModel):
+    workspaceId: str = "default"
+    pages: List[IndexPageRequest]
+
 class DeletePageRequest(BaseModel):
     workspaceId: str = "default"
     pageId: str
@@ -106,7 +117,7 @@ def health_check():
 # ─── Index Page ───────────────────────────────────────────────────────────────
 @app.post("/index-page")
 def index_page(req: IndexPageRequest):
-    """Chunk page text and upsert into ChromaDB."""
+    """Chunk page text and upsert into ChromaDB with SQLite lock protection."""
     try:
         parts = []
         for b in req.blocks:
@@ -119,20 +130,60 @@ def index_page(req: IndexPageRequest):
         splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=80)
         chunks = splitter.split_text(combined)
 
-        # Re-indexing is idempotent; remove stale chunks before writing the new ones.
         delete_filter = _build_chroma_filter(req.workspaceId, req.pageId)
-        try:
-            vector_store.delete(where=delete_filter)
-        except Exception as del_err:
-            print(f"[index-page delete warning] {del_err}")
-
         metas = [{"workspaceId": req.workspaceId, "pageId": req.pageId, "title": req.title, "chunkIndex": i} for i in range(len(chunks))]
         ids   = [f"{req.pageId}-chunk-{i}" for i in range(len(chunks))]
 
-        vector_store.add_texts(texts=chunks, metadatas=metas, ids=ids)
+        with db_lock:
+            try:
+                vector_store.delete(where=delete_filter)
+            except Exception as del_err:
+                print(f"[index-page delete warning] {del_err}")
+
+            vector_store.add_texts(texts=chunks, metadatas=metas, ids=ids)
+
         return {"status": "success", "indexed_chunks": len(chunks), "pageId": req.pageId}
     except Exception as e:
         print(f"[index-page error] {e}")
+        return {"status": "error", "message": str(e)}
+
+
+# ─── Batch Index Pages ────────────────────────────────────────────────────────
+@app.post("/index-pages-batch")
+def index_pages_batch(req: IndexPagesBatchRequest):
+    """Batch index multiple workspace pages sequentially under lock."""
+    try:
+        splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=80)
+        indexed_count = 0
+
+        with db_lock:
+            for p in req.pages:
+                try:
+                    parts = []
+                    for b in p.blocks:
+                        if b.text and b.text.strip():
+                            parts.append(f"[{b.type.upper()}] {b.text.strip()}")
+                    if not parts:
+                        continue
+                    combined = f"Page Title: {p.title}\n" + "\n".join(parts)
+                    chunks = splitter.split_text(combined)
+
+                    delete_filter = _build_chroma_filter(req.workspaceId, p.pageId)
+                    try:
+                        vector_store.delete(where=delete_filter)
+                    except Exception:
+                        pass
+
+                    metas = [{"workspaceId": req.workspaceId, "pageId": p.pageId, "title": p.title, "chunkIndex": i} for i in range(len(chunks))]
+                    ids = [f"{p.pageId}-chunk-{i}" for i in range(len(chunks))]
+                    vector_store.add_texts(texts=chunks, metadatas=metas, ids=ids)
+                    indexed_count += 1
+                except Exception as pe:
+                    print(f"[batch-index page error {p.pageId}] {pe}")
+
+        return {"status": "success", "indexed_pages": indexed_count}
+    except Exception as e:
+        print(f"[index-pages-batch error] {e}")
         return {"status": "error", "message": str(e)}
 
 
@@ -143,7 +194,8 @@ def delete_page(req: DeletePageRequest):
     """Remove all indexed chunks for a deleted or trashed page."""
     try:
         delete_filter = _build_chroma_filter(req.workspaceId, req.pageId)
-        vector_store.delete(where=delete_filter)
+        with db_lock:
+            vector_store.delete(where=delete_filter)
         return {"status": "success", "message": f"Deleted page {req.pageId} from vector store"}
     except Exception as e:
         print(f"[delete-page error] {e}")
@@ -165,14 +217,22 @@ def query_rag(req: QueryRequest):
         if not search_q:
             return {"answer": "Please provide a search query. Example: `/search Next.js 16 features`", "citations": []}
         try:
-            from langchain_community.tools import DuckDuckGoSearchRun
-            web_search_tool = DuckDuckGoSearchRun()
-            results = web_search_tool.run(search_q)
+            from duckduckgo_search import DDGS
+            with DDGS() as ddgs:
+                raw_results = list(ddgs.text(search_q, max_results=5))
+            if raw_results:
+                formatted = "\n\n".join(
+                    f"**{r.get('title', '')}**\n{r.get('body', '')}\n🔗 {r.get('href', '')}" for r in raw_results
+                )
+            else:
+                formatted = "No results found."
             return {
-                "answer": f"🌐 **Web Search Results for '{search_q}':**\n\n{results}",
+                "answer": f"🌐 **Web Search Results for '{search_q}':**\n\n{formatted}",
                 "citations": [],
                 "source": "web_search",
             }
+        except ImportError:
+            return {"answer": "Web search requires `duckduckgo-search`. Run: `pip install duckduckgo-search`", "citations": []}
         except Exception as e:
             return {"answer": f"Web search error: {str(e)}", "citations": []}
 

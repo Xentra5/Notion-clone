@@ -63,6 +63,13 @@ export function KanbanBoard({ blockId, columns: externalColumns, onColumnsChange
     [blockId, onColumnsChange]
   );
 
+  // Sync internal state when external columns prop updates
+  useEffect(() => {
+    if (externalColumns && externalColumns.length > 0) {
+      setColumns(externalColumns);
+    }
+  }, [externalColumns]);
+
   // Auto-focus editing inputs
   useEffect(() => {
     if (editingCard && editRef.current) editRef.current.focus();

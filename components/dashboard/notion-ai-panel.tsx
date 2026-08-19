@@ -39,10 +39,8 @@ interface ChatMessage {
   timestamp?: string;
 }
 
-let msgSeq = 0;
 function createMessageId(role: "user" | "assistant"): string {
-  msgSeq += 1;
-  return `${role}-${msgSeq}`;
+  return `${role}-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 interface SlashCmdItem {
@@ -98,7 +96,13 @@ const AI_SLASH_COMMANDS: SlashCmdItem[] = [
   },
 ];
 
-function ChatMessageText({ text }: { text: string }) {
+function ChatMessageText({
+  text,
+  onInsert,
+}: {
+  text: string;
+  onInsert?: (content: string, type?: string) => void;
+}) {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [insertedIdx, setInsertedIdx] = useState<number | null>(null);
 
@@ -106,7 +110,37 @@ function ChatMessageText({ text }: { text: string }) {
 
   const rawBlocks = text.split("```");
   if (rawBlocks.length <= 1) {
-    return <div className="whitespace-pre-wrap leading-relaxed">{text}</div>;
+    return (
+      <div className="space-y-2">
+        <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
+        {onInsert && text.length > 20 && (
+          <div className="flex items-center gap-1.5 pt-1 text-[11px] border-t border-border/40 mt-1">
+            <button
+              type="button"
+              onClick={() => {
+                navigator.clipboard.writeText(text);
+                setCopiedIdx(-1);
+                setTimeout(() => setCopiedIdx(null), 2000);
+              }}
+              className="px-2 py-0.5 rounded bg-foreground/5 hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition text-[10px] font-medium"
+            >
+              {copiedIdx === -1 ? "✓ Copied" : "📋 Copy"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onInsert(text, "callout");
+                setInsertedIdx(-1);
+                setTimeout(() => setInsertedIdx(null), 2000);
+              }}
+              className="px-2 py-0.5 rounded bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-semibold transition"
+            >
+              {insertedIdx === -1 ? "✓ Added to Page!" : "+ Insert to Page"}
+            </button>
+          </div>
+        )}
+      </div>
+    );
   }
 
   const parts: { type: "text" | "code"; content: string; lang?: string }[] = [];
@@ -139,11 +173,15 @@ function ChatMessageText({ text }: { text: string }) {
   };
 
   const handleInsert = (code: string, lang: string, idx: number) => {
-    window.dispatchEvent(
-      new CustomEvent("ai-append-block", {
-        detail: { text: code, type: "code", language: lang },
-      })
-    );
+    if (onInsert) {
+      onInsert(code, "code");
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("ai-append-block", {
+          detail: { text: code, type: "code", language: lang },
+        })
+      );
+    }
     setInsertedIdx(idx);
     setTimeout(() => setInsertedIdx(null), 2000);
   };
@@ -213,15 +251,54 @@ export function NotionAiPanel({
 
   const showSlashMenu = input.startsWith("/") && !selectedCommand;
   const slashFiltered = showSlashMenu
-    ? AI_SLASH_COMMANDS.filter(
-        (c) =>
-          c.cmd.toLowerCase().includes(input.toLowerCase().trim()) ||
-          c.label.toLowerCase().includes(input.slice(1).toLowerCase().trim())
-      )
+    ? AI_SLASH_COMMANDS.filter((c) => {
+        const query = input.toLowerCase().trim();
+        const cmdName = c.cmd.toLowerCase().trim();
+        const labelName = c.label.toLowerCase().trim();
+        const descName = c.desc.toLowerCase().trim();
+        if (cmdName === "/summary") {
+          return (
+            query.startsWith("/sum") ||
+            query.startsWith("/summ") ||
+            query.startsWith("/sume") ||
+            query.startsWith("/summar") ||
+            labelName.includes(query.slice(1)) ||
+            descName.includes(query.slice(1))
+          );
+        }
+        return (
+          cmdName.includes(query) ||
+          labelName.includes(query.slice(1)) ||
+          descName.includes(query.slice(1))
+        );
+      })
     : [];
-  const activeCommand = selectedCommand || AI_SLASH_COMMANDS.find((command) =>
-    input.trimStart().toLowerCase().startsWith(command.cmd.trim().toLowerCase())
-  );
+
+  const isSummaryInput = (text: string) => {
+    const clean = text.trim().toLowerCase();
+    return (
+      clean === "/summary" ||
+      clean === "/summery" ||
+      clean === "/summarize" ||
+      clean.startsWith("/summary ") ||
+      clean.startsWith("/summery ") ||
+      clean.startsWith("/summarize ") ||
+      clean === "summarize" ||
+      clean === "summarize this page" ||
+      clean === "summarize page" ||
+      clean === "summary"
+    );
+  };
+
+  const activeCommand =
+    selectedCommand ||
+    AI_SLASH_COMMANDS.find((command) => {
+      const cleanInput = input.trimStart().toLowerCase();
+      if (command.cmd.trim() === "/summary") {
+        return isSummaryInput(cleanInput);
+      }
+      return cleanInput.startsWith(command.cmd.trim().toLowerCase());
+    });
 
   useEffect(() => {
     if (!isOpen) return;
@@ -234,6 +311,21 @@ export function NotionAiPanel({
       .catch(() => { if (!cancelled) setMessages([]); });
     return () => { cancelled = true; };
   }, [isOpen, currentPageId]);
+
+  // Listen for trigger-ai-command / open-ai-summary events from Editor or keyboard shortcuts
+  useEffect(() => {
+    const handleTriggerAi = (e: Event) => {
+      const detail = (e as CustomEvent<{ prompt?: string }>).detail;
+      const prompt = detail?.prompt || "/summary";
+      handleSend(prompt);
+    };
+    window.addEventListener("trigger-ai-command", handleTriggerAi);
+    window.addEventListener("open-ai-summary", handleTriggerAi);
+    return () => {
+      window.removeEventListener("trigger-ai-command", handleTriggerAi);
+      window.removeEventListener("open-ai-summary", handleTriggerAi);
+    };
+  }, [currentPageId, currentPageTitle, isLimitReached]);
 
   async function saveChat(nextMessages: ChatMessage[]) {
     await fetch("/api/ai/chat", {
@@ -254,7 +346,6 @@ export function NotionAiPanel({
       return;
     }
 
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
     const recognition = new SpeechRecognition();
     recognition.continuous = true;
@@ -265,7 +356,6 @@ export function NotionAiPanel({
       setIsListening(true);
     };
 
-    /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
     recognition.onresult = (event: any) => {
       let transcript = "";
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -336,6 +426,23 @@ export function NotionAiPanel({
     setSelectedCommand(null);
     setIsGenerating(true);
 
+    // Extract live page context from active editor state
+    let livePageContent = "";
+    let livePageTitle = currentPageTitle;
+    if (typeof window !== "undefined") {
+      const activeCtx = (window as any).__ACTIVE_PAGE_CONTEXT__;
+      if (activeCtx) {
+        if (activeCtx.content) livePageContent = activeCtx.content;
+        if (activeCtx.title) livePageTitle = activeCtx.title;
+      }
+      if (!livePageContent) {
+        const domEl = document.getElementById("editor-page-container");
+        if (domEl) {
+          livePageContent = domEl.innerText?.trim() || "";
+        }
+      }
+    }
+
     try {
       const response = await fetch("/api/user/plan", {
         method: "POST",
@@ -364,6 +471,8 @@ export function NotionAiPanel({
         body: JSON.stringify({
           question: textToSend,
           pageId: currentPageId,
+          pageTitle: livePageTitle || currentPageTitle,
+          pageContent: livePageContent,
           history: messages.map(({ role, text }) => ({ role, text })),
         }),
       });
@@ -390,7 +499,7 @@ export function NotionAiPanel({
       await saveChat(savedMessages);
 
       // Append block to active page ONLY when server explicitly instructs it
-      // (slash commands: /code, /write, /kanban, /table, /summary, /search)
+      // (slash commands: /code, /write, /kanban, /table, /search)
       if (data.action === "append_block" && data.content) {
         const blockType = data.blockType || "paragraph";
         setWriteAction(`✅ Added to ${currentPageTitle}`);
@@ -555,9 +664,9 @@ export function NotionAiPanel({
                 <p className="mt-2 whitespace-pre-wrap text-foreground/80">{writeAction}</p>
               </div>
             )}
-            {messages.map((msg) => (
+            {messages.map((msg, idx) => (
               <div
-                key={msg.id}
+                key={msg.id ? `${msg.id}-${idx}` : `msg-${idx}`}
                 className={`flex gap-3 ${
                   msg.role === "user" ? "flex-row-reverse" : "flex-row"
                 }`}
@@ -583,7 +692,21 @@ export function NotionAiPanel({
                         : "bg-card border border-border text-foreground"
                     }`}
                   >
-                    <ChatMessageText text={msg.text} />
+                    <ChatMessageText
+                      text={msg.text}
+                      onInsert={
+                        msg.role === "assistant"
+                          ? (content, type) => {
+                              window.dispatchEvent(
+                                new CustomEvent("ai-append-block", {
+                                  detail: { text: content, type: type || "paragraph" },
+                                })
+                              );
+                              setWriteAction(`✅ Added to ${currentPageTitle}`);
+                            }
+                          : undefined
+                      }
+                    />
                   </div>
 
                   {/* Render Clickable Citation Badges */}

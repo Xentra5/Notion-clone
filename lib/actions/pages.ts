@@ -11,10 +11,17 @@ export interface PageBlock {
   type: string;
   properties: {
     text?: string;
+    title?: string;
     checked?: boolean;
     language?: string;
     subPageId?: string;
     kanbanColumns?: unknown[];
+    url?: string;
+    fileName?: string;
+    fileSize?: string;
+    toggleChildren?: string;
+    calloutIcon?: string;
+    tableData?: string[][];
   };
   content?: string[];
   parent?: string;

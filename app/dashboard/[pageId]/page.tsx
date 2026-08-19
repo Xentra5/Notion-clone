@@ -189,6 +189,7 @@ export default function PageRoute({ params }: PageRouteProps) {
       pageId={pageId}
       initialBlocks={initialBlocks}
       initialCoverImage={page.coverImage}
+      isAiMeetingNote={Boolean(page.isAiMeetingNote)}
       childPages={childPages}
       onSelectSubPage={handleSelectSubPage}
     />

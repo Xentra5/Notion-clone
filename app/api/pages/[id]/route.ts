@@ -103,6 +103,26 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
+    // Sync to RAG microservice in background if title or blocks changed
+    if ($set.title !== undefined || $set.blocks !== undefined) {
+      const ragServiceUrl = process.env.RAG_SERVICE_URL || "http://localhost:8000";
+      void fetch(`${ragServiceUrl}/index-page`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          workspaceId: session.user.email,
+          pageId: id,
+          title: page.title || "Untitled",
+          blocks: (page.blocks || []).map((b: { id: string; type: string; properties?: { text?: string } }) => ({
+            id: b.id,
+            type: b.type,
+            text: b.properties?.text || "",
+          })),
+        }),
+        signal: AbortSignal.timeout(3000),
+      }).catch(() => null);
+    }
+
     return NextResponse.json({ page });
   } catch (error) {
     console.error("Error updating page:", error);
@@ -147,6 +167,17 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         { $set: { deletedAt: now } }
       );
       if (result.matchedCount === 0) return NextResponse.json({ error: "Page not found" }, { status: 404 });
+    }
+
+    // Clean up deleted chunks in RAG microservice in background
+    const ragServiceUrl = process.env.RAG_SERVICE_URL || "http://localhost:8000";
+    for (const deletedId of targetIds) {
+      void fetch(`${ragServiceUrl}/delete-page`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ workspaceId: session.user.email, pageId: deletedId }),
+        signal: AbortSignal.timeout(3000),
+      }).catch(() => null);
     }
 
     return NextResponse.json({ success: true, permanent: isPermanent, deletedCount: targetIds.length });

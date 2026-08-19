@@ -4,7 +4,15 @@ import {
   useState,
   useCallback,
   useMemo,
+  useEffect,
 } from "react";
+import { toast } from "sonner";
+import {
+  getCalendarEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  deleteCalendarEvent,
+} from "@/lib/actions/calendar";
 import {
   ChevronLeft,
   ChevronRight,
@@ -700,13 +708,49 @@ export function NotionCalendarPage() {
   const [month, setMonth] = useState(now.getMonth());
   const [day, setDay] = useState(now.getDate());
   const [view, setView] = useState<ViewMode>("month");
-  const [events, setEvents] = useState<CalendarEvent[]>(seedEvents);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [newEventDate, setNewEventDate] = useState<string | undefined>();
   const [, setNewEventTime] = useState<string | undefined>();
   const [editingEvent, setEditingEvent] = useState<CalendarEvent | undefined>();
   const [showModal, setShowModal] = useState(false);
 
   const today = useMemo(() => todayStr(), []);
+
+  // Fetch events from MongoDB on mount
+  useEffect(() => {
+    let cancelled = false;
+    getCalendarEvents()
+      .then(async (dbEvents) => {
+        if (cancelled) return;
+        if (dbEvents.length > 0) {
+          setEvents(dbEvents as CalendarEvent[]);
+        } else {
+          // If no events in DB yet, seed initial events to MongoDB
+          const seeds = seedEvents();
+          setEvents(seeds);
+          try {
+            for (const s of seeds) {
+              const { id: _ignored, ...data } = s;
+              await createCalendarEvent(data);
+            }
+          } catch {
+            // Non-critical
+          }
+        }
+      })
+      .catch((err) => {
+        console.error("Failed to load calendar events:", err);
+        if (!cancelled) setEvents(seedEvents());
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const goToToday = () => {
     const n = new Date();
@@ -745,7 +789,8 @@ export function NotionCalendarPage() {
     setShowModal(true);
   };
 
-  const saveEvent = (event: CalendarEvent) => {
+  const saveEvent = async (event: CalendarEvent) => {
+    // Optimistic UI update
     setEvents(prev => {
       const idx = prev.findIndex(e => e.id === event.id);
       if (idx >= 0) {
@@ -755,10 +800,57 @@ export function NotionCalendarPage() {
       }
       return [...prev, event];
     });
+
+    try {
+      const isExistingDbId = event.id && !event.id.startsWith("evt-") && !/^\d+$/.test(event.id);
+      if (isExistingDbId) {
+        const updated = await updateCalendarEvent(event.id, {
+          title: event.title,
+          date: event.date,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          allDay: event.allDay,
+          color: event.color,
+          description: event.description,
+          location: event.location,
+          tags: event.tags,
+          attendees: event.attendees,
+        });
+        setEvents(prev => prev.map(e => e.id === event.id ? (updated as CalendarEvent) : e));
+        toast.success("Event updated");
+      } else {
+        const created = await createCalendarEvent({
+          title: event.title,
+          date: event.date,
+          startTime: event.startTime,
+          endTime: event.endTime,
+          allDay: event.allDay,
+          color: event.color,
+          description: event.description,
+          location: event.location,
+          tags: event.tags,
+          attendees: event.attendees,
+        });
+        setEvents(prev => prev.map(e => e.id === event.id ? (created as CalendarEvent) : e));
+        toast.success("Event created in calendar");
+      }
+    } catch (err) {
+      console.error("Failed to save calendar event:", err);
+      toast.error("Failed to save event to database");
+    }
   };
 
-  const deleteEvent = (id: string) => {
+  const deleteEvent = async (id: string) => {
     setEvents(prev => prev.filter(e => e.id !== id));
+    try {
+      if (!id.startsWith("evt-") && !/^\d+$/.test(id)) {
+        await deleteCalendarEvent(id);
+        toast.success("Event deleted");
+      }
+    } catch (err) {
+      console.error("Failed to delete calendar event:", err);
+      toast.error("Failed to delete event from database");
+    }
   };
 
   // Title for header

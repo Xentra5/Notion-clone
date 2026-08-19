@@ -63,16 +63,21 @@ export default function DashboardLayout({
   useEffect(() => {
     const openQuickAi = () => setIsQuickAiOpen(true);
     const openSettings = () => setIsSettingsOpen(true);
+    const openAiPanel = () => setIsAiOpen(true);
     const syncPageTitle = (event: Event) => {
       const title = (event as CustomEvent<{ title?: string }>).detail?.title;
       if (title) setActiveTitle(title);
     };
     window.addEventListener("open-quick-ai", openQuickAi);
     window.addEventListener("open-settings", openSettings);
+    window.addEventListener("trigger-ai-command", openAiPanel);
+    window.addEventListener("open-ai-summary", openAiPanel);
     window.addEventListener("page-updated", syncPageTitle);
     return () => {
       window.removeEventListener("open-quick-ai", openQuickAi);
       window.removeEventListener("open-settings", openSettings);
+      window.removeEventListener("trigger-ai-command", openAiPanel);
+      window.removeEventListener("open-ai-summary", openAiPanel);
       window.removeEventListener("page-updated", syncPageTitle);
     };
   }, []);

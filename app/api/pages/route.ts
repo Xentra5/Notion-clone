@@ -82,6 +82,24 @@ export async function POST(request: NextRequest) {
       blocks: pageBlocks,
     });
 
+    // Background sync to RAG microservice
+    const ragServiceUrl = process.env.RAG_SERVICE_URL || "http://localhost:8000";
+    void fetch(`${ragServiceUrl}/index-page`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        workspaceId: session.user.email,
+        pageId: page._id.toString(),
+        title: page.title,
+        blocks: pageBlocks.map((b: { id: string; type: string; properties?: { text?: string } }) => ({
+          id: b.id,
+          type: b.type,
+          text: b.properties?.text || "",
+        })),
+      }),
+      signal: AbortSignal.timeout(3000),
+    }).catch(() => null);
+
     return NextResponse.json({ page: page.toObject() }, { status: 201 });
   } catch (error) {
     const err = error as Error & { code?: number; errors?: Record<string, unknown> };

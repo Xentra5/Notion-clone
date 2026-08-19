@@ -16,13 +16,19 @@ import {
   Layers,
   Loader2,
   AlertCircle,
+  Save,
+  Check,
 } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { toast } from "sonner";
 import Strands from "../Strands";
+import { updatePage, type PageBlock } from "@/lib/actions/pages";
+import type { ChecklistItem } from "@/hooks/use-pages";
 
 interface MeetingNoteViewProps {
   currentTitle: string;
+  pageId?: string;
+  initialBlocks?: ChecklistItem[];
   onTitleChange: (title: string) => void;
 }
 
@@ -31,6 +37,75 @@ interface MeetingSummary {
   keyDecisions: string[];
   actionItems: string[];
   topics: string[];
+}
+
+function buildBlocksFromMeeting(currentTitle: string, sum: MeetingSummary | null, rawTranscript: string): PageBlock[] {
+  const blocks: PageBlock[] = [];
+  if (sum) {
+    blocks.push({
+      id: `blk-${Date.now()}-1`,
+      type: "heading1",
+      properties: { text: "Meeting Overview" },
+    });
+    blocks.push({
+      id: `blk-${Date.now()}-2`,
+      type: "callout",
+      properties: { text: sum.summary },
+    });
+    if (sum.keyDecisions && sum.keyDecisions.length > 0) {
+      blocks.push({
+        id: `blk-${Date.now()}-3`,
+        type: "heading2",
+        properties: { text: "Key Decisions" },
+      });
+      sum.keyDecisions.forEach((d, idx) => {
+        blocks.push({
+          id: `blk-${Date.now()}-kd-${idx}`,
+          type: "bulleted_list_item",
+          properties: { text: d },
+        });
+      });
+    }
+    if (sum.actionItems && sum.actionItems.length > 0) {
+      blocks.push({
+        id: `blk-${Date.now()}-4`,
+        type: "heading2",
+        properties: { text: "Action Items" },
+      });
+      sum.actionItems.forEach((a, idx) => {
+        blocks.push({
+          id: `blk-${Date.now()}-ai-${idx}`,
+          type: "to_do",
+          properties: { text: a, checked: false },
+        });
+      });
+    }
+    if (sum.topics && sum.topics.length > 0) {
+      blocks.push({
+        id: `blk-${Date.now()}-5`,
+        type: "heading2",
+        properties: { text: "Topics Covered" },
+      });
+      blocks.push({
+        id: `blk-${Date.now()}-6`,
+        type: "paragraph",
+        properties: { text: sum.topics.map((t) => `#${t}`).join("  ") },
+      });
+    }
+  }
+  if (rawTranscript && rawTranscript.trim()) {
+    blocks.push({
+      id: `blk-${Date.now()}-7`,
+      type: "heading2",
+      properties: { text: "Full Transcript" },
+    });
+    blocks.push({
+      id: `blk-${Date.now()}-8`,
+      type: "toggle",
+      properties: { text: "Meeting Audio Transcript", toggleChildren: rawTranscript },
+    });
+  }
+  return blocks;
 }
 
 // Speech recognition interface definitions for browser compatibility
@@ -56,12 +131,14 @@ interface ISpeechRecognitionInstance {
   stop: () => void;
 }
 
-export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteViewProps) {
+export function MeetingNoteView({ currentTitle, pageId, initialBlocks, onTitleChange }: MeetingNoteViewProps) {
   const [isRecording, setIsRecording] = useState(false);
   const [isMuted, setIsMuted] = useState(false);
   const [recordingTime, setRecordingTime] = useState(0);
   const [activeTab, setActiveTab] = useState<"transcript" | "summary">("transcript");
   const [isFinalizing, setIsFinalizing] = useState(false);
+  const [isSavingToDb, setIsSavingToDb] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [transcripts, setTranscripts] = useState<string[]>([
     "Press 'Start Recording' to begin — your speech will appear here in real-time.",
@@ -72,9 +149,43 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
   const mediaStreamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<ISpeechRecognitionInstance | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const titleTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Keep a live ref to the transcript lines so we can read them at stop-time without stale closure
   const transcriptsRef = useRef<string[]>(transcripts);
   useEffect(() => { transcriptsRef.current = transcripts; }, [transcripts]);
+
+  // Restore existing summary / transcript from initialBlocks if present
+  useEffect(() => {
+    if (!initialBlocks || initialBlocks.length === 0) return;
+    try {
+      const callout = initialBlocks.find((b) => b.type === "callout");
+      const keyDecisions = initialBlocks
+        .filter((b) => b.type === "bullet" && b.text)
+        .map((b) => b.text);
+      const actionItems = initialBlocks
+        .filter((b) => b.type === "todo" && b.text)
+        .map((b) => b.text);
+      const toggle = initialBlocks.find((b) => b.type === "toggle");
+
+      if (callout?.text || keyDecisions.length > 0 || actionItems.length > 0) {
+        setSummary({
+          summary: callout?.text || "",
+          keyDecisions,
+          actionItems,
+          topics: [],
+        });
+        setActiveTab("summary");
+      }
+      if (toggle?.toggleChildren) {
+        const lines = toggle.toggleChildren.split("\n").map((l) => `🎤 ${l}`);
+        if (lines.length > 0) {
+          setTranscripts(lines);
+        }
+      }
+    } catch {
+      // Non-critical restore fallback
+    }
+  }, [initialBlocks]);
 
   // Timer tick
   useEffect(() => {
@@ -93,19 +204,68 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
     stream.getAudioTracks().forEach((t) => { t.enabled = !isMuted; });
   }, [isMuted]);
 
+  const handleTitleUpdate = (newTitle: string) => {
+    onTitleChange(newTitle);
+    if (!pageId) return;
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    titleTimerRef.current = setTimeout(async () => {
+      try {
+        await updatePage(pageId, { title: newTitle.trim() || "Untitled Meeting" });
+        window.dispatchEvent(
+          new CustomEvent("page-updated", { detail: { title: newTitle, updatedAt: new Date() } })
+        );
+      } catch (err) {
+        console.error("Failed to save title:", err);
+      }
+    }, 400);
+  };
+
+  const saveMeetingToDatabase = useCallback(
+    async (overrideSummary?: MeetingSummary | null, overrideTranscript?: string) => {
+      if (!pageId) return;
+      setIsSavingToDb(true);
+      const sumToUse = overrideSummary !== undefined ? overrideSummary : summary;
+      const transToUse =
+        overrideTranscript !== undefined
+          ? overrideTranscript
+          : transcriptsRef.current
+              .filter((l) => !l.includes("Press 'Start Recording'") && !l.includes("Recording started") && !l.includes("⏹️ Recording stopped"))
+              .map((l) => l.replace(/^🎤 /, ""))
+              .join("\n");
+
+      const blocksToSave = buildBlocksFromMeeting(currentTitle, sumToUse, transToUse);
+      try {
+        await updatePage(pageId, {
+          title: currentTitle.trim() || "AI Meeting Note",
+          blocks: blocksToSave as never,
+        });
+        setSaveSuccess(true);
+        setTimeout(() => setSaveSuccess(false), 3000);
+        window.dispatchEvent(
+          new CustomEvent("page-updated", { detail: { title: currentTitle, updatedAt: new Date() } })
+        );
+        toast.success("Meeting notes saved to database");
+      } catch (err) {
+        console.error("Failed to save meeting note to DB:", err);
+        toast.error("Failed to save meeting notes to database");
+      } finally {
+        setIsSavingToDb(false);
+      }
+    },
+    [pageId, currentTitle, summary]
+  );
+
   const startRecording = useCallback(async () => {
     setRecordingError(null);
     try {
       // Request microphone
       mediaStreamRef.current = await navigator.mediaDevices.getUserMedia({ audio: true });
 
-      /* eslint-disable-next-line @typescript-eslint/no-explicit-any */
       const SR = (typeof window !== "undefined" && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition)) as (new () => ISpeechRecognitionInstance) | undefined;
       if (!SR) {
         setRecordingError(
           "Speech recognition is not supported in this browser. Use Chrome or Edge for real-time transcription."
         );
-        // Still start the timer / recording state so the user can manually type
         setTranscripts(["⚠️ Speech recognition unavailable — recording audio only. Type notes below manually."]);
         setIsRecording(true);
         return;
@@ -113,7 +273,7 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
 
       const recog = new SR();
       recog.continuous = true;
-      recog.interimResults = false; // only emit final results for clean lines
+      recog.interimResults = false;
       recog.lang = "en-US";
       recognitionRef.current = recog;
 
@@ -134,7 +294,6 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
         }
       };
 
-      // Auto-restart recognition if it ends (Chrome stops after ~60s of silence)
       recog.onend = () => {
         if (isRecording) {
           try { recog.start(); } catch { /* already stopped */ }
@@ -156,7 +315,7 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
 
     // Stop speech recognition
     if (recognitionRef.current) {
-      recognitionRef.current.onend = null; // prevent auto-restart
+      recognitionRef.current.onend = null;
       try { recognitionRef.current.stop(); } catch { /* ignore */ }
       recognitionRef.current = null;
     }
@@ -190,13 +349,18 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
       const data = await res.json() as MeetingSummary;
       setSummary(data);
       toast.success("AI summary generated!");
+
+      // Persist directly to MongoDB!
+      if (pageId) {
+        void saveMeetingToDatabase(data, rawTranscript);
+      }
     } catch (err) {
       console.error("Meeting summary error:", err);
       setSummaryError("Failed to generate summary. Please check your connection and try again.");
     } finally {
       setIsFinalizing(false);
     }
-  }, [currentTitle]);
+  }, [currentTitle, pageId, saveMeetingToDatabase]);
 
   const meetingStatus = isFinalizing
     ? "Processing"
@@ -285,16 +449,42 @@ export function MeetingNoteView({ currentTitle, onTitleChange }: MeetingNoteView
               <input
                 type="text"
                 value={currentTitle}
-                onChange={(e) => onTitleChange(e.target.value)}
+                onChange={(e) => handleTitleUpdate(e.target.value)}
                 placeholder="Untitled Meeting"
                 className="flex-1 text-3xl sm:text-4xl font-extrabold tracking-tight text-foreground bg-transparent outline-none border-b border-transparent focus:border-border transition"
               />
             </div>
-            <div className="hidden sm:flex items-center gap-2">
+            <div className="flex items-center gap-2">
+              {pageId && (
+                <button
+                  type="button"
+                  onClick={() => saveMeetingToDatabase()}
+                  disabled={isSavingToDb}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold hover:opacity-90 transition shadow-sm disabled:opacity-50"
+                  title="Save notes and AI summary to MongoDB"
+                >
+                  {saveSuccess ? (
+                    <>
+                      <Check className="h-3.5 w-3.5 text-emerald-300" />
+                      <span>Saved</span>
+                    </>
+                  ) : isSavingToDb ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <Save className="h-3.5 w-3.5" />
+                      <span>Save to Note</span>
+                    </>
+                  )}
+                </button>
+              )}
               <button
                 onClick={handleExport}
-                disabled={recordingTime === 0}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border hover:bg-accent text-xs font-semibold text-foreground transition shadow-sm disabled:opacity-40"
+                disabled={recordingTime === 0 && !summary}
+                className="hidden sm:inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-card border border-border hover:bg-accent text-xs font-semibold text-foreground transition shadow-sm disabled:opacity-40"
                 title="Export notes as Markdown"
               >
                 <Download className="h-3.5 w-3.5 text-muted-foreground" />

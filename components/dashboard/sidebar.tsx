@@ -327,15 +327,12 @@ export function Sidebar({
   const loadPages = useCallback(async () => {
     try {
       const data = await getPages();
-      const storageKey = `notion-onboarding-created:${userEmailRef.current || "workspace"}`;
-      const onboardingAlreadyCreated = typeof window !== "undefined" && window.localStorage.getItem(storageKey) === "1";
-      if (data.length === 0 && !isSeedingOnboarding.current && !onboardingAlreadyCreated) {
+      if (data.length === 0 && !isSeedingOnboarding.current) {
         isSeedingOnboarding.current = true;
         const onboarding = await createPage({
           title: "Getting Started with Notion",
           blocks: GETTING_STARTED_BLOCKS,
         });
-        window.localStorage.setItem(storageKey, "1");
         setPages([onboarding]);
         if (pathnameRef.current === "/dashboard") router.push(`/dashboard/${onboarding._id}`);
         return;

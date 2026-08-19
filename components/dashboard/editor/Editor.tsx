@@ -19,6 +19,7 @@ import { useAutosave } from "@/hooks/use-autosave";
 import { updatePage, deletePage, type Page } from "@/lib/actions/pages";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 import type { ChecklistItem, BlockType, KanbanColumn } from "@/hooks/use-pages";
 import {
   Check,
@@ -46,6 +47,7 @@ import {
   Link,
   Trash2,
   SquarePen,
+  Sparkles,
 } from "lucide-react";
 
 export interface EditorProps {
@@ -53,19 +55,24 @@ export interface EditorProps {
   pageId?: string;
   initialBlocks?: ChecklistItem[];
   initialCoverImage?: string;
+  isAiMeetingNote?: boolean;
   childPages?: Page[];
   onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
 }
 
-// ── Slash menu items ─────────────────────────────────────────────────────────
-const SLASH_ITEMS: {
+export interface SlashMenuItem {
   type: BlockType;
   label: string;
   description: string;
   icon: React.ComponentType<{ className?: string }>;
   iconColor: string;
-  category: "Basic" | "Media";
-}[] = [
+  category: "Basic" | "Media" | "AI";
+  action?: "ai_summary";
+}
+
+// ── Slash menu items ─────────────────────────────────────────────────────────
+const SLASH_ITEMS: SlashMenuItem[] = [
+  { type: "paragraph",    label: "AI Summary",    description: "Summarize this page with Notion AI", icon: Sparkles,  iconColor: "text-purple-500", category: "AI", action: "ai_summary" },
   { type: "paragraph",    label: "Text",          description: "Plain paragraph text",         icon: Type,          iconColor: "text-neutral-400",  category: "Basic" },
   { type: "heading1",     label: "Heading 1",     description: "Large section heading",         icon: Heading1,      iconColor: "text-purple-400",   category: "Basic" },
   { type: "heading2",     label: "Heading 2",     description: "Medium section heading",        icon: Heading2,      iconColor: "text-purple-400",   category: "Basic" },
@@ -554,11 +561,13 @@ function Block({
 
         {/* ── Database Block (Multi-View) ── */}
         {item.type === "kanban" && (
-          <DatabaseBlock
-            blockId={item.id}
-            columns={item.kanbanColumns}
-            onColumnsChange={(id, cols) => onUpdateKanbanColumns?.(id, cols)}
-          />
+          <ErrorBoundary fallbackTitle="Database Block Error" fallbackMessage="Could not render the database view.">
+            <DatabaseBlock
+              blockId={item.id}
+              columns={item.kanbanColumns}
+              onColumnsChange={(id, cols) => onUpdateKanbanColumns?.(id, cols)}
+            />
+          </ErrorBoundary>
         )}
       </div>
 
@@ -567,7 +576,7 @@ function Block({
 }
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
-export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, childPages, onSelectSubPage }: EditorProps) {
+export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, isAiMeetingNote, childPages, onSelectSubPage }: EditorProps) {
   const router = useRouter();
   const [pageEmoji, setPageEmoji] = useState("📄");
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -612,11 +621,63 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
 
   const { scheduleAutosave, immediatelySave, cancelAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
 
+  // Helper to extract clean plain-text representation of all blocks in the editor
+  const getPagePlainText = useCallback(() => {
+    const lines: string[] = [];
+    if (currentTitle && currentTitle.trim()) {
+      lines.push(`# ${currentTitle.trim()}`);
+    }
+    for (const item of items) {
+      if (!item) continue;
+      if (item.type === "heading1") {
+        if (item.text?.trim()) lines.push(`\n# ${item.text.trim()}`);
+      } else if (item.type === "heading2") {
+        if (item.text?.trim()) lines.push(`\n## ${item.text.trim()}`);
+      } else if (item.type === "heading3" || item.type === "heading4" || item.type === "heading") {
+        if (item.text?.trim()) lines.push(`\n### ${item.text.trim()}`);
+      } else if (item.type === "bullet") {
+        if (item.text?.trim()) lines.push(`• ${item.text.trim()}`);
+      } else if (item.type === "numbered") {
+        if (item.text?.trim()) lines.push(`- ${item.text.trim()}`);
+      } else if (item.type === "todo") {
+        if (item.text?.trim()) lines.push(`[${item.checked ? "x" : " "}] ${item.text.trim()}`);
+      } else if (item.type === "quote") {
+        if (item.text?.trim()) lines.push(`> ${item.text.trim()}`);
+      } else if (item.type === "callout") {
+        if (item.text?.trim()) lines.push(`💡 ${item.text.trim()}`);
+      } else if (item.type === "toggle") {
+        if (item.text?.trim()) lines.push(`▶ ${item.text.trim()}${item.toggleChildren ? `\n  ${item.toggleChildren}` : ""}`);
+      } else if (item.type === "code") {
+        if (item.text?.trim()) lines.push(`\`\`\`${item.codeLanguage || ""}\n${item.text.trim()}\n\`\`\``);
+      } else if (item.type === "table" && item.tableData && item.tableData.length > 0) {
+        const tableStr = item.tableData.map(row => row.join(" | ")).join("\n");
+        if (tableStr.trim()) lines.push(`\n[Table]\n${tableStr}`);
+      } else if (item.type === "page" || item.type === "link_to_page") {
+        if (item.text?.trim()) lines.push(`📄 Sub-page: ${item.text.trim()}`);
+      } else {
+        if (item.text?.trim()) lines.push(item.text.trim());
+      }
+    }
+    return lines.join("\n").trim();
+  }, [currentTitle, items]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      (window as any).__ACTIVE_PAGE_CONTEXT__ = {
+        pageId: pageId || "workspace-home",
+        title: currentTitle || "Untitled",
+        content: getPagePlainText(),
+        updatedAt: Date.now(),
+      };
+    }
+  }, [pageId, currentTitle, items, getPagePlainText]);
+
   useEffect(() => {
     const handleAiAppend = (e: Event) => {
       const detail = (e as CustomEvent<{ text: string; type?: BlockType; language?: string }>).detail;
       if (detail && detail.text) {
-        const newBlock = makeBlock(detail.type || "paragraph");
+        const targetType = detail.type || "paragraph";
+        const newBlock = makeBlock(targetType);
         newBlock.text = detail.text;
         if (detail.language) {
           newBlock.codeLanguage = detail.language;
@@ -624,7 +685,8 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
         setItems((prev) => {
           const nextItems = [...prev, newBlock];
           // Use immediatelySave (no debounce) so AI content is persisted right away
-          immediatelySave(currentTitleRef.current, nextItems);
+          const activeTitleToSave = currentTitleRef.current || "Untitled";
+          immediatelySave(activeTitleToSave, nextItems);
           return nextItems;
         });
       }
@@ -783,9 +845,22 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       )
     : SLASH_ITEMS;
 
-  const applySlash = useCallback((type: BlockType) => {
+  const applySlash = useCallback((itemOrType: BlockType | SlashMenuItem) => {
+    const targetItem: SlashMenuItem | undefined =
+      typeof itemOrType === "object"
+        ? itemOrType
+        : SLASH_ITEMS.find((s) => s.type === itemOrType);
+    const type = typeof itemOrType === "string" ? itemOrType : itemOrType.type;
     const bid = slash.blockId;
     setSlash({ blockId: "", query: "", open: false });
+
+    if (targetItem?.action === "ai_summary") {
+      setItems((prev) => prev.map((b) => (b.id === bid ? { ...b, text: "" } : b)));
+      window.dispatchEvent(
+        new CustomEvent("trigger-ai-command", { detail: { prompt: "/summary" } })
+      );
+      return;
+    }
 
     setItems(prev => {
       const idx = prev.findIndex(b => b.id === bid);
@@ -819,7 +894,12 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     if (slash.open && slash.blockId === id) {
       if (e.key === "ArrowDown") { e.preventDefault(); setSlashIdx(i => Math.min(i + 1, slashFiltered.length - 1)); return; }
       if (e.key === "ArrowUp") { e.preventDefault(); setSlashIdx(i => Math.max(i - 1, 0)); return; }
-      if (e.key === "Enter") { e.preventDefault(); applySlash(slashFiltered[slashIdx]?.type ?? "paragraph"); return; }
+      if (e.key === "Enter") {
+        e.preventDefault();
+        const selected = slashFiltered[slashIdx] || slashFiltered[0];
+        if (selected) applySlash(selected);
+        return;
+      }
       if (e.key === "Escape") { e.preventDefault(); setSlash({ blockId: "", query: "", open: false }); return; }
     }
 
@@ -1045,10 +1125,18 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     }
   }, [items, slash, slashFiltered, slashIdx, applySlash, focusBlock]);
 
-  if (activeTitle === "AI Meeting Note") {
-    return <MeetingNoteView currentTitle={currentTitle} onTitleChange={setCurrentTitle} />;
+  if (isAiMeetingNote || activeTitle === "AI Meeting Note") {
+    return (
+      <MeetingNoteView
+        currentTitle={currentTitle}
+        pageId={pageId}
+        initialBlocks={initialBlocks}
+        onTitleChange={handleTitleChange}
+      />
+    );
   }
 
+  const aiItems = slashFiltered.filter(s => s.category === "AI");
   const basicItems = slashFiltered.filter(s => s.category === "Basic");
   const mediaItems = slashFiltered.filter(s => s.category === "Media");
 
@@ -1250,6 +1338,37 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                         <p className="px-3 py-2 text-xs text-foreground/40">No results</p>
                       ) : (
                         <>
+                          {aiItems.length > 0 && (
+                            <>
+                              <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-purple-500 uppercase tracking-widest flex items-center gap-1">
+                                <span>✨ Notion AI</span>
+                              </p>
+                              {aiItems.map((s) => {
+                                const Icon = s.icon;
+                                const gi = slashFiltered.indexOf(s);
+                                return (
+                                  <button
+                                    key={s.label}
+                                    type="button"
+                                    onMouseDown={() => applySlash(s)}
+                                    className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${
+                                      slashIdx === gi
+                                        ? "bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-semibold"
+                                        : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"
+                                    }`}
+                                  >
+                                    <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-950/60 border border-purple-300/40 dark:border-purple-800/40 shrink-0 shadow-sm">
+                                      <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
+                                    </div>
+                                    <div>
+                                      <div className="text-[13px] font-medium text-foreground">{s.label}</div>
+                                      <div className="text-[11px] text-foreground/40">{s.description}</div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </>
+                          )}
                           {basicItems.length > 0 && (
                             <>
                               <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">Basic blocks</p>
@@ -1257,7 +1376,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                                 const Icon = s.icon;
                                 const gi = slashFiltered.indexOf(s);
                                 return (
-                                  <button key={s.type} onMouseDown={() => applySlash(s.type)}
+                                  <button key={s.label} type="button" onMouseDown={() => applySlash(s)}
                                     className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${slashIdx === gi ? "bg-[#f0f0ef] dark:bg-white/[0.06]" : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"}`}>
                                     <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
                                       <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
@@ -1278,7 +1397,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                                 const Icon = s.icon;
                                 const gi = slashFiltered.indexOf(s);
                                 return (
-                                  <button key={s.type} onMouseDown={() => applySlash(s.type)}
+                                  <button key={s.label} type="button" onMouseDown={() => applySlash(s)}
                                     className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${slashIdx === gi ? "bg-[#f0f0ef] dark:bg-white/[0.06]" : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"}`}>
                                     <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
                                       <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
