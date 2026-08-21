@@ -6,6 +6,7 @@ import {
   useRef,
   useCallback,
   useLayoutEffect,
+  memo,
 } from "react";
 import { MeetingNoteView } from "./MeetingNoteView";
 import { EmojiDropdown } from "./EmojiPicker";
@@ -21,6 +22,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import type { ChecklistItem, BlockType, KanbanColumn } from "@/hooks/use-pages";
+import { parseMarkdownToBlocks } from "@/lib/markdown-blocks";
 import {
   Check,
   ChevronRight,
@@ -148,6 +150,7 @@ interface BlockProps {
   onUpdateUrl?: (id: string, url: string) => void;
   onToggleCheck: (id: string) => void;
   onKeyDown: (e: React.KeyboardEvent, id: string) => void;
+  onPaste?: (e: React.ClipboardEvent, id: string) => void;
   onDelete?: (id: string) => void;
   onDeleteSubPage?: (subPageId: string) => void;
   onAddAfter?: (id: string) => void;
@@ -155,37 +158,26 @@ interface BlockProps {
   registerRef: (id: string, el: HTMLElement | null) => void;
 }
 
-function Block({
+const Block = memo(function Block({
   item, seqNumber = 1, isFocused, onFocus, onUpdateText, onUpdateLanguage,
   onUpdateCalloutIcon, onUpdateToggleChildren, onUpdateTableData, onUpdateKanbanColumns,
   onUpdateFile, onUpdateUrl,
-  onToggleCheck, onKeyDown, onDelete, onDeleteSubPage, onAddAfter, onSelectSubPage, registerRef,
+  onToggleCheck, onKeyDown, onPaste, onDelete, onDeleteSubPage, onAddAfter, onSelectSubPage, registerRef,
 }: BlockProps) {
   const elRef = useRef<HTMLElement | null>(null);
   const [toggleOpen, setToggleOpen] = useState(false);
   const [showCalloutPicker, setShowCalloutPicker] = useState(false);
 
-  // Keep contentEditable text in sync without losing caret
+  // Synchronize contentEditable text safely without clobbering live typing or caret
   useLayoutEffect(() => {
     const el = elRef.current;
     if (!el) return;
-    if (el.innerText === item.text) return;
-    const sel = window.getSelection();
-    let anchor = 0;
-    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
-      anchor = sel.anchorOffset;
+    // If user is actively typing in this element, do NOT overwrite DOM
+    if (document.activeElement === el) return;
+    if (el.innerText !== (item.text || "")) {
+      el.innerText = item.text || "";
     }
-    el.innerText = item.text;
-    if (isFocused && el.firstChild) {
-      try {
-        const r = document.createRange();
-        r.setStart(el.firstChild, Math.min(anchor, el.firstChild.textContent?.length ?? 0));
-        r.collapse(true);
-        sel?.removeAllRanges();
-        sel?.addRange(r);
-      } catch { /* ignore */ }
-    }
-  });
+  }, [item.text]);
 
   useEffect(() => {
     if (isFocused) elRef.current?.focus();
@@ -209,6 +201,7 @@ function Block({
     onInput: handleInput,
     onKeyDown: handleKD,
     onFocus: handleFocus,
+    onPaste: (e: React.ClipboardEvent<HTMLElement>) => onPaste?.(e, item.id),
     "data-placeholder": item.text ? undefined : getPlaceholder(item.type),
   };
 
@@ -216,7 +209,7 @@ function Block({
 
   return (
     <div
-      className="group/b relative flex items-start -ml-4 -mr-16 pl-4 pr-16 rounded-md hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors overflow-visible"
+      className="group/b relative flex items-start -ml-2 pl-2 sm:-ml-4 sm:pl-4 -mr-2 pr-6 sm:-mr-12 sm:pr-12 rounded-md hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors overflow-visible"
       data-block-id={item.id}
     >
       {/* Drag handle, Add & Delete — hidden for code blocks (they have their own header) */}
@@ -574,7 +567,7 @@ function Block({
 
     </div>
   );
-}
+});
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
 export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, initialIcon, isAiMeetingNote, childPages, onSelectSubPage }: EditorProps) {
@@ -587,7 +580,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]
   );
   const [focusedId, setFocusedId] = useState<string | null>(null);
-  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle">("idle");
+  const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle" | "error">("idle");
   const [remoteCursors, setRemoteCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
 
   useEffect(() => {
@@ -641,7 +634,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     }, 300);
   }, [pageId]);
 
-  const { scheduleAutosave, immediatelySave, cancelAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
+  const { scheduleAutosave, immediatelySave, cancelAutosave, retryAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
 
   // Helper to extract clean plain-text representation of all blocks in the editor
   const getPagePlainText = useCallback(() => {
@@ -698,15 +691,32 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     const handleAiAppend = (e: Event) => {
       const detail = (e as CustomEvent<{ text: string; type?: BlockType; language?: string }>).detail;
       if (detail && detail.text) {
-        const targetType = detail.type || "paragraph";
-        const newBlock = makeBlock(targetType);
-        newBlock.text = detail.text;
-        if (detail.language) {
-          newBlock.codeLanguage = detail.language;
+        let newBlocks: ChecklistItem[] = [];
+
+        if (detail.type === "code") {
+          const codeBlock = makeBlock("code", detail.text);
+          if (detail.language) codeBlock.codeLanguage = detail.language;
+          newBlocks = [codeBlock];
+        } else if (detail.type === "kanban") {
+          newBlocks = [makeBlock("kanban", detail.text)];
+        } else if (detail.type === "table") {
+          newBlocks = [makeBlock("table", detail.text)];
+        } else {
+          // Parse rich markdown (headings, bullets, numbered lists, todos, code, quotes, paragraphs)
+          newBlocks = parseMarkdownToBlocks(detail.text, detail.type, detail.language);
         }
+
+        if (newBlocks.length === 0) {
+          newBlocks = [makeBlock(detail.type || "paragraph", detail.text)];
+        }
+
         setItems((prev) => {
-          const nextItems = [...prev, newBlock];
-          // Use immediatelySave (no debounce) so AI content is persisted right away
+          // If the editor currently only has 1 empty paragraph, replace it with newBlocks
+          const isInitialEmpty =
+            prev.length === 1 &&
+            (!prev[0].text || !prev[0].text.trim()) &&
+            (prev[0].type === "paragraph" || !prev[0].type);
+          const nextItems = isInitialEmpty ? newBlocks : [...prev, ...newBlocks];
           const activeTitleToSave = currentTitleRef.current || "Untitled";
           immediatelySave(activeTitleToSave, nextItems);
           return nextItems;
@@ -762,18 +772,20 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     };
   }, [pageId]);
 
-  // Sync when navigating to a new page
+  // Sync when navigating to a new page — only fires on pageId change.
+  // activeTitle, initialBlocks, initialCoverImage are intentionally omitted:
+  // they are *seed* values that should only apply on navigation, not on every
+  // autosave cycle (which would reset the entire editor and cause a blink).
   useEffect(() => {
-    queueMicrotask(() => {
-      setCurrentTitle(activeTitle);
-      setCoverUrl(initialCoverImage);
-      setItems(initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]);
-      setShowEmojiPicker(false);
-      setSlash({ blockId: "", query: "", open: false });
-      setFocusedId(null);
-      hasMounted.current = false;
-    });
-  }, [pageId, activeTitle, initialBlocks, initialCoverImage]);
+    setCurrentTitle(activeTitle);
+    setCoverUrl(initialCoverImage);
+    setItems(initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]);
+    setShowEmojiPicker(false);
+    setSlash({ blockId: "", query: "", open: false });
+    setFocusedId(null);
+    hasMounted.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageId]);
 
   // Auto-resize title textarea
   useEffect(() => {
@@ -813,20 +825,122 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   }, []);
 
   const updateText = useCallback((id: string, text: string) => {
-    setItems(prev => {
-      const block = prev.find(b => b.id === id);
-      if (block && (block.type === "page" || block.type === "link_to_page") && block.subPageId) {
+    setItems((prev) => {
+      const block = prev.find((b) => b.id === id);
+      if (!block) return prev;
+
+      // Handle sub-page title sync
+      if ((block.type === "page" || block.type === "link_to_page") && block.subPageId) {
         updatePage(block.subPageId, { title: text.trim() || "Untitled" })
           .then((updated) => {
             window.dispatchEvent(new CustomEvent("page-updated", { detail: updated }));
           })
-          .catch(() => {
-            // Ignore if sub-page was already deleted or not found
-          });
+          .catch(() => {});
       }
-      return prev.map(b => b.id === id ? { ...b, text } : b);
+
+      // Auto-formatting markdown shortcuts when typing in a paragraph block
+      if (block.type === "paragraph" || !block.type) {
+        // Heading 1 (# )
+        if (text === "# " || text.startsWith("# ")) {
+          return prev.map((b) =>
+            b.id === id ? { ...b, type: "heading1", text: text.replace(/^#\s*/, "") } : b
+          );
+        }
+        // Heading 2 (## )
+        if (text === "## " || text.startsWith("## ")) {
+          return prev.map((b) =>
+            b.id === id ? { ...b, type: "heading2", text: text.replace(/^##\s*/, "") } : b
+          );
+        }
+        // Heading 3 (### )
+        if (text === "### " || text.startsWith("### ")) {
+          return prev.map((b) =>
+            b.id === id ? { ...b, type: "heading3", text: text.replace(/^###\s*/, "") } : b
+          );
+        }
+        // Bullet (- , * , + )
+        if (text === "- " || text === "* " || text === "+ " || text.startsWith("- ") || text.startsWith("* ") || text.startsWith("+ ")) {
+          return prev.map((b) =>
+            b.id === id ? { ...b, type: "bullet", text: text.replace(/^[-*+]\s*/, "") } : b
+          );
+        }
+        // Numbered (1. )
+        if (/^\d+[\.\)]\s+/.test(text)) {
+          return prev.map((b) =>
+            b.id === id ? { ...b, type: "numbered", text: text.replace(/^\d+[\.\)]\s*/, "") } : b
+          );
+        }
+        // To-do ([] or [ ])
+        if (text === "[] " || text === "[ ] " || text.startsWith("[] ") || text.startsWith("[ ] ")) {
+          return prev.map((b) =>
+            b.id === id ? { ...b, type: "todo", text: text.replace(/^\[ ?\]\s*/, ""), checked: false } : b
+          );
+        }
+        // Quote (> )
+        if (text === "> " || text.startsWith("> ")) {
+          return prev.map((b) =>
+            b.id === id ? { ...b, type: "quote", text: text.replace(/^>\s*/, "") } : b
+          );
+        }
+        // Divider (--- or ***)
+        if (text === "---" || text === "***") {
+          const nextBlock = makeBlock("paragraph", "");
+          const idx = prev.findIndex((b) => b.id === id);
+          const next = [...prev];
+          next.splice(idx, 1, { ...block, type: "divider", text: "" }, nextBlock);
+          setTimeout(() => focusBlock(nextBlock.id), 50);
+          return next;
+        }
+        // Code (```)
+        if (text === "```") {
+          return prev.map((b) =>
+            b.id === id ? { ...b, type: "code", text: "", codeLanguage: "javascript" } : b
+          );
+        }
+      }
+
+      return prev.map((b) => (b.id === id ? { ...b, text } : b));
     });
-  }, []);
+  }, [focusBlock]);
+
+  const handlePaste = useCallback((e: React.ClipboardEvent, id: string) => {
+    const text = e.clipboardData.getData("text/plain");
+    if (!text) return;
+
+    // Check if the pasted text has multiple lines or markdown structures
+    const hasMultipleLines = text.includes("\n");
+    const hasMarkdown = /^#+\s+|^\s*[-*+•]\s+|^\s*\d+[\.\)]\s+|^\s*```|^\s*>\s+|^\s*\[[ xX]\]/m.test(text);
+
+    if (hasMultipleLines || hasMarkdown) {
+      e.preventDefault();
+      const parsedBlocks = parseMarkdownToBlocks(text);
+      if (parsedBlocks.length === 0) return;
+
+      setItems((prev) => {
+        const idx = prev.findIndex((b) => b.id === id);
+        if (idx < 0) return [...prev, ...parsedBlocks];
+
+        const currentBlock = prev[idx];
+        const next = [...prev];
+
+        // If the current block is an empty paragraph, replace it
+        if ((currentBlock.type === "paragraph" || !currentBlock.type) && !currentBlock.text.trim()) {
+          next.splice(idx, 1, ...parsedBlocks);
+        } else {
+          next.splice(idx + 1, 0, ...parsedBlocks);
+        }
+
+        const activeTitleToSave = currentTitleRef.current || "Untitled";
+        immediatelySave(activeTitleToSave, next);
+        return next;
+      });
+
+      const lastParsed = parsedBlocks[parsedBlocks.length - 1];
+      if (lastParsed) {
+        setTimeout(() => focusBlock(lastParsed.id, true), 50);
+      }
+    }
+  }, [immediatelySave, focusBlock]);
 
   const updateLanguage = useCallback((id: string, codeLanguage: string) => {
     setItems(prev => prev.map(b => b.id === id ? { ...b, codeLanguage } : b));
@@ -1199,6 +1313,11 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       {saveStatus === "saved" && (
         <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 text-[11px] text-emerald-500">✓ Saved</div>
       )}
+      {saveStatus === "error" && (
+        <button type="button" onClick={retryAutosave} className="fixed top-3 left-1/2 -translate-x-1/2 z-50 text-[11px] text-red-500 hover:underline">
+          Save failed — retry
+        </button>
+      )}
 
       {/* Remote Multi-Cursor Overlay */}
       <RemoteCursorOverlay cursors={remoteCursors} />
@@ -1206,7 +1325,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       {/* Full-width Page Cover Banner */}
       <PageCoverBanner url={coverUrl} onUpdateCover={handleCoverChange} />
 
-      <div id="editor-page-container" className="max-w-[720px] mx-auto px-24 pt-12 pb-60 select-text">
+      <div id="editor-page-container" className="max-w-[720px] mx-auto px-4 sm:px-8 md:px-12 lg:px-20 pt-8 sm:pt-12 pb-60 select-text">
         {/* Cover & Quick Actions Header */}
         <div className="mb-2 flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity">
           {!coverUrl && (
@@ -1258,7 +1377,9 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
               cancelAutosave();
               const title = currentTitle.trim() || "Untitled";
               try {
-                await updatePage(pageId, { title });
+                // Flush title and blocks together so blurring the title cannot
+                // cancel a pending block save.
+                immediatelySave(title, items);
                 window.dispatchEvent(new CustomEvent("page-updated", { detail: { title, updatedAt: new Date() } }));
               } catch (error) {
                 console.error("Title save failed:", error);
@@ -1320,6 +1441,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                     onUpdateUrl={updateUrl}
                     onToggleCheck={toggleCheck}
                     onKeyDown={handleKeyDown}
+                    onPaste={handlePaste}
                     onAddAfter={(id) => {
                       const newBlock = makeBlock("paragraph");
                       const idx = items.findIndex((b) => b.id === id);

@@ -44,20 +44,76 @@ export interface Page {
   deletedAt?: string;
 }
 
-// GET /api/pages — list all pages for the logged-in user
-export async function getPages(): Promise<Page[]> {
-  const res = await fetch("/api/pages", { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch pages");
-  const data = await res.json();
-  return data.pages as Page[];
+// In-flight request deduplication & short-lived cache
+let inFlightPagesPromise: Promise<Page[]> | null = null;
+const inFlightPageMap = new Map<string, Promise<Page>>();
+let cachedPages: { data: Page[]; timestamp: number } | null = null;
+const CACHE_TTL_MS = 2500; // 2.5s stale-while-revalidate window
+
+export function invalidatePagesCache() {
+  inFlightPagesPromise = null;
+  cachedPages = null;
+  inFlightPageMap.clear();
 }
 
-// GET /api/pages/[id] — fetch a single page by id
+// GET /api/pages — list all pages for the logged-in user with request deduplication
+export async function getPages(forceRefresh = false): Promise<Page[]> {
+  const now = Date.now();
+  if (!forceRefresh && cachedPages && now - cachedPages.timestamp < CACHE_TTL_MS) {
+    return cachedPages.data;
+  }
+
+  if (inFlightPagesPromise) {
+    return inFlightPagesPromise;
+  }
+
+  inFlightPagesPromise = (async () => {
+    try {
+      const res = await fetch("/api/pages", { cache: "no-store" });
+      // 401 = session not yet established or expired — return empty silently.
+      // The dashboard layout already redirects unauthenticated users to /login.
+      if (res.status === 401) return [];
+      if (!res.ok) {
+        console.warn(`Failed to fetch pages: HTTP ${res.status}`);
+        return cachedPages?.data || [];
+      }
+      const data = await res.json();
+      const pages = (data.pages || []) as Page[];
+      cachedPages = { data: pages, timestamp: Date.now() };
+      return pages;
+    } catch (err) {
+      console.warn("Failed to fetch pages (network/server error):", err);
+      return cachedPages?.data || [];
+    } finally {
+      inFlightPagesPromise = null;
+    }
+  })();
+
+  return inFlightPagesPromise;
+}
+
+// GET /api/pages/[id] — fetch a single page by id with request deduplication
 export async function getPage(id: string): Promise<Page> {
-  const res = await fetch(`/api/pages/${id}`, { cache: "no-store" });
-  if (!res.ok) throw new Error(`Failed to fetch page ${id}`);
-  const data = await res.json();
-  return data.page as Page;
+  if (!id) throw new Error("Page ID is required");
+
+  if (inFlightPageMap.has(id)) {
+    return inFlightPageMap.get(id)!;
+  }
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(`/api/pages/${id}`, { cache: "no-store" });
+      if (res.status === 401) throw new Error("Unauthorized");
+      if (!res.ok) throw new Error(`Failed to fetch page ${id} (${res.status})`);
+      const data = await res.json();
+      return data.page as Page;
+    } finally {
+      inFlightPageMap.delete(id);
+    }
+  })();
+
+  inFlightPageMap.set(id, promise);
+  return promise;
 }
 
 // POST /api/pages — create a new page and return it (with _id)
@@ -83,6 +139,7 @@ export async function createPage(data?: {
     throw new Error(`Failed to create page: ${reason}`);
   }
   const result = await res.json();
+  invalidatePagesCache();
   return result.page as Page;
 }
 
@@ -103,6 +160,7 @@ export async function updatePage(
     throw new Error(errorData.detail || errorData.error || `Failed to update page ${id}`);
   }
   const result = await res.json();
+  invalidatePagesCache();
   return result.page as Page;
 }
 
@@ -110,6 +168,7 @@ export async function updatePage(
 export async function deletePage(id: string): Promise<void> {
   const res = await fetch(`/api/pages/${id}`, { method: "DELETE" });
   if (!res.ok) throw new Error(`Failed to delete page ${id}`);
+  invalidatePagesCache();
 }
 
 
@@ -122,9 +181,11 @@ export async function getTrashPages(): Promise<Page[]> {
 export async function restorePage(id: string): Promise<void> {
   const res = await fetch(`/api/pages/${id}/restore`, { method: "POST" });
   if (!res.ok) throw new Error("Failed to restore page");
+  invalidatePagesCache();
 }
 
 export async function permanentlyDeletePage(id: string): Promise<void> {
   const res = await fetch(`/api/pages/${id}?permanent=true`, { method: "DELETE" });
   if (!res.ok) throw new Error("Failed to permanently delete page");
+  invalidatePagesCache();
 }

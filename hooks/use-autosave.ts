@@ -1,89 +1,70 @@
-import { useCallback, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { updatePage } from "@/lib/actions/pages";
 import type { ChecklistItem } from "./use-pages";
 
-
 interface UseAutosaveOptions {
   pageId: string | undefined;
-  onStatusChange: (status: "saved" | "saving" | "idle") => void;
+  onStatusChange: (status: "saved" | "saving" | "idle" | "error") => void;
   delayMs?: number;
 }
 
-/**
- * Provides a debounced autosave trigger that PATCHes /api/pages/[pageId].
- * Call `scheduleAutosave(title, blocks)` whenever content changes; the hook
- * debounces writes and cancels any pending save on unmount.
- */
+/** Debounced, serialized page saving. The newest snapshot always wins. */
 export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutosaveOptions) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestRef = useRef<{ title: string; blocks: ChecklistItem[] } | null>(null);
+  const savingRef = useRef(false);
+  const mountedRef = useRef(true);
 
-  const save = useCallback(
-    async (title: string, blocks: ChecklistItem[]) => {
-      if (!pageId) return; // No ID yet — page must be created first
-
-      onStatusChange("saving");
-      try {
-        await updatePage(pageId, {
-          title,
-          blocks: blocks.map((item) => ({
-            id: item.id,
-            type:
-              item.type === "todo"
-                ? "to_do"
-                : item.type === "bullet"
-                ? "bulleted_list_item"
-                : item.type,
-            properties: {
-              text: item.text,
-              checked: !!item.checked,
-              language: item.codeLanguage ?? "javascript",
-              subPageId: item.subPageId ?? "",
-              kanbanColumns: item.kanbanColumns ?? [],
-              url: item.url ?? "",
-              fileName: item.fileName ?? "",
-              fileSize: item.fileSize ?? "",
-            },
-          })) as never,
-        });
-        onStatusChange("saved");
-        if (typeof window !== "undefined") {
-          window.dispatchEvent(
-            new CustomEvent("page-updated", { detail: { updatedAt: new Date(), title } })
-          );
+  const flush = useCallback(async () => {
+    if (!pageId || savingRef.current) return;
+    savingRef.current = true;
+    onStatusChange("saving");
+    try {
+      while (latestRef.current) {
+        const snapshot = latestRef.current;
+        latestRef.current = null;
+        try {
+          await updatePage(pageId, {
+            title: snapshot.title,
+            blocks: snapshot.blocks.map((item) => ({
+              id: item.id,
+              type: item.type === "todo" ? "to_do" : item.type === "bullet" ? "bulleted_list_item" : item.type,
+              properties: {
+                text: item.text, checked: !!item.checked, language: item.codeLanguage ?? "javascript",
+                subPageId: item.subPageId ?? "", kanbanColumns: item.kanbanColumns ?? [], url: item.url ?? "",
+                fileName: item.fileName ?? "", fileSize: item.fileSize ?? "",
+              },
+            })) as never,
+          });
+          if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("page-updated", { detail: { updatedAt: new Date(), title: snapshot.title } }));
+        } catch (error) {
+          if (!latestRef.current) latestRef.current = snapshot;
+          throw error;
         }
-      } catch (err) {
-        console.error("Auto-save error:", err);
-        onStatusChange("idle");
       }
+      if (mountedRef.current) onStatusChange("saved");
+    } catch (error) {
+      console.error("Auto-save error:", error);
+      if (mountedRef.current) onStatusChange("error");
+    } finally { savingRef.current = false; }
+  }, [pageId, onStatusChange]);
 
-    },
-    [pageId, onStatusChange]
-  );
+  const scheduleAutosave = useCallback((title: string, blocks: ChecklistItem[]) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    latestRef.current = { title, blocks };
+    timerRef.current = setTimeout(() => { timerRef.current = null; void flush(); }, delayMs);
+  }, [flush, delayMs]);
 
-  const scheduleAutosave = useCallback(
-    (title: string, blocks: ChecklistItem[]) => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => save(title, blocks), delayMs);
-    },
-    [save, delayMs]
-  );
-
-  /** Save immediately — no debounce. Used for AI-generated content that must persist right away. */
-  const immediatelySave = useCallback(
-    (title: string, blocks: ChecklistItem[]) => {
-      if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = null;
-      void save(title, blocks);
-    },
-    [save]
-  );
+  const immediatelySave = useCallback((title: string, blocks: ChecklistItem[]) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null; latestRef.current = { title, blocks }; void flush();
+  }, [flush]);
 
   const cancelAutosave = useCallback(() => {
-    if (timerRef.current) {
-      clearTimeout(timerRef.current);
-      timerRef.current = null;
-    }
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = null;
   }, []);
-
-  return { scheduleAutosave, immediatelySave, cancelAutosave };
+  const retryAutosave = useCallback(() => { void flush(); }, [flush]);
+  useEffect(() => () => { mountedRef.current = false; }, []);
+  return { scheduleAutosave, immediatelySave, cancelAutosave, retryAutosave };
 }

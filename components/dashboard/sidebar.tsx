@@ -283,6 +283,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({
+  activePage,
   onSelectPage,
   onOpenSearch,
   onToggleAi,
@@ -293,7 +294,7 @@ export function Sidebar({
 }: SidebarProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const { data: session } = useSession();
+  const { data: session, status } = useSession();
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [newMenuOpen, setNewMenuOpen] = useState(false);
   const newMenuRef = useRef<HTMLDivElement>(null);
@@ -327,6 +328,7 @@ export function Sidebar({
   });
 
   const loadPages = useCallback(async () => {
+    if (status !== "authenticated") return;
     try {
       const data = await getPages();
       if (data.length === 0 && !isSeedingOnboarding.current) {
@@ -343,17 +345,29 @@ export function Sidebar({
     } catch (e) {
       console.error("Failed to load pages:", e);
     }
-  }, [router]);
-
-  useEffect(() => { const timer = window.setTimeout(() => { void loadPages(); }, 0); return () => window.clearTimeout(timer); }, [loadPages]);
+  }, [router, status]);
 
   useEffect(() => {
-    const refreshPages = () => { void loadPages(); };
-    window.addEventListener("page-updated", refreshPages);
-    window.addEventListener("page-created", refreshPages);
+    if (status === "authenticated") {
+      void loadPages();
+    }
+  }, [status, loadPages]);
+
+  useEffect(() => {
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+    // Debounce page-updated to avoid rapid refetches during autosave cycles
+    const refreshPagesDebounced = () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => { void loadPages(); }, 300);
+    };
+    // page-created should refresh immediately (user expects to see the new page)
+    const refreshPagesImmediate = () => { void loadPages(); };
+    window.addEventListener("page-updated", refreshPagesDebounced);
+    window.addEventListener("page-created", refreshPagesImmediate);
     return () => {
-      window.removeEventListener("page-updated", refreshPages);
-      window.removeEventListener("page-created", refreshPages);
+      if (debounceTimer) clearTimeout(debounceTimer);
+      window.removeEventListener("page-updated", refreshPagesDebounced);
+      window.removeEventListener("page-created", refreshPagesImmediate);
     };
   }, [loadPages]);
 

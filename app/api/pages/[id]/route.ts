@@ -64,7 +64,34 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
       $set.title = title.trim();
     }
-    if (blocks !== undefined) $set.blocks = blocks;
+    if (blocks !== undefined) {
+      if (!Array.isArray(blocks)) {
+        return NextResponse.json({ error: "Blocks must be an array" }, { status: 400 });
+      }
+      let invalidBlock = false;
+      const normalizedBlocks = blocks.map((block, index) => {
+        if (!block || typeof block !== "object" || Array.isArray(block)) {
+          invalidBlock = true;
+          return { id: `invalid-${index}`, type: "paragraph", properties: {} };
+        }
+        const candidate = block as Record<string, unknown>;
+        const properties = candidate.properties;
+        if (!properties || typeof properties !== "object" || Array.isArray(properties)) {
+          invalidBlock = true;
+          return { id: `invalid-${index}`, type: "paragraph", properties: {} };
+        }
+        return {
+          ...candidate,
+          id: typeof candidate.id === "string" && candidate.id.trim() ? candidate.id : crypto.randomUUID(),
+          type: typeof candidate.type === "string" && candidate.type.trim() ? candidate.type : "paragraph",
+          properties,
+        };
+      });
+      if (invalidBlock) {
+        return NextResponse.json({ error: "Invalid block data" }, { status: 400 });
+      }
+      $set.blocks = normalizedBlocks;
+    }
     if (category !== undefined) $set.category = category;
     if (icon !== undefined) $set.icon = icon;
     if (coverImage !== undefined) $set.coverImage = coverImage;
@@ -85,12 +112,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Circular Reference Validation
     if ($set.parentPageId && typeof $set.parentPageId === "string") {
+      const proposedParent = await Page.findOne({
+        _id: $set.parentPageId,
+        userId: session.user.email,
+        $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }],
+      }).select("_id parentPageId").lean();
+      if (!proposedParent) {
+        return NextResponse.json({ error: "Parent page not found" }, { status: 400 });
+      }
       let currentCheck: string | null = $set.parentPageId;
       while (currentCheck) {
         if (currentCheck === id) {
           return NextResponse.json({ error: "Circular parent reference detected" }, { status: 400 });
         }
-        const parentDoc: { parentPageId?: string | null } | null = await Page.findById(currentCheck).select("parentPageId").lean();
+        const parentDoc: { parentPageId?: string | null } | null = await Page.findOne({ _id: currentCheck, userId: session.user.email }).select("parentPageId").lean();
         currentCheck = parentDoc?.parentPageId || null;
       }
     }

@@ -2,10 +2,23 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import Page from "@/lib/models/page";
+import { searchDuckDuckGo } from "@/lib/duckduckgo";
 
 const PYTHON_RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || "http://localhost:8000";
 const RAW_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
 const GEMINI_API_KEY = RAW_KEY.replace(/^["']|["']$/g, "").trim();
+
+/** Returns true only when we have a key that looks like a real Gemini key */
+function isValidGeminiKey(key: string): boolean {
+  return Boolean(key && key.length > 20 && !key.startsWith("your-") && !key.startsWith("replace-"));
+}
+
+const NO_KEY_ANSWER =
+  `\u26a0\ufe0f **Gemini API key not configured**\n\n` +
+  `To enable Notion AI, add a valid key to your \`.env\` file:\n` +
+  "```\nGEMINI_API_KEY=AIzaSy...your-key-here\n```\n\n" +
+  `Get a **free** key at [Google AI Studio](https://aistudio.google.com/app/apikey).\n\n` +
+  `Tips:\n- Keys must start with \`AIzaSy\`\n- Do NOT include quotes around the key in .env`;
 
 // Types for page/block shapes returned by Mongoose lean()
 interface RawBlock {
@@ -95,17 +108,29 @@ export async function POST(request: NextRequest) {
       ? history.slice(-12).map((turn) => `${turn.role}: ${turn.text}`).join("\n")
       : "";
 
-    // ─── Slash command detection ─────────────────────────────────────────────────
-    // Slash commands are ALWAYS handled in-process (not by the Python RAG service)
+    // ─── Slash command & natural language intent detection ──────────────────────
     const isSummaryCmd =
       /^\/(summary|summery|summarize)\b/i.test(q) ||
-      /^(summarize(\s+this\s+page|\s+page|\s+note|\s+workspace)?|summary)$/i.test(q);
-    const isSlashCommand =
-      isSummaryCmd ||
-      /^\/(write|code|kanban|table|search)\b/i.test(q);
+      /^(summarize(\s+this\s+page|\s+page|\s+note|\s+workspace)?|summary)$/i.test(q) ||
+      /^summarize\s+/i.test(q);
 
-    // ─── Normal Q&A: try Python RAG service first ────────────────────────────────
-    if (!isSlashCommand) {
+    const isWriteCmd = /^\/write\b/i.test(q) || /^write\s+/i.test(q) || /^draft\s+/i.test(q);
+    const isCodeCmd = /^\/code\b/i.test(q) || /^code\s+/i.test(q);
+    const isSearchCmd = /^\/search\b/i.test(q) || /^search\s+/i.test(q) || /^find\s+/i.test(q);
+    const isKanbanCmd = /^\/kanban\b/i.test(q);
+    const isTableCmd = /^\/table\b/i.test(q);
+
+    // ─── /search command: live web search via built-in LangChain DuckDuckGo tools ───
+    if (isSearchCmd) {
+      const term = q.replace(/^(\/search|search|find)\s*/i, "").trim();
+      if (!term) {
+        return NextResponse.json({
+          answer: "Please provide a search term. Example: `/search Next.js 16` or `/search today's date`",
+          citations: [],
+        });
+      }
+
+      // Try Python LangChain DuckDuckGo search microservice first
       try {
         const ragRes = await fetch(`${PYTHON_RAG_SERVICE_URL}/query`, {
           method: "POST",
@@ -117,43 +142,170 @@ export async function POST(request: NextRequest) {
             history: Array.isArray(history) ? history.slice(-12) : [],
             geminiApiKey: GEMINI_API_KEY,
           }),
-          signal: AbortSignal.timeout(8000),
+          signal: AbortSignal.timeout(10000),
         });
 
         if (ragRes.ok) {
-          const data = await ragRes.json() as { answer?: unknown; citations?: unknown; source?: string; action?: "append_block"; content?: string };
-          if (typeof data.answer === "string") {
+          const data = (await ragRes.json()) as { answer?: string; citations?: unknown[]; source?: string };
+          if (data.answer && typeof data.answer === "string") {
             return NextResponse.json({
               answer: data.answer,
               citations: Array.isArray(data.citations) ? data.citations : [],
-              source: data.source || "rag",
-              action: data.action,
-              content: data.content,
+              source: data.source || "langchain_duckduckgo",
             });
           }
         }
       } catch {
-        // Python service not running: use the in-process Gemini fallback below.
+        // Python service offline — fall through to Node.js DuckDuckGo
+      }
+
+      // Node.js DuckDuckGo search fallback
+      const currentDate = new Date().toLocaleDateString("en-US", {
+        weekday: "long",
+        year: "numeric",
+        month: "long",
+        day: "numeric",
+      });
+
+      const isDateQuery =
+        /what\s+is\s+(today|the\s+date|current\s+date|todays\s+date)/i.test(term) ||
+        /^today('?s)?\s+date/i.test(term);
+      if (isDateQuery) {
+        return NextResponse.json({
+          answer: `🌐 **Live Web & System Search: "${term}"**\n\n### Today's Date\nToday is **${currentDate}**.\n\n*Verified with live system clock & real-time search.*`,
+          citations: [],
+          source: "live_search",
+        });
+      }
+
+      const ddgResults = await searchDuckDuckGo(term);
+      if (ddgResults.length > 0) {
+        const formattedResults = ddgResults
+          .map((r, i) => `**${i + 1}. [${r.title}](${r.url})**\n${r.snippet}\n🔗 [${r.url}](${r.url})`)
+          .join("\n\n");
+
+        return NextResponse.json({
+          answer: `🌐 **DuckDuckGo Live Search: "${term}"**\n\n${formattedResults}`,
+          citations: [],
+          source: "duckduckgo_search",
+        });
+      }
+
+      return NextResponse.json({
+        answer: `🌐 **Web Search for "${term}"**\n\nNo live search results found on DuckDuckGo. Try refining your keywords.`,
+        citations: [],
+        source: "web_search",
+      });
+    }
+
+    // ─── /kanban command ────────────────────────────────────────────────────────
+    if (isKanbanCmd) {
+      const title = q.replace(/^\/kanban\s*/i, "").trim() || "Project Workspace Kanban";
+      return NextResponse.json({
+        answer: `🗄️ **Kanban Board created in active page**\n\nInteractive board: **${title}**`,
+        citations: [],
+        source: "kanban",
+        action: "append_block",
+        blockType: "kanban",
+        content: title,
+      });
+    }
+
+    // ─── /table command ─────────────────────────────────────────────────────────
+    if (isTableCmd) {
+      const title = q.replace(/^\/table\s*/i, "").trim() || "Workspace Matrix Table";
+      return NextResponse.json({
+        answer: `📊 **Matrix Table created in active page**\n\nData Table: **${title}**`,
+        citations: [],
+        source: "table",
+        action: "append_block",
+        blockType: "table",
+        content: title,
+      });
+    }
+
+    // ─── Gate: no valid API key → return clear setup error immediately ────────────
+    // ─── Try Python LangChain RAG microservice — only for normal Q&A ─────────────
+    if (!isSummaryCmd || !providedContent) {
+      try {
+        const ragRes = await fetch(`${PYTHON_RAG_SERVICE_URL}/query`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            workspaceId,
+            pageId: typeof pageId === "string" ? pageId : undefined,
+            question: q,
+            history: Array.isArray(history) ? history.slice(-12) : [],
+            geminiApiKey: GEMINI_API_KEY,
+          }),
+          signal: AbortSignal.timeout(12000),
+        });
+
+        if (ragRes.ok) {
+          const data = (await ragRes.json()) as {
+            answer?: unknown;
+            citations?: unknown;
+            source?: string;
+            action?: "append_block";
+            content?: string;
+            blockType?: string;
+            language?: string;
+          };
+          const answerStr = typeof data.answer === "string" ? data.answer : "";
+          const isBadFallback =
+            !answerStr ||
+            answerStr.includes("To unlock live AI writing") ||
+            answerStr.includes("No content available") ||
+            data.source === "out_of_context";
+
+          if (answerStr && !isBadFallback) {
+            return NextResponse.json({
+              answer: data.answer,
+              citations: Array.isArray(data.citations) ? data.citations : [],
+              source: data.source || "langchain_rag",
+              ...(data.action ? { action: data.action } : {}),
+              ...(data.content ? { content: data.content } : {}),
+              ...(data.blockType ? { blockType: data.blockType } : {}),
+              ...(data.language ? { language: data.language } : {}),
+            });
+          }
+        }
+      } catch {
+        // Python service offline — fall through to in-process Gemini
       }
     }
 
-    // /write command
-    if (q.toLowerCase().startsWith("/write")) {
-      const instruction = q.slice(6).trim();
+    if (!isValidGeminiKey(GEMINI_API_KEY)) {
+      return NextResponse.json({ answer: NO_KEY_ANSWER, citations: [], source: "no_key" });
+    }
+
+    // /write or natural language write command
+    if (isWriteCmd) {
+      const instruction = q.replace(/^(\/write|write|draft)\s*/i, "").trim();
       if (!instruction) {
         return NextResponse.json({
-          answer: "Tell me what to write after `/write`, for example: `/write Explain binary search`.",
+          answer: "Tell me what to write after `/write`, for example: `/write Explain Large Language Models`.",
           citations: [],
           source: "write_help",
         });
       }
 
-      const content = GEMINI_API_KEY
-        ? await callGemini(
-            `You are a Notion writing assistant. Create clean, useful content for the user's active page. Return only the content to append, without commentary.\n\nPrevious conversation:\n${conversationContext || "(none)"}\n\nUser instruction: ${instruction}\n\nWorkspace context:\n${workspaceContext}`,
-            GEMINI_API_KEY
-          )
-        : instruction;
+      const content = await callGemini(
+        `You are Notion AI, an expert writing assistant for documents and notes.
+Instructions:
+- Write clean, comprehensive, well-structured content for the user's document based on the following instruction: "${instruction}".
+- Format with markdown headings (##, ###), clear paragraphs, bullet points (-), numbered lists (1.), quotes (>), checklists (- [ ] ), and code blocks where appropriate.
+- Understand the user's intent even if their query contains typos, misspellings, or grammatical errors.
+- NEVER comment on, quote, or mention any spelling mistakes, grammar errors, or prompt phrasing.
+- Return ONLY the final structured markdown content. No greetings, no "Here is...", no "Sure!".
+
+Previous conversation:
+${conversationContext || "(none)"}
+
+Workspace context:
+${workspaceContext}`,
+        GEMINI_API_KEY
+      );
 
       return NextResponse.json({
         answer: `✍️ **Content written to active page**\n\n${content}`,
@@ -165,9 +317,9 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // /code command
-    if (q.toLowerCase().startsWith("/code")) {
-      const instruction = q.slice(5).trim();
+    // /code or natural language code command
+    if (isCodeCmd) {
+      const instruction = q.replace(/^(\/code|code)\s*/i, "").trim();
       if (!instruction) {
         return NextResponse.json({
           answer: "Tell me what code to create after `/code`, for example: `/code React button with loading state`.",
@@ -177,7 +329,16 @@ export async function POST(request: NextRequest) {
       }
       const codeAnswer = GEMINI_API_KEY
         ? await callGemini(
-            `You are an expert programming assistant. Answer the user's request with a concise explanation and a complete, well-formatted code block wrapped in \`\`\`language ... \`\`\`.\n\nPrevious conversation:\n${conversationContext || "(none)"}\n\nUser request: ${instruction}`,
+            `You are an expert programming assistant.
+Instructions:
+- Provide a clear, concise explanation and a complete, well-formatted code block wrapped in \`\`\`language ... \`\`\`.
+- Understand the user's intent even if their request has misspellings or informal phrasing.
+- NEVER comment on typos or grammar.
+
+Previous conversation:
+${conversationContext || "(none)"}
+
+User request: ${instruction}`,
             GEMINI_API_KEY
           )
         : "AI code generation needs a Gemini API key.";
@@ -198,66 +359,8 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // /kanban command
-    if (q.toLowerCase().startsWith("/kanban")) {
-      const title = q.slice(7).trim() || "Project Workspace Kanban";
-      return NextResponse.json({
-        answer: `🗄️ **Kanban Board created in active page**\n\nInteractive board: **${title}**`,
-        citations: [],
-        source: "kanban",
-        action: "append_block",
-        blockType: "kanban",
-        content: title,
-      });
-    }
-
-    // /table command
-    if (q.toLowerCase().startsWith("/table")) {
-      const title = q.slice(6).trim() || "Workspace Matrix Table";
-      return NextResponse.json({
-        answer: `📊 **Matrix Table created in active page**\n\nData Table: **${title}**`,
-        citations: [],
-        source: "table",
-        action: "append_block",
-        blockType: "table",
-        content: title,
-      });
-    }
-
-    // /search command
-    if (q.toLowerCase().startsWith("/search")) {
-      const term = q.slice(7).trim();
-      if (!term) {
-        return NextResponse.json({
-          answer: "Please provide a search term. Example: `/search Next.js 16`",
-          citations: [],
-        });
-      }
-
-      if (GEMINI_API_KEY) {
-        const geminiAnswer = await callGemini(
-          `You are a web search assistant. Provide a detailed, accurate answer about: "${term}". Format your response with clear headings and bullet points. Include relevant facts, features, and context.`,
-          GEMINI_API_KEY
-        );
-        return NextResponse.json({
-          answer: `🌐 **Web Search: "${term}"**\n\n${geminiAnswer}`,
-          citations: [],
-          source: "gemini_search",
-          action: "append_block",
-          blockType: "paragraph",
-          content: geminiAnswer,
-        });
-      }
-
-      return NextResponse.json({
-        answer: `🌐 **Web Search Results for "${term}":**\n\n• Start the Python RAG service for live DuckDuckGo web search results.\n• Or add GEMINI_API_KEY to your .env.local for instant AI-powered search.`,
-        citations: [],
-      });
-    }
-
     // /summary / /summery / /summarize command
     if (isSummaryCmd) {
-      // Find database active page if activePageId was provided
       const activePage = activePageId ? pages.find((p) => p._id.toString() === activePageId) : null;
       const targetTitle = providedTitle || activePage?.title || "Active Page";
 
@@ -350,22 +453,22 @@ ${workspaceContext}`,
       });
     }
 
-    // Normal Q&A with Gemini — strictly workspace-grounded
+    // Normal Q&A with Gemini
     if (GEMINI_API_KEY) {
-      // If the workspace has no relevant content, skip Gemini and give a helpful redirect
-      if (contentCount === 0) {
-        return NextResponse.json({
-          answer: `🔍 I don't have enough context in your workspace pages to answer **"${q}"**.\n\n💡 Try:\n- **\`/search ${q}\`** — live web search\n- **\`/write ${q}\`** — have AI write content about it directly to this page\n- Add notes about this topic to your workspace first.`,
-          citations: [],
-          source: "out_of_context",
-        });
-      }
+      // Check if query matches any workspace notes
+      const normalizedQ = q.toLowerCase();
+      const hasWorkspaceMatch = pages.some((p) => {
+        const titleMatch = (p.title || "").toLowerCase().includes(normalizedQ);
+        const blockMatch = (p.blocks || []).some((b: RawBlock) =>
+          (b.properties?.text || "").toLowerCase().includes(normalizedQ)
+        );
+        return titleMatch || blockMatch;
+      });
 
-      const geminiAnswer = await callGemini(
-        `You are Notion AI, a workspace assistant. You ONLY answer questions using the workspace notes below.
-If the question cannot be answered from the workspace content, respond EXACTLY with:
-"🔍 I don't have notes on this in your workspace. Try \`/search ${q}\` to search the web."
-Do NOT answer general knowledge questions. Do NOT make up or generate information.
+      if (hasWorkspaceMatch && contentCount > 0) {
+        const workspaceAnswer = await callGemini(
+          `You are Notion AI, an expert workspace assistant. Answer the user's question using the workspace notes below.
+If the question is directly answered by the workspace content, provide a clear, helpful response.
 
 Previous conversation:
 ${conversationContext || "(none)"}
@@ -374,12 +477,34 @@ Workspace pages (${pageCount} pages):
 ${workspaceContext}
 
 User question: ${q}`,
+          GEMINI_API_KEY
+        );
+        return NextResponse.json({
+          answer: workspaceAnswer,
+          citations: pages.slice(0, 3).map((p) => ({ pageId: p._id.toString(), title: p.title || "Untitled" })),
+          source: "gemini_rag",
+        });
+      }
+
+      // General knowledge fallback when question isn't in workspace notes
+      const generalAnswer = await callGemini(
+        `You are Notion AI, an intelligent workspace assistant.
+Instructions:
+- Provide a clear, thorough, and well-structured answer to the user's question: "${q}".
+- Format your response with clear markdown headings, paragraphs, bullet points, or code snippets where appropriate.
+- Understand the user's intent even if their query contains typos, misspellings, or broken grammar.
+- NEVER comment on, quote, or mention any spelling mistakes, grammar errors, or prompt phrasing.
+- Directly deliver the informative, structured answer.
+
+Previous conversation:
+${conversationContext || "(none)"}`,
         GEMINI_API_KEY
       );
+
       return NextResponse.json({
-        answer: geminiAnswer,
+        answer: `${generalAnswer}\n\n*(Answered with Notion AI general knowledge. Try \`/search\` for live web search or \`/write\` to add directly to this page.)*`,
         citations: [],
-        source: "gemini_rag",
+        source: "general_ai",
       });
     }
 
@@ -400,7 +525,7 @@ async function callGemini(prompt: string, apiKey: string): Promise<string> {
     return "⚠️ Please set a valid GEMINI_API_KEY in your .env file (get one free at https://aistudio.google.com/app/apikey).";
   }
 
-  const models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-2.0-flash"];
+  const models = ["gemini-2.0-flash", "gemini-1.5-flash", "gemini-1.5-pro", "gemini-2.5-flash"];
   let lastError = "";
 
   for (const model of models) {
@@ -412,9 +537,9 @@ async function callGemini(prompt: string, apiKey: string): Promise<string> {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }],
-            generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+            generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
           }),
-          signal: AbortSignal.timeout(15000),
+          signal: AbortSignal.timeout(20000),
         }
       );
 

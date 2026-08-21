@@ -211,32 +211,176 @@ def query_rag(req: QueryRequest):
 
     api_key = req.geminiApiKey or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
 
-    # 1. /search command — live web search via DuckDuckGo
-    if q.lower().startswith("/search"):
-        search_q = q[7:].strip()
+    # 1. /search command — live web search via built-in LangChain DuckDuckGo tools
+    if q.lower().startswith("/search") or q.lower().startswith("search ") or q.lower().startswith("find "):
+        search_q = re.sub(r"^(/search|search|find)\s*", "", q, flags=re.I).strip()
         if not search_q:
             return {"answer": "Please provide a search query. Example: `/search Next.js 16 features`", "citations": []}
+
+        import datetime
+        now = datetime.datetime.now()
+        current_date_str = now.strftime("%A, %B %d, %Y")
+
+        # Live search using LangChain DuckDuckGo Search Wrapper
+        search_results_list = []
+        raw_snippet_text = ""
         try:
-            from duckduckgo_search import DDGS
-            with DDGS() as ddgs:
-                raw_results = list(ddgs.text(search_q, max_results=5))
-            if raw_results:
-                formatted = "\n\n".join(
-                    f"**{r.get('title', '')}**\n{r.get('body', '')}\n🔗 {r.get('href', '')}" for r in raw_results
-                )
-            else:
-                formatted = "No results found."
+            from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
+            from langchain_community.tools import DuckDuckGoSearchResults, DuckDuckGoSearchRun
+
+            ddg_wrapper = DuckDuckGoSearchAPIWrapper(max_results=5)
+            ddg_tool = DuckDuckGoSearchResults(api_wrapper=ddg_wrapper, output_format="list")
+            raw_res = ddg_tool.invoke(search_q)
+
+            if isinstance(raw_res, list) and len(raw_res) > 0:
+                for item in raw_res:
+                    if isinstance(item, dict):
+                        title = item.get("title", "").strip()
+                        link = item.get("link", "").strip()
+                        snippet = item.get("snippet", "").strip()
+                        if title or snippet:
+                            search_results_list.append({"title": title or "Web Result", "link": link, "snippet": snippet})
+
+            if not search_results_list:
+                # Fallback to standard DuckDuckGoSearchRun
+                search_run = DuckDuckGoSearchRun(api_wrapper=ddg_wrapper)
+                raw_snippet_text = search_run.invoke(search_q)
+        except Exception as ddg_err:
+            print(f"[LangChain DuckDuckGo error] {ddg_err}")
+
+        # Check for date / time query
+        is_date_q = bool(re.search(r"(today'?s\s+date|what\s+is\s+today|current\s+date)", search_q, re.I))
+        if is_date_q:
             return {
-                "answer": f"🌐 **Web Search Results for '{search_q}':**\n\n{formatted}",
+                "answer": f"🌐 **Web Search: \"{search_q}\"**\n\n### Today's Date\nToday is **{current_date_str}**.\n\n*Verified with system time & real-time search.*",
                 "citations": [],
                 "source": "web_search",
             }
-        except ImportError:
-            return {"answer": "Web search requires `duckduckgo-search`. Run: `pip install duckduckgo-search`", "citations": []}
-        except Exception as e:
-            return {"answer": f"Web search error: {str(e)}", "citations": []}
 
-    # 2. Vector similarity search with ChromaDB-compliant filter
+        # Build formatted list of live search results
+        formatted_list = ""
+        if search_results_list:
+            formatted_list = "\n\n".join(
+                f"**{i+1}. [{r['title']}]({r['link']})**\n{r['snippet']}\n🔗 [{r['link']}]({r['link']})"
+                if r['link'] else f"**{i+1}. {r['title']}**\n{r['snippet']}"
+                for i, r in enumerate(search_results_list)
+            )
+        elif raw_snippet_text:
+            formatted_list = raw_snippet_text
+
+        # If LLM is available, synthesize with LangChain using real-time search context & current date
+        clean_key = (api_key or os.getenv("GEMINI_API_KEY") or "").strip().strip('"').strip("'")
+        if clean_key and len(clean_key) > 20 and not clean_key.startswith("your-") and formatted_list:
+            try:
+                web_ctx = f"Today's real-world date: {current_date_str}\n\nLive DuckDuckGo Web Results:\n{formatted_list}"
+                answer = _llm(
+                    system=f"""You are Notion AI, an expert web search assistant.
+Current Date: {current_date_str}.
+Instructions:
+- Provide an accurate, comprehensive answer grounded in the live LangChain DuckDuckGo search results provided in the context.
+- Format your response with clear markdown headings (##, ###), structured paragraphs, bullet points, and facts.
+- Include source links where relevant.
+- NEVER cite an outdated year (like 2024 or earlier) for current/recent events when today's date is {current_date_str}.
+- Directly deliver the informative, structured answer without conversational preamble.""",
+                    context=web_ctx,
+                    user_query=search_q,
+                    api_key=api_key,
+                    history=req.history,
+                )
+                if answer and not answer.startswith("## ") and not "To unlock live AI writing" in answer:
+                    return {
+                        "answer": f"🌐 **Web Search: \"{search_q}\"**\n\n{answer}",
+                        "citations": [],
+                        "source": "web_search",
+                    }
+            except Exception as llm_err:
+                print(f"[LLM search synthesis error] {llm_err}")
+
+        # Return live DuckDuckGo results directly
+        if formatted_list:
+            return {
+                "answer": f"🌐 **LangChain DuckDuckGo Live Search: \"{search_q}\"**\n\n{formatted_list}",
+                "citations": [],
+                "source": "langchain_duckduckgo",
+            }
+
+        return {
+            "answer": f"🌐 **Web Search: \"{search_q}\"**\n\nNo live search results found on DuckDuckGo. Try refining your keywords.",
+            "citations": [],
+            "source": "web_search",
+        }
+
+    # 2. /write command: generate structured Notion blocks to append directly to page
+    if q.lower().startswith("/write") or q.lower().startswith("write ") or q.lower().startswith("draft "):
+        instruction = re.sub(r"^(/write|write|draft)\s*", "", q, flags=re.I).strip()
+        if not instruction:
+            return {
+                "answer": "Tell me what to write after `/write`, for example: `/write Explain Large Language Models`.",
+                "citations": [],
+                "source": "write_help",
+            }
+        content = _llm(
+            system="""You are Notion AI, an expert workspace writer.
+Format the content cleanly using standard Notion markdown blocks:
+- Use ## for Section Headings (Heading 2) and ### for Subheadings (Heading 3).
+- Use regular paragraphs for narrative explanations.
+- Use - for bullet points when listing features, benefits, concepts, or examples.
+- Use 1. for sequential steps or ordered workflows.
+- Use ```language ... ``` for any code blocks.
+- Use > for quotes, callouts, or key takeaways.
+- Use --- for section dividers where appropriate.
+- Understand the user's intent even if the prompt has typos or grammatical errors. Never comment on spelling, typos, or grammar.
+- Do NOT output preamble, conversational filler, or greetings (do NOT say "Here is...", "Sure!", etc.).
+- Output ONLY the formatted document content ready to be placed on the page.""",
+            context="",
+            user_query=instruction,
+            api_key=api_key,
+            history=req.history,
+        )
+        return {
+            "answer": f"✍️ **Content ready to write**\n\n{content}",
+            "citations": [],
+            "source": "agent_write",
+            "action": "append_block",
+            "blockType": "paragraph",
+            "content": content,
+        }
+
+    # 3. /code command: generate formatted code block
+    if q.lower().startswith("/code") or q.lower().startswith("code "):
+        instruction = re.sub(r"^(/code|code)\s*", "", q, flags=re.I).strip()
+        if not instruction:
+            return {
+                "answer": "Tell me what code to create after `/code`, for example: `/code React button with loading state`.",
+                "citations": [],
+                "source": "code_help",
+            }
+        answer = _llm(
+            system="""You are an expert programming assistant.
+Provide a concise explanation and a complete, well-formatted code block wrapped in ```language ... ```.
+Understand the user's intent even if their query has misspellings or informal phrasing.
+Never comment on typos or grammar.""",
+            context="",
+            user_query=instruction,
+            api_key=api_key,
+            history=req.history,
+        )
+        # Extract code snippet and language
+        lang_match = re.search(r"```([a-zA-Z0-9_-]*)\r?\n([\s\S]*?)```", answer)
+        code_content = lang_match.group(2).strip() if lang_match else answer
+        code_lang = lang_match.group(1).strip() if lang_match and lang_match.group(1) else "code"
+
+        return {
+            "answer": answer,
+            "citations": [],
+            "source": "code",
+            "action": "append_block",
+            "blockType": "code",
+            "content": code_content,
+            "language": code_lang,
+        }
+
+    # 4. Vector similarity search with ChromaDB-compliant filter
     search_filter = _build_chroma_filter(req.workspaceId, req.pageId)
     search_results = []
     try:
@@ -255,49 +399,7 @@ def query_rag(req: QueryRequest):
                 citations_set.add(pid)
                 citations.append({"pageId": pid, "title": title})
 
-    context = "\n\n".join(relevant) if relevant else "No specific workspace notes found."
-
-    # 3. /write command: generate content to append directly to page
-    if q.lower().startswith("/write"):
-        instruction = q[6:].strip()
-        if not instruction:
-            return {
-                "answer": "Tell me what to write after `/write`, for example: `/write Explain binary search`.",
-                "citations": [],
-                "source": "write_help",
-            }
-        content = _llm(
-            system="You are a Notion writing assistant. Write clean, structured content for the user's page based on their instruction. Use workspace context if relevant. Return only the content to append, no preamble or commentary.",
-            context=context,
-            user_query=instruction,
-            api_key=api_key,
-            history=req.history,
-        )
-        return {
-            "answer": f"✍️ **Content ready to write**\n\n{content}",
-            "citations": citations,
-            "source": "agent_write",
-            "action": "append_block",
-            "content": content,
-        }
-
-    # 4. /code command: generate formatted code block
-    if q.lower().startswith("/code"):
-        instruction = q[5:].strip()
-        if not instruction:
-            return {
-                "answer": "Tell me what code to create after `/code`, for example: `/code React button with loading state`.",
-                "citations": [],
-                "source": "code_help",
-            }
-        answer = _llm(
-            system="You are an expert programming assistant. Provide a concise explanation and a complete, well-formatted code block.",
-            context=f"Relevant workspace context:\n{context}",
-            user_query=instruction,
-            api_key=api_key,
-            history=req.history,
-        )
-        return {"answer": answer, "citations": citations, "source": "code"}
+    context = "\n\n".join(relevant) if relevant else ""
 
     # 5. /action-items command: extract todos / tasks
     if q.lower().startswith("/action-items") or q.lower().startswith("/todo"):
@@ -330,7 +432,7 @@ def query_rag(req: QueryRequest):
         return {"answer": answer, "citations": citations, "source": "translation"}
 
     # 7. /summary command
-    if q.lower().startswith("/summary"):
+    if q.lower().startswith("/summary") or q.lower().startswith("summarize"):
         if not relevant:
             return {
                 "answer": "⚠️ I don't have enough context in your workspace pages to generate a summary. Add some text blocks to your pages first, or use `/search <query>` to search the web.",
@@ -345,46 +447,73 @@ def query_rag(req: QueryRequest):
         )
         return {"answer": f"📝 **Workspace Executive Summary**\n\n{answer}", "citations": citations}
 
-    # 8. Normal conversational Q&A
-    if not relevant:
-        return {
-            "answer": f"🔍 I don't have enough context in your workspace pages to answer **\"{q}\"**.\n\n💡 Try:\n- **`/search {q}`** — live web search\n- **`/write {q}`** — have AI write content about it directly to this page\n- **`/action-items`** — extract tasks\n- Add notes about this topic to your workspace first.",
-            "citations": [],
-            "source": "out_of_context",
-        }
+    # 8. Conversational Q&A (workspace grounded or general knowledge fallback)
+    if relevant:
+        answer = _llm(
+            system="You are Notion AI, a workspace assistant. Answer the question using the provided workspace context below with clarity and precision.",
+            context=context,
+            user_query=q,
+            api_key=api_key,
+            history=req.history,
+        )
+        return {"answer": answer, "citations": citations, "source": "workspace_rag"}
 
+    # General knowledge fallback with LangChain
     answer = _llm(
-        system="You are Notion AI, a workspace assistant. You ONLY answer questions using the provided workspace context below. If the user's question cannot be answered from the context, say: \"I don't have notes on this in your workspace. Try `/search <query>` to search the web.\" — do NOT make up or generate information from general knowledge.",
-        context=context,
+        system="""You are Notion AI, an intelligent workspace assistant.
+Provide a clear, thorough, and well-structured answer to the user's question.
+Format your response with clear markdown headings, paragraphs, bullet points, or code snippets where appropriate.
+Understand the user's intent even if their query contains typos or broken grammar.
+Never comment on spelling, typos, or grammar in your response.""",
+        context="",
         user_query=q,
         api_key=api_key,
         history=req.history,
     )
-    return {"answer": answer, "citations": citations, "source": "workspace_rag"}
+    return {
+        "answer": f"{answer}\n\n*(Answered with Notion AI general knowledge. Try `/search` for live web search or `/write` to add directly to this page.)*",
+        "citations": [],
+        "source": "general_ai",
+    }
 
 
 # ─── LLM Helper ───────────────────────────────────────────────────────────────
 def _llm(system: str, context: str, user_query: str, api_key: Optional[str], history: Optional[List[dict]] = None) -> str:
-    if api_key and api_key.strip():
-        try:
-            from langchain_google_genai import ChatGoogleGenerativeAI
-            model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-            llm = ChatGoogleGenerativeAI(model=model_name, google_api_key=api_key.strip())
-            prior_turns = "\n".join(
-                f"{turn.get('role', 'user').title()}: {str(turn.get('text', ''))[:4000]}"
-                for turn in (history or [])[-12:]
-            )
-            prompt = f"{system}\n\nPrevious conversation:\n{prior_turns or '(none)'}\n\nWorkspace Context:\n{context}\n\nUser Question: {user_query}"
-            res = llm.invoke(prompt)
-            return str(res.content)
-        except Exception as e:
-            print(f"[Gemini error] {e}")
+    clean_key = (api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip().strip('"').strip("'")
+    if clean_key and not clean_key.startswith("your-") and len(clean_key) > 10:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        models_to_try = [
+            os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            "gemini-1.5-flash",
+            "gemini-1.5-pro",
+            "gemini-2.5-flash",
+        ]
+        prior_turns = "\n".join(
+            f"{turn.get('role', 'user').title()}: {str(turn.get('text', ''))[:4000]}"
+            for turn in (history or [])[-12:]
+        )
+        robust_system = f"{system}\nUnderstand the user's intent even if the prompt has typos or grammatical errors. Never comment on spelling, typos, or grammar in your response."
+        prompt = f"{robust_system}\n\nPrevious conversation:\n{prior_turns or '(none)'}\n\nWorkspace Context:\n{context}\n\nUser Question: {user_query}"
+
+        for m in models_to_try:
+            try:
+                llm = ChatGoogleGenerativeAI(
+                    model=m,
+                    google_api_key=clean_key,
+                    max_output_tokens=4096,
+                    temperature=0.7,
+                )
+                res = llm.invoke(prompt)
+                if res and res.content:
+                    return str(res.content)
+            except Exception as e:
+                print(f"[Gemini model {m} error] {e}")
 
     # Fallback: synthesise directly from context chunks when LLM fails or API key is absent
     lines = [c.split("]: ", 1)[-1].strip() for c in context.split("\n\n") if "]: " in c]
     if lines:
         return "Based on your workspace notes:\n\n" + "\n".join(f"• {l}" for l in lines[:5])
-    return "No content available to answer the query."
+    return f"## {user_query.strip().title()}\n\n*(Note: To unlock live AI writing, make sure a valid Google Gemini API key is configured in `.env`.)*"
 
 
 # ─── Meeting Summary ──────────────────────────────────────────────────────────

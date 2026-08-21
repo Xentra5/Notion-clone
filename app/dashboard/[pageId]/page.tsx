@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { use } from "react";
 import { useRouter } from "next/navigation";
 import { DocumentCanvas } from "@/components/dashboard/document-canvas";
@@ -59,6 +59,9 @@ export default function PageRoute({ params }: PageRouteProps) {
   const [page, setPage] = useState<Page | null>(null);
   const [childPages, setChildPages] = useState<Page[]>([]);
   const [notFound, setNotFound] = useState(false);
+  // Track whether we've ever loaded content so we can avoid flashing a spinner
+  // when navigating between pages (show stale content until new data arrives).
+  const hasLoadedOnce = useRef(false);
 
   const fetchChildPages = useCallback(async () => {
     try {
@@ -74,25 +77,21 @@ export default function PageRoute({ params }: PageRouteProps) {
     let cancelled = false;
 
     getPage(pageId)
-      .then((p) => { if (!cancelled) { setPage(p); setNotFound(false); } })
+      .then((p) => { if (!cancelled) { setPage(p); setNotFound(false); hasLoadedOnce.current = true; } })
       .catch(() => { if (!cancelled) { setPage(null); setNotFound(true); } });
 
-    queueMicrotask(() => {
-      fetchChildPages();
-    });
+    fetchChildPages();
 
     const handleRefresh = () => {
       fetchChildPages();
     };
 
     window.addEventListener("page-created", handleRefresh);
-    window.addEventListener("page-updated", handleRefresh);
     window.addEventListener("page-deleted", handleRefresh);
 
     return () => {
       cancelled = true;
       window.removeEventListener("page-created", handleRefresh);
-      window.removeEventListener("page-updated", handleRefresh);
       window.removeEventListener("page-deleted", handleRefresh);
     };
   }, [pageId, fetchChildPages]);

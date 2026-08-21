@@ -114,22 +114,23 @@ export const authOptions: NextAuthOptions = {
         token.name = user.name;
         token.email = user.email;
         if (user.image) token.picture = user.image;
-      }
-      if (trigger === 'update' && session?.name) {
-        token.name = session.name;
+        token.plan = (user as { plan?: string }).plan || "free";
       }
 
-      if (token.email) {
-        try {
-          await connectToDatabase();
-          const dbUser = await User.findOne({ email: (token.email as string).toLowerCase() });
-          if (dbUser) {
-            token.id = dbUser._id.toString();
-            token.plan = dbUser.plan || 'free';
-            if (dbUser.image) token.picture = dbUser.image;
+      if (trigger === "update") {
+        if (session?.name) token.name = session.name;
+        if (token.email) {
+          try {
+            await connectToDatabase();
+            const dbUser = await User.findOne({ email: (token.email as string).toLowerCase() }).select("_id plan image name").lean();
+            if (dbUser) {
+              token.id = dbUser._id.toString();
+              token.plan = dbUser.plan || "free";
+              if (dbUser.image) token.picture = dbUser.image;
+            }
+          } catch (err) {
+            console.error("[JWT Fetch User Error]:", err);
           }
-        } catch (err) {
-          console.error('[JWT Fetch User Error]:', err);
         }
       }
 

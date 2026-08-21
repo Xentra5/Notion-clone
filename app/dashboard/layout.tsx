@@ -31,6 +31,7 @@ export default function DashboardLayout({
   const [activeTitle, setActiveTitle] = useState("Getting Started with Notion");
   const [lastEditedAt, setLastEditedAt] = useState<string | Date | undefined>(undefined);
   const [isAiOpen, setIsAiOpen] = useState(false);
+  const [isAiSplitView, setIsAiSplitView] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -40,6 +41,17 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [utilityPage, setUtilityPage] = useState<"Library" | "My Tasks" | "Marketplace" | "Help" | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+
+  // Auto-collapse sidebar when 50/50 split view is toggled
+  const handleToggleSplitView = () => {
+    setIsAiSplitView((prev) => {
+      const next = !prev;
+      if (next && window.innerWidth < 1280) {
+        setSidebarOpen(false);
+      }
+      return next;
+    });
+  };
 
   // Redirect to login if user is not authenticated
   useEffect(() => {
@@ -66,7 +78,9 @@ export default function DashboardLayout({
     const openAiPanel = () => setIsAiOpen(true);
     const syncPageTitle = (event: Event) => {
       const title = (event as CustomEvent<{ title?: string }>).detail?.title;
-      if (title) setActiveTitle(title);
+      if (title) {
+        setActiveTitle((prev) => (prev !== title ? title : prev));
+      }
     };
     window.addEventListener("open-quick-ai", openQuickAi);
     window.addEventListener("open-settings", openSettings);
@@ -163,6 +177,8 @@ export default function DashboardLayout({
         onClose={() => setIsAiOpen(false)}
         currentPageTitle={activeTitle}
         currentPageId={pageId}
+        isSplitView={isAiSplitView}
+        onToggleSplitView={handleToggleSplitView}
       />
 
       {/* Overlay Modals */}

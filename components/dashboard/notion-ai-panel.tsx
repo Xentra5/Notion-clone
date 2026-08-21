@@ -26,6 +26,8 @@ interface NotionAiPanelProps {
   onClose: () => void;
   currentPageTitle: string;
   currentPageId?: string;
+  isSplitView?: boolean;
+  onToggleSplitView?: () => void;
 }
 
 interface ChatMessage {
@@ -96,6 +98,180 @@ const AI_SLASH_COMMANDS: SlashCmdItem[] = [
   },
 ];
 
+function renderInlineMarkdown(text: string): React.ReactNode {
+  if (!text) return text;
+  const parts: React.ReactNode[] = [];
+  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+  let lastIdx = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = regex.exec(text)) !== null) {
+    if (match.index > lastIdx) {
+      parts.push(text.substring(lastIdx, match.index));
+    }
+    const token = match[0];
+    if (token.startsWith("**") && token.endsWith("**")) {
+      parts.push(
+        <strong key={match.index} className="font-semibold text-foreground">
+          {token.slice(2, -2)}
+        </strong>
+      );
+    } else if (token.startsWith("`") && token.endsWith("`")) {
+      parts.push(
+        <code
+          key={match.index}
+          className="px-1 py-0.5 rounded bg-muted font-mono text-[11px] text-foreground border border-border/40"
+        >
+          {token.slice(1, -1)}
+        </code>
+      );
+    } else if (token.startsWith("*") && token.endsWith("*")) {
+      parts.push(
+        <em key={match.index} className="italic text-foreground/90">
+          {token.slice(1, -1)}
+        </em>
+      );
+    }
+    if (match.index === regex.lastIndex) {
+      regex.lastIndex++;
+    }
+    lastIdx = regex.lastIndex;
+  }
+
+  if (lastIdx < text.length) {
+    parts.push(text.substring(lastIdx));
+  }
+
+  return parts.length > 0 ? parts : text;
+}
+
+function RenderMarkdownContent({ text }: { text: string }) {
+  const lines = text.split(/\r?\n/);
+  const elements: React.ReactNode[] = [];
+  let currentList: { type: "bullet" | "number"; items: string[] } | null = null;
+
+  const flushList = () => {
+    if (!currentList) return;
+    if (currentList.type === "bullet") {
+      elements.push(
+        <ul key={`list-${elements.length}`} className="space-y-1 my-1 pl-2 text-xs leading-relaxed">
+          {currentList.items.map((it, idx) => (
+            <li key={idx} className="flex items-start gap-1.5">
+              <span className="text-primary font-bold select-none text-[10px] mt-0.5">•</span>
+              <span className="flex-1">{renderInlineMarkdown(it)}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    } else {
+      elements.push(
+        <ol key={`list-${elements.length}`} className="space-y-1 my-1 pl-2 text-xs leading-relaxed">
+          {currentList.items.map((it, idx) => (
+            <li key={idx} className="flex items-start gap-1.5">
+              <span className="text-muted-foreground font-mono text-[10px] select-none min-w-[14px]">
+                {idx + 1}.
+              </span>
+              <span className="flex-1">{renderInlineMarkdown(it)}</span>
+            </li>
+          ))}
+        </ol>
+      );
+    }
+    currentList = null;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (!trimmed) {
+      flushList();
+      continue;
+    }
+
+    // Horizontal Rule
+    if (/^(\-{3,}|\*{3,}|_{3,})$/.test(trimmed)) {
+      flushList();
+      elements.push(<hr key={i} className="my-2 border-t border-border/50" />);
+      continue;
+    }
+
+    // Headings
+    if (/^###\s+/.test(trimmed)) {
+      flushList();
+      elements.push(
+        <h4 key={i} className="font-semibold text-foreground text-xs mt-2 mb-1">
+          {renderInlineMarkdown(trimmed.replace(/^###\s+/, ""))}
+        </h4>
+      );
+      continue;
+    }
+    if (/^##\s+/.test(trimmed)) {
+      flushList();
+      elements.push(
+        <h3 key={i} className="font-bold text-foreground text-sm mt-2.5 mb-1">
+          {renderInlineMarkdown(trimmed.replace(/^##\s+/, ""))}
+        </h3>
+      );
+      continue;
+    }
+    if (/^#\s+/.test(trimmed)) {
+      flushList();
+      elements.push(
+        <h2 key={i} className="font-bold text-foreground text-base mt-3 mb-1.5">
+          {renderInlineMarkdown(trimmed.replace(/^#\s+/, ""))}
+        </h2>
+      );
+      continue;
+    }
+
+    // Bullet items
+    const bulletMatch = /^[-*+•]\s+(.*)$/.exec(trimmed);
+    if (bulletMatch) {
+      if (!currentList || currentList.type !== "bullet") {
+        flushList();
+        currentList = { type: "bullet", items: [] };
+      }
+      currentList.items.push(bulletMatch[1]);
+      continue;
+    }
+
+    // Numbered items
+    const numMatch = /^\d+[\.\)]\s+(.*)$/.exec(trimmed);
+    if (numMatch) {
+      if (!currentList || currentList.type !== "number") {
+        flushList();
+        currentList = { type: "number", items: [] };
+      }
+      currentList.items.push(numMatch[1]);
+      continue;
+    }
+
+    // Quotes
+    if (/^>\s+/.test(trimmed)) {
+      flushList();
+      elements.push(
+        <blockquote key={i} className="border-l-2 border-primary/50 pl-2.5 my-1 text-muted-foreground italic text-xs">
+          {renderInlineMarkdown(trimmed.replace(/^>\s+/, ""))}
+        </blockquote>
+      );
+      continue;
+    }
+
+    // Regular paragraph
+    flushList();
+    elements.push(
+      <p key={i} className="my-1 text-xs leading-relaxed">
+        {renderInlineMarkdown(trimmed)}
+      </p>
+    );
+  }
+
+  flushList();
+
+  return <div className="space-y-1">{elements}</div>;
+}
+
 function ChatMessageText({
   text,
   onInsert,
@@ -109,40 +285,6 @@ function ChatMessageText({
   if (!text) return null;
 
   const rawBlocks = text.split("```");
-  if (rawBlocks.length <= 1) {
-    return (
-      <div className="space-y-2">
-        <div className="whitespace-pre-wrap leading-relaxed">{text}</div>
-        {onInsert && text.length > 20 && (
-          <div className="flex items-center gap-1.5 pt-1 text-[11px] border-t border-border/40 mt-1">
-            <button
-              type="button"
-              onClick={() => {
-                navigator.clipboard.writeText(text);
-                setCopiedIdx(-1);
-                setTimeout(() => setCopiedIdx(null), 2000);
-              }}
-              className="px-2 py-0.5 rounded bg-foreground/5 hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition text-[10px] font-medium"
-            >
-              {copiedIdx === -1 ? "✓ Copied" : "📋 Copy"}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onInsert(text, "callout");
-                setInsertedIdx(-1);
-                setTimeout(() => setInsertedIdx(null), 2000);
-              }}
-              className="px-2 py-0.5 rounded bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-semibold transition"
-            >
-              {insertedIdx === -1 ? "✓ Added to Page!" : "+ Insert to Page"}
-            </button>
-          </div>
-        )}
-      </div>
-    );
-  }
-
   const parts: { type: "text" | "code"; content: string; lang?: string }[] = [];
 
   for (let i = 0; i < rawBlocks.length; i++) {
@@ -166,19 +308,19 @@ function ChatMessageText({
     }
   }
 
-  const handleCopy = (code: string, idx: number) => {
-    navigator.clipboard.writeText(code);
+  const handleCopy = (content: string, idx: number) => {
+    navigator.clipboard.writeText(content);
     setCopiedIdx(idx);
     setTimeout(() => setCopiedIdx(null), 2000);
   };
 
-  const handleInsert = (code: string, lang: string, idx: number) => {
+  const handleInsert = (content: string, type: string, idx: number, lang?: string) => {
     if (onInsert) {
-      onInsert(code, "code");
+      onInsert(content, type);
     } else {
       window.dispatchEvent(
         new CustomEvent("ai-append-block", {
-          detail: { text: code, type: "code", language: lang },
+          detail: { text: content, type, ...(lang ? { language: lang } : {}) },
         })
       );
     }
@@ -190,7 +332,7 @@ function ChatMessageText({
     <div className="space-y-2.5">
       {parts.map((p, idx) => {
         if (p.type === "text") {
-          return <div key={idx} className="whitespace-pre-wrap leading-relaxed">{p.content}</div>;
+          return <RenderMarkdownContent key={idx} text={p.content} />;
         }
         return (
           <div key={idx} className="my-2.5 rounded-xl bg-[#121214] border border-emerald-500/30 overflow-hidden shadow-xl text-xs font-mono">
@@ -203,14 +345,14 @@ function ChatMessageText({
                 <button
                   type="button"
                   onClick={() => handleCopy(p.content, idx)}
-                  className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition text-[10px] font-sans font-medium active:scale-95"
+                  className="px-2.5 py-1 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-200 transition text-[10px] font-sans font-medium active:scale-95 cursor-pointer"
                 >
                   {copiedIdx === idx ? "✓ Copied" : "Copy"}
                 </button>
                 <button
                   type="button"
-                  onClick={() => handleInsert(p.content, p.lang || "code", idx)}
-                  className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition text-[10px] font-sans flex items-center gap-1 active:scale-95 shadow-sm"
+                  onClick={() => handleInsert(p.content, "code", idx, p.lang || "code")}
+                  className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-bold transition text-[10px] font-sans flex items-center gap-1 active:scale-95 shadow-sm cursor-pointer"
                 >
                   {insertedIdx === idx ? "✓ Added to Page!" : "+ Insert to Page"}
                 </button>
@@ -222,6 +364,26 @@ function ChatMessageText({
           </div>
         );
       })}
+
+      {/* Global message actions for assistant response */}
+      {onInsert && text.length > 20 && (
+        <div className="flex items-center gap-1.5 pt-1.5 text-[11px] border-t border-border/40 mt-1">
+          <button
+            type="button"
+            onClick={() => handleCopy(text, -1)}
+            className="px-2 py-0.5 rounded bg-foreground/5 hover:bg-foreground/10 text-muted-foreground hover:text-foreground transition text-[10px] font-medium cursor-pointer"
+          >
+            {copiedIdx === -1 ? "✓ Copied" : "📋 Copy"}
+          </button>
+          <button
+            type="button"
+            onClick={() => handleInsert(text, "paragraph", -1)}
+            className="px-2.5 py-0.5 rounded bg-primary/10 hover:bg-primary/20 text-primary text-[10px] font-semibold transition cursor-pointer"
+          >
+            {insertedIdx === -1 ? "✓ Added to Page!" : "+ Insert to Page"}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -231,6 +393,8 @@ export function NotionAiPanel({
   onClose,
   currentPageTitle,
   currentPageId,
+  isSplitView,
+  onToggleSplitView,
 }: NotionAiPanelProps) {
   const { data: session, update } = useSession();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -537,7 +701,11 @@ export function NotionAiPanel({
   }
 
   return (
-    <aside className="w-full sm:w-[380px] lg:w-[420px] bg-sidebar border-l border-sidebar-border flex flex-col h-full text-foreground select-none font-sans shrink-0 animate-in slide-in-from-right duration-200">
+    <aside
+      className={`bg-sidebar border-l border-sidebar-border flex flex-col h-full text-foreground select-none font-sans shrink-0 animate-in slide-in-from-right duration-200 ${
+        isSplitView ? "w-full lg:w-1/2" : "w-full sm:w-[380px] lg:w-[420px]"
+      }`}
+    >
       {/* Top Header Bar */}
       <div className="h-11 border-b border-sidebar-border px-3 flex items-center justify-between text-xs text-muted-foreground shrink-0 bg-sidebar">
         {/* Left: Options & AI Chat Selector */}
@@ -569,8 +737,13 @@ export function NotionAiPanel({
             <MessageSquarePlus className="h-4 w-4" />
           </button>
           <button
-            className="p-1.5 rounded hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition text-muted-foreground"
-            title="Split view"
+            onClick={onToggleSplitView}
+            className={`p-1.5 rounded transition cursor-pointer ${
+              isSplitView
+                ? "bg-primary/15 text-primary"
+                : "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground text-muted-foreground"
+            }`}
+            title={isSplitView ? "Standard panel view" : "50/50 Split view"}
           >
             <Columns2 className="h-4 w-4" />
           </button>

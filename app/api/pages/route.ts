@@ -12,7 +12,11 @@ export async function GET(request: NextRequest) {
     }
 
     await connectToDatabase();
-    const pages = await Page.find({ userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] })
+    const pages = await Page.find({
+      userId: session.user.email,
+      $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }],
+    })
+      .select("_id userId title icon coverImage category parentPageId isAiMeetingNote isStarred permission createdAt updatedAt deletedAt")
       .sort({ updatedAt: -1 })
       .lean();
 

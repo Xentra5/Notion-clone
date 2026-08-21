@@ -54,13 +54,10 @@ const PageSchema = new Schema(
 );
 
 
-// Text search index for searching across pages
+// Performance Indexes
+PageSchema.index({ userId: 1, deletedAt: 1, updatedAt: -1 });
+PageSchema.index({ parentPageId: 1, userId: 1, deletedAt: 1 });
 PageSchema.index({ title: "text", "blocks.properties.text": "text" });
-
-// In development with HMR, delete stale model to pick up schema changes
-if (process.env.NODE_ENV !== "production" && mongoose.models.Page) {
-  mongoose.deleteModel("Page");
-}
 
 const Page = mongoose.models.Page || mongoose.model("Page", PageSchema);
 
