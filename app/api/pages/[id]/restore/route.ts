@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import Page from "@/lib/models/page";
+import { serverCache } from "@/lib/cache";
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await getSession(request);
@@ -14,5 +15,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     { returnDocument: "after" }
   ).lean();
   if (!page) return NextResponse.json({ error: "Page not found" }, { status: 404 });
+
+  // Invalidate cached workspace pages and AI responses
+  serverCache.invalidatePrefix(`pages:workspace:${session.user.email}`);
+  serverCache.invalidatePrefix(`ai:res:${session.user.email}`);
+
   return NextResponse.json({ page });
 }

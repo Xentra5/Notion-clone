@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import Page, { removeLegacyTitleIndex } from "@/lib/models/page";
+import { serverCache } from "@/lib/cache";
 
 // GET /api/pages — fetch all pages for the logged-in user
 export async function GET(request: NextRequest) {
@@ -103,6 +104,10 @@ export async function POST(request: NextRequest) {
       }),
       signal: AbortSignal.timeout(3000),
     }).catch(() => null);
+
+    // Invalidate cached workspace pages and AI responses
+    serverCache.invalidatePrefix(`pages:workspace:${session.user.email}`);
+    serverCache.invalidatePrefix(`ai:res:${session.user.email}`);
 
     return NextResponse.json({ page: page.toObject() }, { status: 201 });
   } catch (error) {

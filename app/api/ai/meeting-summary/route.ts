@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
+import { serverCache, hashQuery } from "@/lib/cache";
 
 const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || "http://localhost:8000";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
@@ -16,6 +17,13 @@ export async function POST(request: NextRequest) {
   }
 
   const { transcript, title = "Meeting" } = body as { transcript: string; title?: string };
+  const meetingCacheKey = `ai:meeting:${hashQuery(`${session.user.email}:${title}:${transcript}`)}`;
+
+  // 1. Check in-memory cache
+  const cachedSummary = serverCache.get(meetingCacheKey);
+  if (cachedSummary) {
+    return NextResponse.json(cachedSummary);
+  }
 
   // ── Try FastAPI RAG service first ─────────────────────────────────────────
   try {
@@ -27,11 +35,13 @@ export async function POST(request: NextRequest) {
     });
     if (ragRes.ok) {
       const data = await ragRes.json();
+      serverCache.set(meetingCacheKey, data, 600); // 10 minutes
       return NextResponse.json(data);
     }
   } catch {
     // FastAPI not running — fall through to direct Gemini call
   }
+
 
   // ── Direct Gemini fallback ────────────────────────────────────────────────
   if (!GEMINI_API_KEY) {
@@ -97,12 +107,14 @@ Rules:
       actionItems?: string[];
       topics?: string[];
     };
-    return NextResponse.json({
+    const result = {
       summary: parsed.summary ?? "",
       keyDecisions: parsed.keyDecisions ?? [],
       actionItems: parsed.actionItems ?? [],
       topics: parsed.topics ?? [],
-    });
+    };
+    serverCache.set(meetingCacheKey, result, 600);
+    return NextResponse.json(result);
   } catch (err) {
     console.error("[meeting-summary direct-gemini error]", err);
     return NextResponse.json({

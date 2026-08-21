@@ -3,6 +3,7 @@ import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import Page from "@/lib/models/page";
 import { searchDuckDuckGo } from "@/lib/duckduckgo";
+import { serverCache, hashQuery } from "@/lib/cache";
 
 const PYTHON_RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || "http://localhost:8000";
 const RAW_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
@@ -57,12 +58,40 @@ export async function POST(request: NextRequest) {
     const providedTitle = typeof pageTitle === "string" && pageTitle.trim() ? pageTitle.trim() : "";
     const providedContent = typeof pageContent === "string" && pageContent.trim() ? pageContent.trim() : "";
 
-    // Fetch user's active workspace pages for in-memory fallback & indexing
-    await connectToDatabase();
-    const pages = (await Page.find({
-      userId: session.user.email,
-      $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }],
-    }).lean()) as RawPage[];
+    // ─── 1. Check AI Response In-Memory Cache ───────────────────────────────
+    const queryHash = hashQuery(
+      `${session.user.email}:${activePageId || "workspace"}:${q}:${providedContent ? hashQuery(providedContent) : ""}`
+    );
+    const aiResponseCacheKey = `ai:res:${session.user.email}:${queryHash}`;
+    const isInteractiveCmd = /^\/(kanban|table)\b/i.test(q);
+
+    if (!isInteractiveCmd) {
+      const cached = serverCache.get<Record<string, unknown>>(aiResponseCacheKey);
+      if (cached) {
+        return NextResponse.json(cached);
+      }
+    }
+
+    const respondWithCache = (payload: Record<string, unknown>, ttl = 300) => {
+      if (!isInteractiveCmd && payload.answer && !payload.error) {
+        serverCache.set(aiResponseCacheKey, payload, ttl);
+      }
+      return NextResponse.json(payload);
+    };
+
+    // ─── 2. Fetch Workspace Pages with In-Memory Caching ────────────────────
+    const workspaceCacheKey = `pages:workspace:${session.user.email}`;
+    let pages = serverCache.get<RawPage[]>(workspaceCacheKey);
+
+    if (!pages) {
+      await connectToDatabase();
+      pages = (await Page.find({
+        userId: session.user.email,
+        $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }],
+      }).lean()) as RawPage[];
+
+      serverCache.set(workspaceCacheKey, pages, 180);
+    }
 
     const workspaceId = session.user.email;
     // Batch index in the background without flooding parallel requests
@@ -86,6 +115,7 @@ export async function POST(request: NextRequest) {
         signal: AbortSignal.timeout(10000),
       }).catch(() => null);
     }
+
 
     // ─── Build workspace & conversation context (used by slash cmds AND fallback) ───
     const pageTitles = pages.map((p) => p.title || "Untitled");
@@ -148,11 +178,11 @@ export async function POST(request: NextRequest) {
         if (ragRes.ok) {
           const data = (await ragRes.json()) as { answer?: string; citations?: unknown[]; source?: string };
           if (data.answer && typeof data.answer === "string") {
-            return NextResponse.json({
+            return respondWithCache({
               answer: data.answer,
               citations: Array.isArray(data.citations) ? data.citations : [],
               source: data.source || "langchain_duckduckgo",
-            });
+            }, 600);
           }
         }
       } catch {
@@ -171,11 +201,11 @@ export async function POST(request: NextRequest) {
         /what\s+is\s+(today|the\s+date|current\s+date|todays\s+date)/i.test(term) ||
         /^today('?s)?\s+date/i.test(term);
       if (isDateQuery) {
-        return NextResponse.json({
+        return respondWithCache({
           answer: `🌐 **Live Web & System Search: "${term}"**\n\n### Today's Date\nToday is **${currentDate}**.\n\n*Verified with live system clock & real-time search.*`,
           citations: [],
           source: "live_search",
-        });
+        }, 600);
       }
 
       const ddgResults = await searchDuckDuckGo(term);
@@ -184,11 +214,11 @@ export async function POST(request: NextRequest) {
           .map((r, i) => `**${i + 1}. [${r.title}](${r.url})**\n${r.snippet}\n🔗 [${r.url}](${r.url})`)
           .join("\n\n");
 
-        return NextResponse.json({
+        return respondWithCache({
           answer: `🌐 **DuckDuckGo Live Search: "${term}"**\n\n${formattedResults}`,
           citations: [],
           source: "duckduckgo_search",
-        });
+        }, 600);
       }
 
       return NextResponse.json({
@@ -259,7 +289,7 @@ export async function POST(request: NextRequest) {
             data.source === "out_of_context";
 
           if (answerStr && !isBadFallback) {
-            return NextResponse.json({
+            return respondWithCache({
               answer: data.answer,
               citations: Array.isArray(data.citations) ? data.citations : [],
               source: data.source || "langchain_rag",
@@ -267,7 +297,7 @@ export async function POST(request: NextRequest) {
               ...(data.content ? { content: data.content } : {}),
               ...(data.blockType ? { blockType: data.blockType } : {}),
               ...(data.language ? { language: data.language } : {}),
-            });
+            }, 300);
           }
         }
       } catch {
@@ -398,22 +428,22 @@ Page Content:
 ${pageText.slice(0, 10000)}`,
             GEMINI_API_KEY
           );
-          return NextResponse.json({
+          return respondWithCache({
             answer: `📝 **Page Summary: "${targetTitle}"**\n\n${geminiAnswer}`,
             citations: activePage ? [{ pageId: activePage._id.toString(), title: targetTitle }] : [],
             source: "gemini_summary",
-          });
+          }, 600);
         }
 
         // Local summary without API key
         const lines = pageText.split("\n").map((l) => l.trim()).filter(Boolean);
         const wordCount = pageText.split(/\s+/).filter(Boolean).length;
         const excerpt = lines.slice(0, 8).map((l) => `• ${l}`).join("\n");
-        return NextResponse.json({
+        return respondWithCache({
           answer: `📝 **Page Summary: "${targetTitle}"** (${wordCount} words)\n\n## 📌 Highlights\n${excerpt}${lines.length > 8 ? "\n\n*(and more)*" : ""}\n\n💡 *Tip: Add GEMINI_API_KEY to your .env.local file for deep AI-generated insights.*`,
           citations: activePage ? [{ pageId: activePage._id.toString(), title: targetTitle }] : [],
           source: "local_summary",
-        });
+        }, 120);
       }
 
       // 3. If active page has no text, check if workspace has other pages with content
@@ -432,17 +462,17 @@ Workspace pages:
 ${workspaceContext}`,
             GEMINI_API_KEY
           );
-          return NextResponse.json({
+          return respondWithCache({
             answer: `📝 **Workspace Executive Summary** (${pageCount} pages)\n\n${geminiAnswer}`,
             citations: pages.slice(0, 4).map((p) => ({ pageId: p._id.toString(), title: p.title || "Untitled" })),
             source: "gemini_summary",
-          });
+          }, 300);
         }
 
-        return NextResponse.json({
+        return respondWithCache({
           answer: `📝 **Workspace Summary** (${pageCount} pages)\n\nYour workspace contains: **${pageTitles.join(", ")}**.\n\n💡 Add a GEMINI_API_KEY to .env.local for AI-powered summaries, or start the Python RAG service.`,
           citations: pages.slice(0, 4).map((p) => ({ pageId: p._id.toString(), title: p.title || "Untitled" })),
-        });
+        }, 180);
       }
 
       // 4. Truly empty page and empty workspace
@@ -479,11 +509,11 @@ ${workspaceContext}
 User question: ${q}`,
           GEMINI_API_KEY
         );
-        return NextResponse.json({
+        return respondWithCache({
           answer: workspaceAnswer,
           citations: pages.slice(0, 3).map((p) => ({ pageId: p._id.toString(), title: p.title || "Untitled" })),
           source: "gemini_rag",
-        });
+        }, 300);
       }
 
       // General knowledge fallback when question isn't in workspace notes
@@ -501,11 +531,11 @@ ${conversationContext || "(none)"}`,
         GEMINI_API_KEY
       );
 
-      return NextResponse.json({
+      return respondWithCache({
         answer: `${generalAnswer}\n\n*(Answered with Notion AI general knowledge. Try \`/search\` for live web search or \`/write\` to add directly to this page.)*`,
         citations: [],
         source: "general_ai",
-      });
+      }, 600);
     }
 
     // No API key, no Python service — clear instructions

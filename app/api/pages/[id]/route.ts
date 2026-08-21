@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import Page from "@/lib/models/page";
+import { serverCache } from "@/lib/cache";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -160,6 +161,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }).catch(() => null);
     }
 
+    // Invalidate cached workspace pages and AI responses
+    serverCache.invalidatePrefix(`pages:workspace:${session.user.email}`);
+    serverCache.invalidatePrefix(`ai:res:${session.user.email}`);
+
     return NextResponse.json({ page });
   } catch (error) {
     console.error("Error updating page:", error);
@@ -216,6 +221,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         signal: AbortSignal.timeout(3000),
       }).catch(() => null);
     }
+
+    // Invalidate cached workspace pages and AI responses
+    serverCache.invalidatePrefix(`pages:workspace:${session.user.email}`);
+    serverCache.invalidatePrefix(`ai:res:${session.user.email}`);
 
     return NextResponse.json({ success: true, permanent: isPermanent, deletedCount: targetIds.length });
   } catch (error) {
