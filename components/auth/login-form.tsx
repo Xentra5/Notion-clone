@@ -45,6 +45,7 @@ export default function LoginForm() {
   const setMessage = setCustomMessage;
 
   useEffect(() => {
+    router.prefetch("/dashboard");
     if (status === "authenticated") {
       router.replace("/dashboard");
     }
@@ -68,7 +69,8 @@ export default function LoginForm() {
         return;
       }
 
-      window.location.href = "/dashboard";
+      router.push("/dashboard");
+      router.refresh();
     } catch {
       setMessage("We could not sign you in. Please check your credentials and try again.");
       setIsSubmitting(false);

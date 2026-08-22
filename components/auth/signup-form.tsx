@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
 import {
   AlertCircle,
@@ -17,6 +18,7 @@ import {
 type SocialProvider = "google" | "apple";
 
 export default function SignupForm() {
+  const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -53,9 +55,10 @@ export default function SignupForm() {
 
       if (result?.error) {
         // Fallback to manual login redirect if credentials auto-login returns an issue
-        window.location.href = "/login?signup=success";
+        router.push("/login?signup=success");
       } else {
-        window.location.href = "/dashboard";
+        router.push("/dashboard");
+        router.refresh();
       }
     } catch {
       setMessage("We could not complete sign-up. Please try again.");

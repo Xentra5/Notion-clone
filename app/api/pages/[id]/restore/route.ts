@@ -16,7 +16,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
   ).lean();
   if (!page) return NextResponse.json({ error: "Page not found" }, { status: 404 });
 
-  // Invalidate cached workspace pages and AI responses
+  // Invalidate cached document, lists, and AI responses
+  serverCache.invalidate(`page:doc:${id}:${session.user.email}`);
+  serverCache.invalidate(`pages:list:${session.user.email}`);
+  serverCache.invalidate(`pages:trash:${session.user.email}`);
   serverCache.invalidatePrefix(`pages:workspace:${session.user.email}`);
   serverCache.invalidatePrefix(`ai:res:${session.user.email}`);
 

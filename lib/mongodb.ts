@@ -22,13 +22,19 @@ export async function connectToDatabase() {
     throw new Error("Please define the MONGODB_URI environment variable in .env");
   }
 
-  if (cached.conn) {
+  if (cached.conn && mongoose.connection.readyState === 1) {
     return cached.conn;
   }
 
   if (!cached.promise) {
-    const opts = {
+    const opts: mongoose.ConnectOptions = {
       bufferCommands: false,
+      family: 4,                      // Force IPv4 to prevent 30s DNS resolution hang on Windows & Atlas
+      serverSelectionTimeoutMS: 5000, // Timeout after 5s max instead of default 30s
+      connectTimeoutMS: 10000,
+      socketTimeoutMS: 45000,
+      maxPoolSize: 10,
+      minPoolSize: 1,
     };
 
     cached.promise = mongoose.connect(MONGODB_URI!, opts).then((mongooseInstance) => {
@@ -40,6 +46,7 @@ export async function connectToDatabase() {
     cached.conn = await cached.promise;
   } catch (e) {
     cached.promise = null;
+    cached.conn = null;
     throw e;
   }
 

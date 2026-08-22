@@ -431,8 +431,16 @@ Never comment on typos or grammar.""",
         )
         return {"answer": answer, "citations": citations, "source": "translation"}
 
-    # 7. /summary command
-    if q.lower().startswith("/summary") or q.lower().startswith("summarize"):
+    # 7. /summary / /summery command
+    if (
+        q.lower().startswith("/summary")
+        or q.lower().startswith("/summery")
+        or q.lower().startswith("/sum")
+        or q.lower().startswith("/tldr")
+        or q.lower().startswith("summarize")
+        or q.lower().startswith("summary")
+        or q.lower().startswith("summery")
+    ):
         if not relevant:
             return {
                 "answer": "⚠️ I don't have enough context in your workspace pages to generate a summary. Add some text blocks to your pages first, or use `/search <query>` to search the web.",

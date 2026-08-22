@@ -12,6 +12,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const cacheKey = `pages:list:${session.user.email}`;
+    const cachedPages = serverCache.get(cacheKey);
+    if (cachedPages) {
+      return NextResponse.json({ pages: cachedPages });
+    }
+
     await connectToDatabase();
     const pages = await Page.find({
       userId: session.user.email,
@@ -20,6 +26,8 @@ export async function GET(request: NextRequest) {
       .select("_id userId title icon coverImage category parentPageId isAiMeetingNote isStarred permission createdAt updatedAt deletedAt")
       .sort({ updatedAt: -1 })
       .lean();
+
+    serverCache.set(cacheKey, pages, 60); // 60s TTL
 
     return NextResponse.json({ pages });
   } catch (error) {
@@ -106,6 +114,8 @@ export async function POST(request: NextRequest) {
     }).catch(() => null);
 
     // Invalidate cached workspace pages and AI responses
+    serverCache.invalidate(`pages:list:${session.user.email}`);
+    serverCache.invalidate(`pages:trash:${session.user.email}`);
     serverCache.invalidatePrefix(`pages:workspace:${session.user.email}`);
     serverCache.invalidatePrefix(`ai:res:${session.user.email}`);
 

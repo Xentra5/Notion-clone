@@ -140,9 +140,9 @@ export async function POST(request: NextRequest) {
 
     // ─── Slash command & natural language intent detection ──────────────────────
     const isSummaryCmd =
-      /^\/(summary|summery|summarize)\b/i.test(q) ||
-      /^(summarize(\s+this\s+page|\s+page|\s+note|\s+workspace)?|summary)$/i.test(q) ||
-      /^summarize\s+/i.test(q);
+      /^\/(summary|summery|summarize|sum|tldr)\b/i.test(q) ||
+      /^(summarize(\s+this\s+page|\s+page|\s+note|\s+workspace)?|summary|summery|tldr)$/i.test(q) ||
+      /^(summarize|summary|summery)\s+/i.test(q);
 
     const isWriteCmd = /^\/write\b/i.test(q) || /^write\s+/i.test(q) || /^draft\s+/i.test(q);
     const isCodeCmd = /^\/code\b/i.test(q) || /^code\s+/i.test(q);

@@ -71,32 +71,33 @@ export interface SlashMenuItem {
   iconColor: string;
   category: "Basic" | "Media" | "AI";
   action?: "ai_summary";
+  aliases?: string[];
 }
 
 // ── Slash menu items ─────────────────────────────────────────────────────────
 const SLASH_ITEMS: SlashMenuItem[] = [
-  { type: "paragraph",    label: "AI Summary",    description: "Summarize this page with Notion AI", icon: Sparkles,  iconColor: "text-purple-500", category: "AI", action: "ai_summary" },
-  { type: "paragraph",    label: "Text",          description: "Plain paragraph text",         icon: Type,          iconColor: "text-neutral-400",  category: "Basic" },
-  { type: "heading1",     label: "Heading 1",     description: "Large section heading",         icon: Heading1,      iconColor: "text-purple-400",   category: "Basic" },
-  { type: "heading2",     label: "Heading 2",     description: "Medium section heading",        icon: Heading2,      iconColor: "text-purple-400",   category: "Basic" },
-  { type: "heading3",     label: "Heading 3",     description: "Small section heading",         icon: Heading3,      iconColor: "text-purple-400",   category: "Basic" },
-  { type: "bullet",       label: "Bulleted list", description: "Simple bulleted list",          icon: List,          iconColor: "text-amber-400",    category: "Basic" },
-  { type: "numbered",     label: "Numbered list", description: "Numbered list",                 icon: ListOrdered,   iconColor: "text-amber-400",    category: "Basic" },
-  { type: "todo",         label: "To-do",         description: "Track tasks with a checkbox",   icon: CheckSquare,   iconColor: "text-blue-400",     category: "Basic" },
-  { type: "quote",        label: "Quote",         description: "Capture a quote",               icon: Quote,         iconColor: "text-emerald-400",  category: "Basic" },
-  { type: "callout",      label: "Callout",       description: "Highlighted callout box",       icon: MessageSquare, iconColor: "text-rose-400",     category: "Basic" },
-  { type: "divider",      label: "Divider",       description: "Visual horizontal line",        icon: Minus,         iconColor: "text-neutral-400",  category: "Basic" },
-  { type: "toggle",       label: "Toggle",        description: "Collapsible section",           icon: ChevronRight,  iconColor: "text-neutral-400",  category: "Basic" },
-  { type: "page",         label: "Page",          description: "Embed a sub-page link",         icon: FileText,      iconColor: "text-neutral-400",  category: "Basic" },
-  { type: "code",         label: "Code",          description: "Code snippet with copy",        icon: Code,          iconColor: "text-emerald-400",  category: "Media" },
-  { type: "image",        label: "Image",         description: "Upload or embed an image",      icon: ImageIcon,     iconColor: "text-indigo-400",   category: "Media" },
-  { type: "video",        label: "Video",         description: "Embed YouTube, Vimeo...",       icon: Video,         iconColor: "text-red-400",      category: "Media" },
-  { type: "audio",        label: "Audio",         description: "Audio recording or file",       icon: Volume2,       iconColor: "text-purple-400",   category: "Media" },
-  { type: "file",         label: "File",          description: "Upload a file",                 icon: Paperclip,     iconColor: "text-neutral-400",  category: "Media" },
-  { type: "web_bookmark", label: "Web bookmark",  description: "Save a visual web link",        icon: Bookmark,      iconColor: "text-orange-400",   category: "Media" },
-  { type: "table",        label: "Table",         description: "Simple table",                  icon: Table,         iconColor: "text-cyan-400",     category: "Media" },
-  { type: "kanban",       label: "Board view",    description: "Kanban board for task tracking",icon: Table,         iconColor: "text-blue-500",     category: "Media" },
-  { type: "link_to_page", label: "Link to page",  description: "Link to an existing page",      icon: Link,          iconColor: "text-blue-400",     category: "Media" },
+  { type: "paragraph",    label: "AI Summary",    description: "Summarize this page with Notion AI", icon: Sparkles,  iconColor: "text-purple-500", category: "AI", action: "ai_summary", aliases: ["summary", "summery", "summarize", "ai", "sum", "tldr"] },
+  { type: "paragraph",    label: "Text",          description: "Plain paragraph text",         icon: Type,          iconColor: "text-neutral-400",  category: "Basic", aliases: ["p", "paragraph", "plain"] },
+  { type: "heading1",     label: "Heading 1",     description: "Large section heading",         icon: Heading1,      iconColor: "text-purple-400",   category: "Basic", aliases: ["h1", "title", "heading"] },
+  { type: "heading2",     label: "Heading 2",     description: "Medium section heading",        icon: Heading2,      iconColor: "text-purple-400",   category: "Basic", aliases: ["h2", "subtitle", "heading"] },
+  { type: "heading3",     label: "Heading 3",     description: "Small section heading",         icon: Heading3,      iconColor: "text-purple-400",   category: "Basic", aliases: ["h3", "heading"] },
+  { type: "bullet",       label: "Bulleted list", description: "Simple bulleted list",          icon: List,          iconColor: "text-amber-400",    category: "Basic", aliases: ["ul", "list", "bullet"] },
+  { type: "numbered",     label: "Numbered list", description: "Numbered list",                 icon: ListOrdered,   iconColor: "text-amber-400",    category: "Basic", aliases: ["ol", "num", "number"] },
+  { type: "todo",         label: "To-do",         description: "Track tasks with a checkbox",   icon: CheckSquare,   iconColor: "text-blue-400",     category: "Basic", aliases: ["check", "task", "checkbox", "todo"] },
+  { type: "quote",        label: "Quote",         description: "Capture a quote",               icon: Quote,         iconColor: "text-emerald-400",  category: "Basic", aliases: ["blockquote", "quote"] },
+  { type: "callout",      label: "Callout",       description: "Highlighted callout box",       icon: MessageSquare, iconColor: "text-rose-400",     category: "Basic", aliases: ["note", "alert", "tip", "warning", "info"] },
+  { type: "divider",      label: "Divider",       description: "Visual horizontal line",        icon: Minus,         iconColor: "text-neutral-400",  category: "Basic", aliases: ["hr", "line", "separator"] },
+  { type: "toggle",       label: "Toggle",        description: "Collapsible section",           icon: ChevronRight,  iconColor: "text-neutral-400",  category: "Basic", aliases: ["accordion", "details"] },
+  { type: "page",         label: "Page",          description: "Embed a sub-page link",         icon: FileText,      iconColor: "text-neutral-400",  category: "Basic", aliases: ["subpage", "doc"] },
+  { type: "code",         label: "Code",          description: "Code snippet with copy",        icon: Code,          iconColor: "text-emerald-400",  category: "Media", aliases: ["js", "ts", "py", "snippet", "script"] },
+  { type: "image",        label: "Image",         description: "Upload or embed an image",      icon: ImageIcon,     iconColor: "text-indigo-400",   category: "Media", aliases: ["img", "photo", "picture"] },
+  { type: "video",        label: "Video",         description: "Embed YouTube, Vimeo...",       icon: Video,         iconColor: "text-red-400",      category: "Media", aliases: ["youtube", "mp4"] },
+  { type: "audio",        label: "Audio",         description: "Audio recording or file",       icon: Volume2,       iconColor: "text-purple-400",   category: "Media", aliases: ["mp3", "voice", "sound"] },
+  { type: "file",         label: "File",          description: "Upload a file",                 icon: Paperclip,     iconColor: "text-neutral-400",  category: "Media", aliases: ["attachment", "pdf"] },
+  { type: "web_bookmark", label: "Web bookmark",  description: "Save a visual web link",        icon: Bookmark,      iconColor: "text-orange-400",   category: "Media", aliases: ["link", "url"] },
+  { type: "table",        label: "Table",         description: "Simple table",                  icon: Table,         iconColor: "text-cyan-400",     category: "Media", aliases: ["grid", "sheet"] },
+  { type: "kanban",       label: "Board view",    description: "Kanban board for task tracking",icon: Table,         iconColor: "text-blue-500",     category: "Media", aliases: ["board", "cards"] },
+  { type: "link_to_page", label: "Link to page",  description: "Link to an existing page",      icon: Link,          iconColor: "text-blue-400",     category: "Media", aliases: ["reference"] },
 ];
 
 function makeBlock(type: BlockType = "paragraph", text = ""): ChecklistItem {
@@ -975,10 +976,15 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   }, []);
 
   const slashFiltered = slash.query
-    ? SLASH_ITEMS.filter(s =>
-        s.label.toLowerCase().includes(slash.query.toLowerCase()) ||
-        s.description.toLowerCase().includes(slash.query.toLowerCase())
-      )
+    ? SLASH_ITEMS.filter((s) => {
+        const q = slash.query.toLowerCase().trim();
+        return (
+          s.label.toLowerCase().includes(q) ||
+          s.description.toLowerCase().includes(q) ||
+          s.type.toLowerCase().includes(q) ||
+          (s.aliases && s.aliases.some((a) => a.toLowerCase().includes(q)))
+        );
+      })
     : SLASH_ITEMS;
 
   const applySlash = useCallback((itemOrType: BlockType | SlashMenuItem) => {
@@ -992,6 +998,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
 
     if (targetItem?.action === "ai_summary") {
       setItems((prev) => prev.map((b) => (b.id === bid ? { ...b, text: "" } : b)));
+      window.dispatchEvent(new CustomEvent("open-ai-summary"));
       window.dispatchEvent(
         new CustomEvent("trigger-ai-command", { detail: { prompt: "/summary" } })
       );

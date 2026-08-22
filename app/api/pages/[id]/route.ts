@@ -22,6 +22,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
 
+    const cacheKey = `page:doc:${id}:${session.user.email}`;
+    const cachedPage = serverCache.get(cacheKey);
+    if (cachedPage) {
+      return NextResponse.json({ page: cachedPage });
+    }
+
     await connectToDatabase();
 
     const page = await Page.findOne({
@@ -33,6 +39,8 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     if (!page) {
       return NextResponse.json({ error: "Page not found" }, { status: 404 });
     }
+
+    serverCache.set(cacheKey, page, 120); // 2 minutes TTL
 
     return NextResponse.json({ page });
   } catch (error) {
@@ -161,7 +169,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }).catch(() => null);
     }
 
-    // Invalidate cached workspace pages and AI responses
+    // Invalidate cached document, list, and AI responses
+    serverCache.invalidate(`page:doc:${id}:${session.user.email}`);
+    serverCache.invalidate(`pages:list:${session.user.email}`);
+    serverCache.invalidate(`pages:trash:${session.user.email}`);
     serverCache.invalidatePrefix(`pages:workspace:${session.user.email}`);
     serverCache.invalidatePrefix(`ai:res:${session.user.email}`);
 
@@ -222,7 +233,12 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       }).catch(() => null);
     }
 
-    // Invalidate cached workspace pages and AI responses
+    // Invalidate cached documents, list, and AI responses
+    for (const tid of targetIds) {
+      serverCache.invalidate(`page:doc:${tid}:${session.user.email}`);
+    }
+    serverCache.invalidate(`pages:list:${session.user.email}`);
+    serverCache.invalidate(`pages:trash:${session.user.email}`);
     serverCache.invalidatePrefix(`pages:workspace:${session.user.email}`);
     serverCache.invalidatePrefix(`ai:res:${session.user.email}`);
 

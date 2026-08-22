@@ -101,7 +101,7 @@ const AI_SLASH_COMMANDS: SlashCmdItem[] = [
 function renderInlineMarkdown(text: string): React.ReactNode {
   if (!text) return text;
   const parts: React.ReactNode[] = [];
-  const regex = /(\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
+  const regex = /(\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)|\*\*[^*]+\*\*|`[^`]+`|\*[^*]+\*)/g;
   let lastIdx = 0;
   let match: RegExpExecArray | null;
 
@@ -110,7 +110,19 @@ function renderInlineMarkdown(text: string): React.ReactNode {
       parts.push(text.substring(lastIdx, match.index));
     }
     const token = match[0];
-    if (token.startsWith("**") && token.endsWith("**")) {
+    if (token.startsWith("[") && match[2] && match[3]) {
+      parts.push(
+        <a
+          key={match.index}
+          href={match[3]}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-primary underline hover:text-primary/80 transition font-medium"
+        >
+          {match[2]}
+        </a>
+      );
+    } else if (token.startsWith("**") && token.endsWith("**")) {
       parts.push(
         <strong key={match.index} className="font-semibold text-foreground">
           {token.slice(2, -2)}
@@ -426,6 +438,8 @@ export function NotionAiPanel({
             query.startsWith("/summ") ||
             query.startsWith("/sume") ||
             query.startsWith("/summar") ||
+            query.startsWith("/summery") ||
+            query.startsWith("/summary") ||
             labelName.includes(query.slice(1)) ||
             descName.includes(query.slice(1))
           );
@@ -444,13 +458,18 @@ export function NotionAiPanel({
       clean === "/summary" ||
       clean === "/summery" ||
       clean === "/summarize" ||
+      clean === "/sum" ||
+      clean === "/tldr" ||
       clean.startsWith("/summary ") ||
       clean.startsWith("/summery ") ||
       clean.startsWith("/summarize ") ||
+      clean.startsWith("/sum ") ||
       clean === "summarize" ||
       clean === "summarize this page" ||
       clean === "summarize page" ||
-      clean === "summary"
+      clean === "summary" ||
+      clean === "summery" ||
+      clean === "tldr"
     );
   };
 
