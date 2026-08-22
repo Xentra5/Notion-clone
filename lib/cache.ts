@@ -90,6 +90,10 @@ export class MemoryCache {
       return false;
     }
 
+    // Bump LRU order — consistent with get() behaviour
+    this.store.delete(key);
+    this.store.set(key, entry);
+
     return true;
   }
 
@@ -203,20 +207,21 @@ export function hashQuery(input: string): string {
   return crypto.createHash("sha256").update(input.trim().toLowerCase()).digest("hex").slice(0, 16);
 }
 
-// Global cache instance to survive Next.js dev server hot module reloading
+// Global cache instance — survives Next.js HMR in dev AND process reuse in
+// serverless production (Vercel Lambda warm starts reuse the same Node process,
+// so the global persists across requests on the same instance).
 declare global {
   // eslint-disable-next-line no-var
   var __appServerCache: MemoryCache | undefined;
 }
 
-export const serverCache =
-  global.__appServerCache ||
-  new MemoryCache({
+if (!global.__appServerCache) {
+  global.__appServerCache = new MemoryCache({
     maxEntries: 3000,
     defaultTtlSeconds: 60,
     cleanupIntervalSeconds: 60,
   });
-
-if (process.env.NODE_ENV !== "production") {
-  global.__appServerCache = serverCache;
 }
+
+// Always export the global singleton — both dev and production
+export const serverCache = global.__appServerCache;
