@@ -561,6 +561,15 @@ export function Sidebar({
             <span className="font-semibold text-foreground truncate">
               {userName}&apos;s Notion
             </span>
+            {session?.user?.plan === "pro" ? (
+              <span className="text-[9px] font-extrabold bg-purple-600 dark:bg-purple-600 text-white px-1.5 py-0.5 rounded-full shrink-0 uppercase tracking-wide scale-90 shadow-sm border border-purple-500">
+                Pro
+              </span>
+            ) : (
+              <span className="text-[9px] font-extrabold bg-neutral-200 dark:bg-[#2e2e2e] text-neutral-600 dark:text-neutral-400 px-1.5 py-0.5 rounded-full shrink-0 uppercase tracking-wide scale-90 border border-neutral-300 dark:border-neutral-700">
+                Free
+              </span>
+            )}
           </div>
           <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground shrink-0 transition" />
         </button>
@@ -569,7 +578,16 @@ export function Sidebar({
         {showWorkspaceMenu && (
           <div className="absolute left-2 right-2 top-full mt-1 bg-popover border border-border rounded-xl shadow-2xl p-2 z-50 animate-in fade-in duration-100 text-popover-foreground">
             <div className="px-2.5 py-2 border-b border-border mb-1">
-              <p className="font-bold text-foreground truncate">{session?.user?.name || "User"}</p>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="font-bold text-foreground truncate">{session?.user?.name || "User"}</p>
+                <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded-full uppercase tracking-wider ${
+                  session?.user?.plan === "pro"
+                    ? "bg-purple-100 dark:bg-purple-950/80 border border-purple-200 dark:border-purple-800 text-purple-700 dark:text-purple-300 animate-pulse"
+                    : "bg-neutral-100 dark:bg-neutral-800 border border-neutral-200 dark:border-neutral-700 text-neutral-600 dark:text-neutral-400"
+                }`}>
+                  {session?.user?.plan === "pro" ? "Pro" : "Free"}
+                </span>
+              </div>
               <p className="text-[11px] text-muted-foreground truncate">{session?.user?.email || "user@notion.so"}</p>
             </div>
             <button
