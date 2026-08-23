@@ -1,10 +1,11 @@
 /**
  * lib/actions/pages.ts
  *
- * Client-side fetch wrappers for the /api/pages endpoints.
- * Components import these helpers instead of inlining fetch() calls,
- * so the API contract is defined in one place.
+ * Client-side fetch wrappers with Local-First IndexedDB persistence,
+ * 0ms instant Stale-While-Revalidate (SWR), Multi-tab sync, and Optimistic mutations.
  */
+
+import { localStore } from "@/lib/storage/local-store";
 
 export interface PageBlock {
   id: string;
@@ -44,14 +45,14 @@ export interface Page {
   deletedAt?: string;
 }
 
-// In-flight request deduplication & dual-layer client caches
+// In-flight request deduplication
 let inFlightPagesPromise: Promise<Page[]> | null = null;
 const inFlightPageMap = new Map<string, Promise<Page>>();
 let cachedPagesList: { data: Page[]; timestamp: number } | null = null;
 const pageDocCache = new Map<string, { data: Page; timestamp: number }>();
 
-const LIST_CACHE_TTL_MS = 30_000; // 30s for sidebar pages list
-const DOC_CACHE_TTL_MS = 60_000;  // 60s for individual document bodies
+const LIST_CACHE_TTL_MS = 30_000; // 30s for memory list cache
+const DOC_CACHE_TTL_MS = 60_000;  // 60s for memory doc cache
 
 export function invalidatePagesCache(pageId?: string) {
   inFlightPagesPromise = null;
@@ -59,26 +60,44 @@ export function invalidatePagesCache(pageId?: string) {
   inFlightPageMap.clear();
   if (pageId) {
     pageDocCache.delete(pageId);
+    void localStore.removePageLocal(pageId);
   } else {
     pageDocCache.clear();
   }
 }
 
-// GET /api/pages — list all pages for the logged-in user with request deduplication
+// GET /api/pages — list all pages with 0ms Local-First read & background SWR
 export async function getPages(forceRefresh = false): Promise<Page[]> {
   const now = Date.now();
+
+  // 1. Fast Memory Cache
   if (!forceRefresh && cachedPagesList && now - cachedPagesList.timestamp < LIST_CACHE_TTL_MS) {
     return cachedPagesList.data;
   }
 
+  // 2. Fast IndexedDB Persistence Cache (0ms instant render)
+  if (!forceRefresh) {
+    const localPages = await localStore.getPagesListLocal();
+    if (localPages && localPages.length > 0) {
+      cachedPagesList = { data: localPages, timestamp: now };
+      // Background revalidation
+      void revalidatePagesList();
+      return localPages;
+    }
+  }
+
+  // 3. Deduplicated Network Request
   if (inFlightPagesPromise) {
     return inFlightPagesPromise;
   }
 
+  return revalidatePagesList();
+}
+
+async function revalidatePagesList(): Promise<Page[]> {
   inFlightPagesPromise = (async () => {
     try {
       const res = await fetch("/api/pages", { cache: "no-store" });
-      // 401 = session not yet established or expired — return empty silently.
       if (res.status === 401) return [];
       if (!res.ok) {
         console.warn(`Failed to fetch pages: HTTP ${res.status}`);
@@ -87,6 +106,9 @@ export async function getPages(forceRefresh = false): Promise<Page[]> {
       const data = await res.json();
       const pages = (data.pages || []) as Page[];
       cachedPagesList = { data: pages, timestamp: Date.now() };
+      
+      // Update IndexedDB persistent store asynchronously
+      void localStore.setPagesListLocal(pages);
       return pages;
     } catch (err) {
       console.warn("Failed to fetch pages (network/server error):", err);
@@ -99,23 +121,38 @@ export async function getPages(forceRefresh = false): Promise<Page[]> {
   return inFlightPagesPromise;
 }
 
-// GET /api/pages/[id] — fetch a single page with in-memory 0ms cache & deduplication
+// GET /api/pages/[id] — 0ms Local-First document read with SWR
 export async function getPage(id: string, forceRefresh = false): Promise<Page> {
   if (!id) throw new Error("Page ID is required");
 
   const now = Date.now();
   const cached = pageDocCache.get(id);
 
-  // 1. Instant Client-Side Cache Hit (0ms)
+  // 1. Instant In-Memory Cache Hit (0ms)
   if (!forceRefresh && cached && now - cached.timestamp < DOC_CACHE_TTL_MS) {
     return cached.data;
   }
 
-  // 2. Request deduplication for simultaneous calls
+  // 2. Instant IndexedDB Local Persistence Hit (0ms)
+  if (!forceRefresh) {
+    const localDoc = await localStore.getPageLocal(id);
+    if (localDoc) {
+      pageDocCache.set(id, { data: localDoc, timestamp: now });
+      // Asynchronously revalidate in background without blocking UI
+      void revalidatePage(id);
+      return localDoc;
+    }
+  }
+
+  // 3. Deduplicated Network Fetch
   if (inFlightPageMap.has(id)) {
     return inFlightPageMap.get(id)!;
   }
 
+  return revalidatePage(id);
+}
+
+async function revalidatePage(id: string): Promise<Page> {
   const promise = (async () => {
     try {
       const res = await fetch(`/api/pages/${id}`, { cache: "no-store" });
@@ -123,7 +160,10 @@ export async function getPage(id: string, forceRefresh = false): Promise<Page> {
       if (!res.ok) throw new Error(`Failed to fetch page ${id} (${res.status})`);
       const data = await res.json();
       const page = data.page as Page;
+      
+      // Persist in Memory and IndexedDB
       pageDocCache.set(id, { data: page, timestamp: Date.now() });
+      void localStore.setPageLocal(page);
       return page;
     } finally {
       inFlightPageMap.delete(id);
@@ -134,7 +174,7 @@ export async function getPage(id: string, forceRefresh = false): Promise<Page> {
   return promise;
 }
 
-// POST /api/pages — create a new page and return it (with _id)
+// POST /api/pages — create a new page and return it
 export async function createPage(data?: {
   title?: string;
   icon?: string;
@@ -158,42 +198,88 @@ export async function createPage(data?: {
   }
   const result = await res.json();
   const page = result.page as Page;
+
+  // Persist locally across memory and IndexedDB
   pageDocCache.set(page._id, { data: page, timestamp: Date.now() });
-  cachedPagesList = null; // Invalidate list cache so sidebar updates
+  void localStore.setPageLocal(page);
+  cachedPagesList = null;
+
   return page;
 }
 
-// PATCH /api/pages/[id] — update one or more fields on an existing page
+// PATCH /api/pages/[id] — optimistic local update + write-through network sync
 export async function updatePage(
   id: string,
   data: Partial<Pick<Page, "title" | "blocks" | "category" | "icon" | "coverImage" | "isStarred" | "permission">> & {
     parentPageId?: string;
   }
 ): Promise<Page> {
-  const res = await fetch(`/api/pages/${id}`, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(data),
-  });
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({} as { detail?: string; error?: string }));
-    throw new Error(errorData.detail || errorData.error || `Failed to update page ${id}`);
+  // 1. Optimistically apply change to local cache immediately
+  const existing = pageDocCache.get(id)?.data || (await localStore.getPageLocal(id));
+  if (existing) {
+    const optimisticPage: Page = {
+      ...existing,
+      ...data,
+      updatedAt: new Date().toISOString(),
+    };
+    pageDocCache.set(id, { data: optimisticPage, timestamp: Date.now() });
+    void localStore.setPageLocal(optimisticPage);
   }
-  const result = await res.json();
-  const updatedPage = result.page as Page;
-  
-  // Write-through update: immediately update client cache
-  pageDocCache.set(id, { data: updatedPage, timestamp: Date.now() });
-  cachedPagesList = null; // Invalidate sidebar list
-  
-  return updatedPage;
+
+  // 2. Dispatch network update with background retry queue fallback
+  try {
+    const res = await fetch(`/api/pages/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+
+    if (!res.ok) {
+      const errorData = await res.json().catch(() => ({} as { detail?: string; error?: string }));
+      throw new Error(errorData.detail || errorData.error || `Failed to update page ${id}`);
+    }
+
+    const result = await res.json();
+    const updatedPage = result.page as Page;
+
+    // Write-through update
+    pageDocCache.set(id, { data: updatedPage, timestamp: Date.now() });
+    void localStore.setPageLocal(updatedPage);
+    cachedPagesList = null;
+
+    return updatedPage;
+  } catch (err) {
+    console.warn("Network update failed, enqueued for background sync:", err);
+    // Queue mutation for offline/background execution
+    void localStore.enqueueMutation({
+      type: "update",
+      pageId: id,
+      payload: data,
+    });
+
+    // Return optimistic page so user experience remains uninterrupted
+    if (existing) {
+      return { ...existing, ...data, updatedAt: new Date().toISOString() };
+    }
+    throw err;
+  }
 }
 
-// DELETE /api/pages/[id] — permanently delete a page
+// DELETE /api/pages/[id] — optimistic delete
 export async function deletePage(id: string): Promise<void> {
-  const res = await fetch(`/api/pages/${id}`, { method: "DELETE" });
-  if (!res.ok) throw new Error(`Failed to delete page ${id}`);
+  // Optimistically remove locally
   invalidatePagesCache(id);
+
+  try {
+    const res = await fetch(`/api/pages/${id}`, { method: "DELETE" });
+    if (!res.ok) throw new Error(`Failed to delete page ${id}`);
+  } catch (err) {
+    console.warn("Network delete failed, enqueued for background sync:", err);
+    void localStore.enqueueMutation({
+      type: "delete",
+      pageId: id,
+    });
+  }
 }
 
 export async function getTrashPages(): Promise<Page[]> {
@@ -213,4 +299,3 @@ export async function permanentlyDeletePage(id: string): Promise<void> {
   if (!res.ok) throw new Error("Failed to permanently delete page");
   invalidatePagesCache(id);
 }
-

@@ -8,6 +8,7 @@ import { PricingModal } from "./pricing-modal";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RenameModal } from "@/components/ui/rename-modal";
 import { getPages, createPage, updatePage, deletePage, type Page, type PageBlock } from "@/lib/actions/pages";
+import { localStore } from "@/lib/storage/local-store";
 import {
   Home,
   Search,
@@ -364,8 +365,22 @@ export function Sidebar({
     const refreshPagesImmediate = () => { void loadPages(); };
     window.addEventListener("page-updated", refreshPagesDebounced);
     window.addEventListener("page-created", refreshPagesImmediate);
+    // Subscribe to local store for multi-tab sync.
+    // Only react to structural events that change the sidebar tree —
+    // NOT page_updated (autosave), which would cause excess GET /api/pages
+    // calls every time the user types a character in the editor.
+    const STRUCTURAL_EVENTS = new Set(["page_created", "page_deleted", "pages_list_updated"]);
+    const unsubscribeLocal = localStore.subscribe((evt) => {
+      if (STRUCTURAL_EVENTS.has(evt.type)) {
+        evt.type === "page_created"
+          ? void loadPages()          // Immediate: user expects to see the new page right away
+          : refreshPagesDebounced(); // Debounced: list refresh is sufficient for deletions & bulk updates
+      }
+    });
+
     return () => {
       if (debounceTimer) clearTimeout(debounceTimer);
+      unsubscribeLocal();
       window.removeEventListener("page-updated", refreshPagesDebounced);
       window.removeEventListener("page-created", refreshPagesImmediate);
     };

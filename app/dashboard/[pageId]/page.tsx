@@ -5,6 +5,7 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import { DocumentCanvas } from "@/components/dashboard/document-canvas";
 import { getPage, getPages, createPage, updatePage, type Page, type PageBlock } from "@/lib/actions/pages";
+import { localStore } from "@/lib/storage/local-store";
 import type { ChecklistItem } from "@/hooks/use-pages";
 
 interface PageRouteProps {
@@ -89,8 +90,16 @@ export default function PageRoute({ params }: PageRouteProps) {
     window.addEventListener("page-created", handleRefresh);
     window.addEventListener("page-deleted", handleRefresh);
 
+    // Subscribe to local store for multi-tab updates
+    const unsubscribe = localStore.subscribe((evt) => {
+      if (evt.pageId === pageId && evt.data && !cancelled) {
+        setPage(evt.data as Page);
+      }
+    });
+
     return () => {
       cancelled = true;
+      unsubscribe();
       window.removeEventListener("page-created", handleRefresh);
       window.removeEventListener("page-deleted", handleRefresh);
     };
