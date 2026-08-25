@@ -34,7 +34,7 @@ class LocalStoreEngine {
   private memoryMeta = new Map<string, unknown>();
   private isOnline = typeof navigator !== "undefined" ? navigator.onLine : true;
   private isSyncing = false;
-  private listeners = new Set<(event: { type: string; pageId?: string; data?: unknown }) => void>();
+  private listeners = new Set<(event: { type: string; pageId?: string; data?: unknown; fromSameTab?: boolean }) => void>();
 
   constructor() {
     if (typeof window !== "undefined") {
@@ -126,14 +126,14 @@ class LocalStoreEngine {
     });
   }
 
-  public subscribe(callback: (event: { type: string; pageId?: string; data?: unknown }) => void) {
+  public subscribe(callback: (event: { type: string; pageId?: string; data?: unknown; fromSameTab?: boolean }) => void) {
     this.listeners.add(callback);
     return () => {
       this.listeners.delete(callback);
     };
   }
 
-  private notifyListeners(event: { type: string; pageId?: string; data?: unknown }) {
+  private notifyListeners(event: { type: string; pageId?: string; data?: unknown; fromSameTab?: boolean }) {
     this.listeners.forEach((cb) => {
       try {
         cb(event);
@@ -144,9 +144,12 @@ class LocalStoreEngine {
   }
 
   private broadcast(event: { type: string; pageId?: string; data?: unknown }) {
-    this.notifyListeners(event);
+    // Mark as same-tab so subscribers in this tab can distinguish editor autosave
+    // writes from genuine cross-tab updates and avoid feedback loops.
+    this.notifyListeners({ ...event, fromSameTab: true });
     if (this.channel) {
       try {
+        // Cross-tab message does NOT include fromSameTab — receiving tabs will see it as undefined/false
         this.channel.postMessage(event);
       } catch (err) {
         console.warn("BroadcastChannel error:", err);

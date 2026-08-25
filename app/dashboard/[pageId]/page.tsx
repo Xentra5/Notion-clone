@@ -90,9 +90,14 @@ export default function PageRoute({ params }: PageRouteProps) {
     window.addEventListener("page-created", handleRefresh);
     window.addEventListener("page-deleted", handleRefresh);
 
-    // Subscribe to local store for multi-tab updates
+    // Subscribe to local store for cross-tab updates ONLY.
+    // We MUST NOT react to same-tab `page_updated` events (fromSameTab: true)
+    // because those are fired by the editor's own autosave and the AI insert logic.
+    // Reacting to them would cause: AI inserts blocks → optimistic write → setPage()
+    // → initialBlocks recomputes → editor re-renders with stale DB data → inserted
+    // blocks disappear visually.
     const unsubscribe = localStore.subscribe((evt) => {
-      if (evt.pageId === pageId && evt.data && !cancelled) {
+      if (evt.pageId === pageId && evt.data && !cancelled && !evt.fromSameTab) {
         setPage(evt.data as Page);
       }
     });
