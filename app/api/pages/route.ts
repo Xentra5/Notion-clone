@@ -3,6 +3,7 @@ import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import Page, { removeLegacyTitleIndex, resolveAncestors } from "@/lib/models/page";
 import { serverCache } from "@/lib/cache";
+import { ragQueue } from "@/lib/rag-queue";
 
 // GET /api/pages — fetch all pages for the logged-in user
 export async function GET(request: NextRequest) {
@@ -99,23 +100,17 @@ export async function POST(request: NextRequest) {
       blocks: pageBlocks,
     });
 
-    // Background sync to RAG microservice
-    const ragServiceUrl = process.env.RAG_SERVICE_URL || "http://localhost:8000";
-    void fetch(`${ragServiceUrl}/index-page`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId: session.user.email,
-        pageId: page._id.toString(),
-        title: page.title,
-        blocks: pageBlocks.map((b: { id: string; type: string; properties?: { text?: string } }) => ({
-          id: b.id,
-          type: b.type,
-          text: b.properties?.text || "",
-        })),
-      }),
-      signal: AbortSignal.timeout(3000),
-    }).catch(() => null);
+    // Asynchronous, resilient background indexing to RAG microservice
+    ragQueue.enqueueIndex({
+      workspaceId: session.user.email,
+      pageId: page._id.toString(),
+      title: page.title,
+      blocks: pageBlocks.map((b: { id: string; type: string; properties?: { text?: string } }) => ({
+        id: b.id,
+        type: b.type,
+        text: b.properties?.text || "",
+      })),
+    });
 
     // Invalidate cached workspace pages and AI responses
     serverCache.invalidate(`pages:list:${session.user.email}`);
