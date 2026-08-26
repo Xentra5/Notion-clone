@@ -40,6 +40,16 @@ const PageSchema = new Schema(
       default: "Private",
     },
     parentPageId: { type: String, default: null, index: true },
+    /**
+     * Materialized Path: ordered list of ancestor page IDs from root → direct parent.
+     * e.g. root page  → ancestors: []
+     *      child page → ancestors: ["rootId"]
+     *      grandchild → ancestors: ["rootId", "childId"]
+     *
+     * Enables O(1) subtree queries: Page.find({ ancestors: pageId })
+     * instead of N+1 recursive MongoDB round-trips.
+     */
+    ancestors: { type: [String], default: [] },
     isAiMeetingNote: { type: Boolean, default: false },
     isStarred: { type: Boolean, default: false },
     permission: {
@@ -57,11 +67,27 @@ const PageSchema = new Schema(
 // Performance Indexes
 PageSchema.index({ userId: 1, deletedAt: 1, updatedAt: -1 });
 PageSchema.index({ parentPageId: 1, userId: 1, deletedAt: 1 });
+// Materialized path index — powers O(1) subtree queries
+PageSchema.index({ ancestors: 1, userId: 1 });
 PageSchema.index({ title: "text", "blocks.properties.text": "text" });
 
 const Page = mongoose.models.Page || mongoose.model("Page", PageSchema);
 
 export default Page;
+
+/**
+ * Resolve the full ancestor chain (root → parent) for a given parentPageId.
+ * Returns an empty array if parentPageId is null.
+ *
+ * Uses the stored `ancestors` field on the parent to reconstruct the path in
+ * a single DB read — O(1) instead of an N-deep recursive walk.
+ */
+export async function resolveAncestors(parentPageId: string | null): Promise<string[]> {
+  if (!parentPageId) return [];
+  const parent = await Page.findById(parentPageId).select("ancestors").lean() as { ancestors?: string[] } | null;
+  if (!parent) return [];
+  return [...(parent.ancestors ?? []), parentPageId];
+}
 
 let legacyTitleIndexMigration: Promise<void> | null = null;
 

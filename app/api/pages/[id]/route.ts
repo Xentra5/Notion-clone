@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
-import Page from "@/lib/models/page";
+import Page, { resolveAncestors } from "@/lib/models/page";
 import { serverCache } from "@/lib/cache";
 
 interface RouteParams {
@@ -139,6 +139,37 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       }
     }
 
+    // If the parent is being changed, recompute ancestors for this page and
+    // cascade the update to every descendant in a single bulkWrite.
+    if ($set.parentPageId !== undefined) {
+      const newParentId = $set.parentPageId as string | null;
+      const newAncestors = await resolveAncestors(newParentId);
+      $set.ancestors = newAncestors;
+
+      // Cascade: update all descendants so their ancestor paths stay correct.
+      // Fetch every descendant (now using the indexed ancestors field — O(1)).
+      const descendants = await Page.find({ ancestors: id, userId: session.user.email })
+        .select("_id ancestors parentPageId")
+        .lean() as { _id: mongoose.Types.ObjectId; ancestors: string[]; parentPageId?: string | null }[];
+
+      if (descendants.length > 0) {
+        // For each descendant, splice out the old prefix and prepend the new one.
+        // Old prefix = everything before (and including) `id` in that descendant's ancestors.
+        const ops = descendants.map((d) => {
+          const cutAt = d.ancestors.indexOf(id);
+          // suffix = path from id's child down to d's direct parent
+          const suffix = cutAt >= 0 ? d.ancestors.slice(cutAt + 1) : [];
+          return {
+            updateOne: {
+              filter: { _id: d._id },
+              update: { $set: { ancestors: [...newAncestors, id, ...suffix] } },
+            },
+          };
+        });
+        await Page.bulkWrite(ops);
+      }
+    }
+
     const page = await Page.findOneAndUpdate(
       { _id: id, userId: session.user.email, $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }] },
       { $set },
@@ -183,14 +214,16 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-async function getDescendantPageIds(parentId: string, userId: string): Promise<string[]> {
-  const children = await Page.find({ parentPageId: parentId, userId }).select("_id").lean();
-  let ids: string[] = children.map((c) => (c._id as mongoose.Types.ObjectId).toString());
-  for (const childId of ids) {
-    const subChildren = await getDescendantPageIds(childId, userId);
-    ids = ids.concat(subChildren);
-  }
-  return ids;
+/**
+ * Fetch all descendant page IDs using the materialized `ancestors` index.
+ * This is a single O(1) indexed MongoDB query, replacing the old N+1
+ * recursive round-trip approach.
+ */
+async function getDescendantPageIds(pageId: string, userId: string): Promise<string[]> {
+  const descendants = await Page.find({ ancestors: pageId, userId })
+    .select("_id")
+    .lean() as { _id: mongoose.Types.ObjectId }[];
+  return descendants.map((d) => d._id.toString());
 }
 
 // DELETE /api/pages/[id] — move a page and all its sub-tree child pages to Trash, or permanently delete them.

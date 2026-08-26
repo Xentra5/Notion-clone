@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
-import Page, { removeLegacyTitleIndex } from "@/lib/models/page";
+import Page, { removeLegacyTitleIndex, resolveAncestors } from "@/lib/models/page";
 import { serverCache } from "@/lib/cache";
 
 // GET /api/pages — fetch all pages for the logged-in user
@@ -85,12 +85,16 @@ export async function POST(request: NextRequest) {
     await connectToDatabase();
     await removeLegacyTitleIndex();
 
+    // Resolve materialized ancestor path in a single DB read
+    const ancestors = await resolveAncestors(parentId);
+
     const page = await Page.create({
       userId: session.user.email,
       title: pageTitle,
       icon: "📄",
       category: pageCategory,
       parentPageId: parentId,
+      ancestors,
       isAiMeetingNote: !!isAiMeetingNote,
       blocks: pageBlocks,
     });
