@@ -21,17 +21,17 @@ export function AuthButton() {
     const initial = displayName.charAt(0).toUpperCase();
 
     return (
-      <div className="flex items-center gap-2 sm:gap-3">
-        <Link href="/dashboard">
-          <Button className="h-9 rounded-lg bg-[#0078df] px-3.5 text-[14px] font-bold text-white hover:bg-[#0067c2]">
+      <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+        <Link href="/dashboard" className="shrink-0">
+          <Button className="h-8.5 sm:h-9 rounded-lg bg-[#0078df] px-3 sm:px-3.5 text-xs sm:text-[14px] font-bold text-white hover:bg-[#0067c2] shrink-0">
             Enter Workspace
           </Button>
         </Link>
-        <div className="hidden sm:flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-[#262626]">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0078df] text-[10px] font-bold text-white">
+        <div className="hidden 2xl:flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs font-semibold text-[#262626] shrink-0">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[#0078df] text-[10px] font-bold text-white shrink-0">
             {initial}
           </span>
-          <span className="max-w-28 truncate text-[13px] sm:max-w-36">
+          <span className="max-w-28 truncate text-[13px]">
             {displayName}
           </span>
         </div>
@@ -39,11 +39,11 @@ export function AuthButton() {
           type="button"
           variant="secondary"
           onClick={() => signOut({ callbackUrl: "/" })}
-          className="h-9 rounded-lg bg-neutral-100 px-3 text-[14px] font-semibold text-[#262626] hover:bg-neutral-200"
+          className="h-8.5 sm:h-9 rounded-lg bg-neutral-100 px-2.5 sm:px-3 text-xs sm:text-[14px] font-semibold text-[#262626] hover:bg-neutral-200 shrink-0"
           title="Sign out"
         >
-          <LogOut className="h-3.5 w-3.5 sm:hidden" />
-          <span className="hidden sm:inline">Sign out</span>
+          <LogOut className="h-4 w-4 xl:hidden" />
+          <span className="hidden xl:inline">Sign out</span>
         </Button>
       </div>
     );
@@ -52,7 +52,7 @@ export function AuthButton() {
   return (
     <Link
       href="/login"
-      className="text-[15px] font-semibold text-[#262626] transition hover:text-black"
+      className="whitespace-nowrap text-xs sm:text-[14px] lg:text-[15px] font-semibold text-[#262626] transition hover:text-black shrink-0"
     >
       Log in
     </Link>
