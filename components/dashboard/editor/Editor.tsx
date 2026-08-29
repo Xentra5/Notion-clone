@@ -6,6 +6,7 @@ import {
   useRef,
   useCallback,
   useLayoutEffect,
+  useMemo,
   memo,
 } from "react";
 import { MeetingNoteView } from "./MeetingNoteView";
@@ -157,6 +158,32 @@ interface BlockProps {
   onAddAfter?: (id: string) => void;
   onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
   registerRef: (id: string, el: HTMLElement | null) => void;
+}
+
+function areBlockPropsEqual(prev: BlockProps, next: BlockProps): boolean {
+  if (prev.isFocused !== next.isFocused) return false;
+  if (prev.seqNumber !== next.seqNumber) return false;
+  if (prev.onSelectSubPage !== next.onSelectSubPage) return false;
+
+  const p = prev.item;
+  const n = next.item;
+
+  if (p === n) return true;
+  if (p.id !== n.id) return false;
+  if (p.type !== n.type) return false;
+  if (p.text !== n.text) return false;
+  if (p.checked !== n.checked) return false;
+  if (p.codeLanguage !== n.codeLanguage) return false;
+  if (p.subPageId !== n.subPageId) return false;
+  if (p.url !== n.url) return false;
+  if (p.fileName !== n.fileName) return false;
+  if (p.fileSize !== n.fileSize) return false;
+  if (p.toggleChildren !== n.toggleChildren) return false;
+  if (p.calloutIcon !== n.calloutIcon) return false;
+  if (p.tableData !== n.tableData) return false;
+  if (p.kanbanColumns !== n.kanbanColumns) return false;
+
+  return true;
 }
 
 const Block = memo(function Block({
@@ -568,7 +595,7 @@ const Block = memo(function Block({
 
     </div>
   );
-});
+}, areBlockPropsEqual);
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
 export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, initialIcon, isAiMeetingNote, childPages, onSelectSubPage }: EditorProps) {
@@ -677,15 +704,18 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     return lines.join("\n").trim();
   }, [currentTitle, items]);
 
+  // Debounced active page context generation — avoids document-wide string loops on every keystroke
   useEffect(() => {
-    if (typeof window !== "undefined") {
+    if (typeof window === "undefined") return;
+    const timer = setTimeout(() => {
       (window as any).__ACTIVE_PAGE_CONTEXT__ = {
         pageId: pageId || "workspace-home",
         title: currentTitle || "Untitled",
         content: getPagePlainText(),
         updatedAt: Date.now(),
       };
-    }
+    }, 1000);
+    return () => clearTimeout(timer);
   }, [pageId, currentTitle, items, getPagePlainText]);
 
   useEffect(() => {
@@ -974,6 +1004,57 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   const updateUrl = useCallback((id: string, url: string) => {
     setItems(prev => prev.map(b => b.id === id ? { ...b, url } : b));
   }, []);
+
+  const handleAddAfter = useCallback((id: string) => {
+    const newBlock = makeBlock("paragraph");
+    setItems((p) => {
+      const idx = p.findIndex((b) => b.id === id);
+      const next = [...p];
+      next.splice(idx + 1, 0, newBlock);
+      return next;
+    });
+    setTimeout(() => focusBlock(newBlock.id), 0);
+  }, [focusBlock]);
+
+  const handleDeleteBlock = useCallback((id: string) => {
+    setItems((p) => {
+      if (p.length > 1) {
+        const idx = p.findIndex((b) => b.id === id);
+        const prev = p[idx - 1] ?? p[idx + 1];
+        if (prev) setTimeout(() => focusBlock(prev.id, true), 0);
+        return p.filter((b) => b.id !== id);
+      } else {
+        return [makeBlock("paragraph")];
+      }
+    });
+  }, [focusBlock]);
+
+  const handleDeleteSubPage = useCallback(async (subPageId: string) => {
+    try {
+      await deletePage(subPageId);
+      toast.success("Sub-page deleted");
+      setItems((prev) => prev.filter((b) => b.subPageId !== subPageId));
+      window.dispatchEvent(new CustomEvent("page-deleted", { detail: { pageId: subPageId } }));
+    } catch (err) {
+      console.error("Failed to delete sub-page:", err);
+      toast.error("Failed to delete sub-page");
+    }
+  }, []);
+
+  // Precomputed O(N) sequence number map for numbered lists
+  const seqNumbers = useMemo(() => {
+    const map = new Map<string, number>();
+    let currentCount = 0;
+    for (const b of items) {
+      if (b.type === "numbered") {
+        currentCount++;
+        map.set(b.id, currentCount);
+      } else {
+        currentCount = 0;
+      }
+    }
+    return map;
+  }, [items]);
 
   const slashFiltered = slash.query
     ? SLASH_ITEMS.filter((s) => {
@@ -1419,66 +1500,33 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
 
         {/* Blocks */}
         <div className="space-y-px">
-          {(() => {
-            return items.map((item, index) => {
-              let seqNumber = 1;
-              if (item.type === "numbered") {
-                let count = 0;
-                for (let i = 0; i <= index; i++) {
-                  if (items[i].type === "numbered") count++;
-                  else count = 0;
-                }
-                seqNumber = count;
-              }
+          {items.map((item) => {
+            const seqNumber = item.type === "numbered" ? (seqNumbers.get(item.id) ?? 1) : 1;
 
-              return (
-                <div key={item.id} className="relative">
-                  <Block
-                    item={item}
-                    seqNumber={seqNumber}
-                    isFocused={focusedId === item.id}
-                    onFocus={setFocusedId}
-                    onUpdateText={updateText}
-                    onUpdateLanguage={updateLanguage}
-                    onUpdateCalloutIcon={updateCalloutIcon}
-                    onUpdateToggleChildren={updateToggleChildren}
-                    onUpdateTableData={updateTableData}
-                    onUpdateKanbanColumns={updateKanbanColumns}
-                    onUpdateFile={updateFile}
-                    onUpdateUrl={updateUrl}
-                    onToggleCheck={toggleCheck}
-                    onKeyDown={handleKeyDown}
-                    onPaste={handlePaste}
-                    onAddAfter={(id) => {
-                      const newBlock = makeBlock("paragraph");
-                      const idx = items.findIndex((b) => b.id === id);
-                      setItems((p) => { const next = [...p]; next.splice(idx + 1, 0, newBlock); return next; });
-                      setTimeout(() => focusBlock(newBlock.id), 0);
-                    }}
-                    onDelete={(id) => {
-                      if (items.length > 1) {
-                        const idx = items.findIndex((b) => b.id === id);
-                        const prev = items[idx - 1] ?? items[idx + 1];
-                        setItems((p) => p.filter((b) => b.id !== id));
-                        if (prev) setTimeout(() => focusBlock(prev.id, true), 0);
-                      } else {
-                        setItems([makeBlock("paragraph")]);
-                      }
-                    }}
-                    onDeleteSubPage={async (subPageId) => {
-                      try {
-                        await deletePage(subPageId);
-                        toast.success("Sub-page deleted");
-                        setItems((prev) => prev.filter((b) => b.subPageId !== subPageId));
-                        window.dispatchEvent(new CustomEvent("page-deleted", { detail: { pageId: subPageId } }));
-                      } catch (err) {
-                        console.error("Failed to delete sub-page:", err);
-                        toast.error("Failed to delete sub-page");
-                      }
-                    }}
-                    onSelectSubPage={onSelectSubPage}
-                    registerRef={registerRef}
-                  />
+            return (
+              <div key={item.id} className="relative">
+                <Block
+                  item={item}
+                  seqNumber={seqNumber}
+                  isFocused={focusedId === item.id}
+                  onFocus={setFocusedId}
+                  onUpdateText={updateText}
+                  onUpdateLanguage={updateLanguage}
+                  onUpdateCalloutIcon={updateCalloutIcon}
+                  onUpdateToggleChildren={updateToggleChildren}
+                  onUpdateTableData={updateTableData}
+                  onUpdateKanbanColumns={updateKanbanColumns}
+                  onUpdateFile={updateFile}
+                  onUpdateUrl={updateUrl}
+                  onToggleCheck={toggleCheck}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  onAddAfter={handleAddAfter}
+                  onDelete={handleDeleteBlock}
+                  onDeleteSubPage={handleDeleteSubPage}
+                  onSelectSubPage={onSelectSubPage}
+                  registerRef={registerRef}
+                />
 
                   {/* Slash menu attached to this block */}
                   {slash.open && slash.blockId === item.id && (
@@ -1569,8 +1617,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                   )}
                 </div>
               );
-            });
-          })()}
+            })}
 
           {/* Empty state hint */}
           {items.length === 1 && !items[0].text && focusedId !== items[0].id && (
