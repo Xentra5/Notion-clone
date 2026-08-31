@@ -5,52 +5,30 @@ import {
   useEffect,
   useRef,
   useCallback,
-  useLayoutEffect,
   useMemo,
-  memo,
 } from "react";
 import { MeetingNoteView } from "./MeetingNoteView";
-import { EmojiDropdown } from "./EmojiPicker";
-import { CodeBlock } from "./CodeBlock";
-import { DatabaseBlock } from "./DatabaseBlock";
-import { WebBookmarkBlock } from "./WebBookmarkBlock";
-import { FileUploadBlock } from "./FileUploadBlock";
 import { PageCoverBanner } from "./PageCoverBanner";
 import { RemoteCursorOverlay } from "./RemoteCursorOverlay";
+import { BlockItem } from "./BlockItem";
+import {
+  SlashCommandMenu,
+  SLASH_ITEMS,
+  getDefaultText,
+  type SlashMenuItem,
+} from "./SlashCommandMenu";
+import { EditorHeader } from "./EditorHeader";
 import { useAutosave } from "@/hooks/use-autosave";
 import { updatePage, deletePage, type Page } from "@/lib/actions/pages";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { ErrorBoundary } from "@/components/ui/error-boundary";
 import type { ChecklistItem, BlockType, KanbanColumn } from "@/hooks/use-pages";
 import { parseMarkdownToBlocks } from "@/lib/markdown-blocks";
 import {
-  Check,
-  ChevronRight,
-  GripVertical,
   Plus,
-  Type,
-  Heading1,
-  Heading2,
-  Heading3,
-  List,
-  ListOrdered,
-  CheckSquare,
-  Quote,
-  Code,
-  Minus,
-  MessageSquare,
   FileText,
-  Image as ImageIcon,
-  Video,
-  Volume2,
-  Paperclip,
-  Bookmark,
-  Table,
-  Link,
+  ChevronRight,
   Trash2,
-  SquarePen,
-  Sparkles,
 } from "lucide-react";
 
 export interface EditorProps {
@@ -64,43 +42,6 @@ export interface EditorProps {
   onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
 }
 
-export interface SlashMenuItem {
-  type: BlockType;
-  label: string;
-  description: string;
-  icon: React.ComponentType<{ className?: string }>;
-  iconColor: string;
-  category: "Basic" | "Media" | "AI";
-  action?: "ai_summary";
-  aliases?: string[];
-}
-
-// ── Slash menu items ─────────────────────────────────────────────────────────
-const SLASH_ITEMS: SlashMenuItem[] = [
-  { type: "paragraph",    label: "AI Summary",    description: "Summarize this page with Notion AI", icon: Sparkles,  iconColor: "text-purple-500", category: "AI", action: "ai_summary", aliases: ["summary", "summery", "summarize", "ai", "sum", "tldr"] },
-  { type: "paragraph",    label: "Text",          description: "Plain paragraph text",         icon: Type,          iconColor: "text-neutral-400",  category: "Basic", aliases: ["p", "paragraph", "plain"] },
-  { type: "heading1",     label: "Heading 1",     description: "Large section heading",         icon: Heading1,      iconColor: "text-purple-400",   category: "Basic", aliases: ["h1", "title", "heading"] },
-  { type: "heading2",     label: "Heading 2",     description: "Medium section heading",        icon: Heading2,      iconColor: "text-purple-400",   category: "Basic", aliases: ["h2", "subtitle", "heading"] },
-  { type: "heading3",     label: "Heading 3",     description: "Small section heading",         icon: Heading3,      iconColor: "text-purple-400",   category: "Basic", aliases: ["h3", "heading"] },
-  { type: "bullet",       label: "Bulleted list", description: "Simple bulleted list",          icon: List,          iconColor: "text-amber-400",    category: "Basic", aliases: ["ul", "list", "bullet"] },
-  { type: "numbered",     label: "Numbered list", description: "Numbered list",                 icon: ListOrdered,   iconColor: "text-amber-400",    category: "Basic", aliases: ["ol", "num", "number"] },
-  { type: "todo",         label: "To-do",         description: "Track tasks with a checkbox",   icon: CheckSquare,   iconColor: "text-blue-400",     category: "Basic", aliases: ["check", "task", "checkbox", "todo"] },
-  { type: "quote",        label: "Quote",         description: "Capture a quote",               icon: Quote,         iconColor: "text-emerald-400",  category: "Basic", aliases: ["blockquote", "quote"] },
-  { type: "callout",      label: "Callout",       description: "Highlighted callout box",       icon: MessageSquare, iconColor: "text-rose-400",     category: "Basic", aliases: ["note", "alert", "tip", "warning", "info"] },
-  { type: "divider",      label: "Divider",       description: "Visual horizontal line",        icon: Minus,         iconColor: "text-neutral-400",  category: "Basic", aliases: ["hr", "line", "separator"] },
-  { type: "toggle",       label: "Toggle",        description: "Collapsible section",           icon: ChevronRight,  iconColor: "text-neutral-400",  category: "Basic", aliases: ["accordion", "details"] },
-  { type: "page",         label: "Page",          description: "Embed a sub-page link",         icon: FileText,      iconColor: "text-neutral-400",  category: "Basic", aliases: ["subpage", "doc"] },
-  { type: "code",         label: "Code",          description: "Code snippet with copy",        icon: Code,          iconColor: "text-emerald-400",  category: "Media", aliases: ["js", "ts", "py", "snippet", "script"] },
-  { type: "image",        label: "Image",         description: "Upload or embed an image",      icon: ImageIcon,     iconColor: "text-indigo-400",   category: "Media", aliases: ["img", "photo", "picture"] },
-  { type: "video",        label: "Video",         description: "Embed YouTube, Vimeo...",       icon: Video,         iconColor: "text-red-400",      category: "Media", aliases: ["youtube", "mp4"] },
-  { type: "audio",        label: "Audio",         description: "Audio recording or file",       icon: Volume2,       iconColor: "text-purple-400",   category: "Media", aliases: ["mp3", "voice", "sound"] },
-  { type: "file",         label: "File",          description: "Upload a file",                 icon: Paperclip,     iconColor: "text-neutral-400",  category: "Media", aliases: ["attachment", "pdf"] },
-  { type: "web_bookmark", label: "Web bookmark",  description: "Save a visual web link",        icon: Bookmark,      iconColor: "text-orange-400",   category: "Media", aliases: ["link", "url"] },
-  { type: "table",        label: "Table",         description: "Simple table",                  icon: Table,         iconColor: "text-cyan-400",     category: "Media", aliases: ["grid", "sheet"] },
-  { type: "kanban",       label: "Board view",    description: "Kanban board for task tracking",icon: Table,         iconColor: "text-blue-500",     category: "Media", aliases: ["board", "cards"] },
-  { type: "link_to_page", label: "Link to page",  description: "Link to an existing page",      icon: Link,          iconColor: "text-blue-400",     category: "Media", aliases: ["reference"] },
-];
-
 function makeBlock(type: BlockType = "paragraph", text = ""): ChecklistItem {
   return {
     id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
@@ -109,493 +50,6 @@ function makeBlock(type: BlockType = "paragraph", text = ""): ChecklistItem {
     checked: false,
   };
 }
-
-function getDefaultText(type: BlockType): string {
-  const m: Partial<Record<BlockType, string>> = {
-    // New blocks start empty. Placeholders guide the user without becoming content.
-    heading1: "", heading2: "", heading3: "",
-    heading4: "", heading: "",
-    todo: "", bullet: "", numbered: "",
-    quote: "", callout: "", toggle: "",
-    code: "", page: "",
-    link_to_page: "", image: "", video: "",
-    audio: "", file: "", web_bookmark: "",
-    paragraph: "",
-  };
-  return m[type] ?? "";
-}
-
-function getPlaceholder(type: BlockType | undefined): string {
-  const m: Partial<Record<BlockType, string>> = {
-    heading1: "Heading 1", heading2: "Heading 2", heading3: "Heading 3",
-    heading4: "Heading 4", heading: "Heading",
-    bullet: "List", numbered: "List", todo: "To-do", toggle: "Toggle",
-    quote: "Empty quote", callout: "Callout text", code: "// Write code here",
-    paragraph: "",
-  };
-  return m[type as BlockType] ?? "";
-}
-
-// ── Single Block ─────────────────────────────────────────────────────────────
-interface BlockProps {
-  item: ChecklistItem;
-  seqNumber?: number;
-  isFocused: boolean;
-  onFocus: (id: string) => void;
-  onUpdateText: (id: string, text: string) => void;
-  onUpdateLanguage?: (id: string, language: string) => void;
-  onUpdateCalloutIcon?: (id: string, icon: string) => void;
-  onUpdateToggleChildren?: (id: string, childrenText: string) => void;
-  onUpdateTableData?: (id: string, data: string[][]) => void;
-  onUpdateKanbanColumns?: (id: string, columns: KanbanColumn[]) => void;
-  onUpdateFile?: (id: string, url: string, fileName: string, fileSize?: string) => void;
-  onUpdateUrl?: (id: string, url: string) => void;
-  onToggleCheck: (id: string) => void;
-  onKeyDown: (e: React.KeyboardEvent, id: string) => void;
-  onPaste?: (e: React.ClipboardEvent, id: string) => void;
-  onDelete?: (id: string) => void;
-  onDeleteSubPage?: (subPageId: string) => void;
-  onAddAfter?: (id: string) => void;
-  onSelectSubPage: (blockId: string, subPageId?: string, title?: string) => void;
-  registerRef: (id: string, el: HTMLElement | null) => void;
-}
-
-function areBlockPropsEqual(prev: BlockProps, next: BlockProps): boolean {
-  if (prev.isFocused !== next.isFocused) return false;
-  if (prev.seqNumber !== next.seqNumber) return false;
-  if (prev.onSelectSubPage !== next.onSelectSubPage) return false;
-
-  const p = prev.item;
-  const n = next.item;
-
-  if (p === n) return true;
-  if (p.id !== n.id) return false;
-  if (p.type !== n.type) return false;
-  if (p.text !== n.text) return false;
-  if (p.checked !== n.checked) return false;
-  if (p.codeLanguage !== n.codeLanguage) return false;
-  if (p.subPageId !== n.subPageId) return false;
-  if (p.url !== n.url) return false;
-  if (p.fileName !== n.fileName) return false;
-  if (p.fileSize !== n.fileSize) return false;
-  if (p.toggleChildren !== n.toggleChildren) return false;
-  if (p.calloutIcon !== n.calloutIcon) return false;
-  if (p.tableData !== n.tableData) return false;
-  if (p.kanbanColumns !== n.kanbanColumns) return false;
-
-  return true;
-}
-
-const Block = memo(function Block({
-  item, seqNumber = 1, isFocused, onFocus, onUpdateText, onUpdateLanguage,
-  onUpdateCalloutIcon, onUpdateToggleChildren, onUpdateTableData, onUpdateKanbanColumns,
-  onUpdateFile, onUpdateUrl,
-  onToggleCheck, onKeyDown, onPaste, onDelete, onDeleteSubPage, onAddAfter, onSelectSubPage, registerRef,
-}: BlockProps) {
-  const elRef = useRef<HTMLElement | null>(null);
-  const [toggleOpen, setToggleOpen] = useState(false);
-  const [showCalloutPicker, setShowCalloutPicker] = useState(false);
-
-  // Synchronize contentEditable text safely without clobbering live typing or caret
-  useLayoutEffect(() => {
-    const el = elRef.current;
-    if (!el) return;
-    // If user is actively typing in this element, do NOT overwrite DOM
-    if (document.activeElement === el) return;
-    if (el.innerText !== (item.text || "")) {
-      el.innerText = item.text || "";
-    }
-  }, [item.text]);
-
-  useEffect(() => {
-    if (isFocused) elRef.current?.focus();
-  }, [isFocused]);
-
-  const setRef = useCallback((el: HTMLElement | null) => {
-    elRef.current = el;
-    registerRef(item.id, el);
-  }, [item.id, registerRef]);
-
-  const handleInput = (e: React.FormEvent<HTMLElement>) => {
-    onUpdateText(item.id, (e.target as HTMLElement).innerText);
-  };
-
-  const handleKD = (e: React.KeyboardEvent<HTMLElement>) => onKeyDown(e, item.id);
-  const handleFocus = () => onFocus(item.id);
-
-  const ce = {
-    contentEditable: true as const,
-    suppressContentEditableWarning: true,
-    onInput: handleInput,
-    onKeyDown: handleKD,
-    onFocus: handleFocus,
-    onPaste: (e: React.ClipboardEvent<HTMLElement>) => onPaste?.(e, item.id),
-    "data-placeholder": item.text ? undefined : getPlaceholder(item.type),
-  };
-
-  const textCls = "w-full text-[15px] leading-[1.75] text-foreground outline-none empty:before:content-[attr(data-placeholder)] empty:before:text-[#aaa] dark:empty:before:text-[#3d3d3d] empty:before:pointer-events-none empty:before:select-none";
-
-  return (
-    <div
-      className="group/b relative flex items-start -ml-2 pl-2 sm:-ml-4 sm:pl-4 -mr-2 pr-6 sm:-mr-12 sm:pr-12 rounded-md hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors overflow-visible"
-      data-block-id={item.id}
-    >
-      {/* Drag handle, Add & Delete — hidden for code blocks (they have their own header) */}
-      {item.type !== "code" && (
-      <div className="absolute right-1 top-[4px] flex items-center gap-0.5 opacity-0 group-hover/b:opacity-100 transition-opacity z-10">
-        <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Add block below" onClick={() => onAddAfter?.(item.id)}>
-          <Plus className="h-3.5 w-3.5" />
-        </button>
-        <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition" title="Drag">
-          <GripVertical className="h-3.5 w-3.5" />
-        </button>
-        {onDelete && (
-          <button type="button" className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition" title="Delete block" onClick={() => onDelete(item.id)}>
-            <Trash2 className="h-3.5 w-3.5" />
-          </button>
-        )}
-      </div>
-      )}
-
-      <div className="flex-1 min-w-0 py-[1.5px]">
-
-        {/* ── Paragraph ── */}
-        {(item.type === "paragraph" || !item.type) && (
-          <div {...ce} ref={setRef} className={textCls} />
-        )}
-
-        {/* ── Headings ── */}
-        {item.type === "heading1" && (
-          <div {...ce} ref={setRef}
-            className="w-full text-[2rem] font-bold leading-tight tracking-tight text-foreground outline-none mt-8 mb-1 empty:before:content-[attr(data-placeholder)] empty:before:text-[#ccc] dark:empty:before:text-[#3a3a3a] empty:before:pointer-events-none" />
-        )}
-        {item.type === "heading2" && (
-          <div {...ce} ref={setRef}
-            className="w-full text-[1.5rem] font-bold leading-tight tracking-tight text-foreground outline-none mt-6 mb-0.5 empty:before:content-[attr(data-placeholder)] empty:before:text-[#ccc] dark:empty:before:text-[#3a3a3a] empty:before:pointer-events-none" />
-        )}
-        {item.type === "heading3" && (
-          <div {...ce} ref={setRef}
-            className="w-full text-[1.125rem] font-semibold leading-snug text-foreground outline-none mt-4 mb-0.5 empty:before:content-[attr(data-placeholder)] empty:before:text-[#ccc] dark:empty:before:text-[#3a3a3a] empty:before:pointer-events-none" />
-        )}
-        {(item.type === "heading4" || item.type === "heading") && (
-          <div {...ce} ref={setRef}
-            className="w-full text-[1rem] font-semibold leading-snug text-foreground outline-none mt-3 mb-0.5 empty:before:content-[attr(data-placeholder)] empty:before:text-[#ccc] dark:empty:before:text-[#3a3a3a] empty:before:pointer-events-none" />
-        )}
-
-        {/* ── Bullet ── */}
-        {item.type === "bullet" && (
-          <div className="flex items-start gap-2.5 py-px">
-            <span className="shrink-0 select-none text-foreground/50 font-bold text-[8px] mt-[9px] leading-none">•</span>
-            <div {...ce} ref={setRef} className={textCls} />
-          </div>
-        )}
-
-        {/* ── Numbered ── */}
-        {item.type === "numbered" && (
-          <div className="flex items-start gap-2.5 py-px">
-            <span className="shrink-0 select-none text-foreground/50 tabular-nums text-[13px] mt-[2px] min-w-[1.2rem] text-right font-medium">{seqNumber}.</span>
-            <div {...ce} ref={setRef} className={textCls} />
-          </div>
-        )}
-
-        {/* ── To-do ── */}
-        {item.type === "todo" && (
-          <div className="flex items-start gap-2">
-            <button type="button" onClick={() => onToggleCheck(item.id)}
-              className={`shrink-0 mt-[4px] h-[17px] w-[17px] rounded-[3px] border-[1.5px] flex items-center justify-center transition-all ${
-                item.checked ? "bg-[#2383e2] border-[#2383e2]" : "border-[#c0c0c0] dark:border-[#444] hover:border-[#2383e2]"
-              }`}>
-              {item.checked && <Check className="h-2.5 w-2.5 text-white stroke-[3]" />}
-            </button>
-            <div {...ce} ref={setRef}
-              className={`${textCls} ${item.checked ? "line-through text-foreground/40" : ""}`} />
-          </div>
-        )}
-
-        {/* ── Toggle ── */}
-        {item.type === "toggle" && (
-          <div>
-            <div className="flex items-start gap-1">
-              <button
-                type="button"
-                onClick={() => setToggleOpen(v => !v)}
-                className={`shrink-0 mt-[3px] p-0.5 rounded text-foreground/40 hover:text-foreground/80 hover:bg-black/5 dark:hover:bg-white/5 transition-all duration-150 ${toggleOpen ? "rotate-90" : ""}`}
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-              <div {...ce} ref={setRef} className={`${textCls} font-medium`} />
-            </div>
-            {toggleOpen && (
-              <div className="ml-[22px] pl-3.5 border-l-2 border-foreground/[0.08] dark:border-foreground/10 mt-1.5 pb-1">
-                <textarea
-                  value={item.toggleChildren || ""}
-                  onChange={(e) => onUpdateToggleChildren?.(item.id, e.target.value)}
-                  placeholder="Type something inside the toggle..."
-                  rows={Math.max(2, (item.toggleChildren || "").split("\n").length)}
-                  className="w-full bg-transparent text-[14px] text-foreground/70 outline-none resize-none placeholder:text-foreground/25 leading-relaxed font-sans"
-                />
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* ── Quote ── */}
-        {item.type === "quote" && (
-          <div className="flex items-start gap-0 py-1">
-            <div className="w-[3px] shrink-0 self-stretch bg-foreground/20 dark:bg-foreground/15 rounded-full mr-4" />
-            <div {...ce} ref={setRef}
-              className={`${textCls} text-foreground/80 italic`} />
-          </div>
-        )}
-
-        {/* ── Callout ── */}
-        {item.type === "callout" && (
-          <div className="relative flex items-start gap-3 px-3.5 py-2.5 rounded-lg bg-[#f3f3f2] dark:bg-[#1c1c1c] border border-transparent dark:border-white/[0.05] my-1 transition-colors hover:bg-[#eeeeed] dark:hover:bg-[#1f1f1f]">
-            <button
-              type="button"
-              onClick={() => setShowCalloutPicker(!showCalloutPicker)}
-              className="shrink-0 text-[18px] select-none mt-[2px] hover:scale-110 transition-transform cursor-pointer p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5"
-              title="Change callout icon"
-            >
-              {item.calloutIcon || "💡"}
-            </button>
-            {showCalloutPicker && (
-              <div className="absolute left-4 top-12 z-50">
-                <EmojiDropdown
-                  onSelect={(emoji) => {
-                    onUpdateCalloutIcon?.(item.id, emoji);
-                    setShowCalloutPicker(false);
-                  }}
-                  onClose={() => setShowCalloutPicker(false)}
-                />
-              </div>
-            )}
-            <div {...ce} ref={setRef} className={`${textCls} text-[14px]`} />
-          </div>
-        )}
-
-        {/* ── Divider ── */}
-        {item.type === "divider" && (
-          <div className="py-3">
-            <hr className="border-t border-foreground/10" />
-          </div>
-        )}
-
-        {/* ── Code ── */}
-        {item.type === "code" && (
-          <CodeBlock
-            id={item.id}
-            code={item.text}
-            language={item.codeLanguage || "javascript"}
-            onChangeCode={(id, code) => onUpdateText(id, code)}
-            onChangeLang={(id, lang) => onUpdateLanguage?.(id, lang)}
-            isFocused={isFocused}
-            onFocus={handleFocus}
-            onExitToNewBlock={() => onAddAfter?.(item.id)}
-          />
-        )}
-
-        {/* ── Page / Link to page ── */}
-        {(item.type === "page" || item.type === "link_to_page") && (
-          <div
-            className="flex items-center justify-between gap-3 my-1.5 px-2.5 py-2 rounded-xl bg-foreground/[0.02] hover:bg-foreground/[0.06] border border-foreground/[0.06] hover:border-foreground/15 transition-all group/page cursor-pointer w-full shadow-xs"
-            onClick={(e) => {
-              const target = e.target as HTMLElement;
-              // If not clicking inside the contentEditable or delete button, open the subpage
-              if (!target.isContentEditable && !target.closest("button")) {
-                onSelectSubPage(item.id, item.subPageId, item.text || "Untitled");
-              }
-            }}
-          >
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div
-                className="h-6 w-6 rounded-md bg-foreground/5 flex items-center justify-center text-foreground/80 shrink-0 group-hover/page:text-primary transition"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectSubPage(item.id, item.subPageId, item.text || "Untitled");
-                }}
-                title="Open sub-page"
-              >
-                <FileText className="h-4 w-4 stroke-[1.8]" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div
-                  {...ce}
-                  ref={setRef}
-                  className="font-bold text-[14px] text-foreground hover:text-primary outline-none w-full cursor-text empty:before:content-[attr(data-placeholder)] empty:before:text-foreground/30 empty:before:pointer-events-none transition-colors"
-                  data-placeholder="Untitled page"
-                />
-              </div>
-            </div>
-
-            {item.subPageId ? (
-              <div className="flex items-center gap-1.5 opacity-0 group-hover/page:opacity-100 transition shrink-0">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onSelectSubPage(item.id, item.subPageId, item.text || "Untitled");
-                  }}
-                  className="flex items-center gap-1 text-[11px] font-semibold px-2 py-1 rounded-lg bg-foreground/10 hover:bg-primary hover:text-primary-foreground text-foreground transition shadow-2xs"
-                  title="Open this sub-page"
-                >
-                  <span>Open</span>
-                  <ChevronRight className="h-3 w-3" />
-                </button>
-                {onDeleteSubPage && (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onDeleteSubPage(item.subPageId!);
-                    }}
-                    title="Delete sub-page"
-                    className="p-1 rounded-lg hover:bg-red-500/10 text-foreground/40 hover:text-red-500 transition"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onSelectSubPage(item.id, undefined, item.text || "Untitled");
-                }}
-                className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition shadow-xs shrink-0"
-              >
-                <Plus className="h-3 w-3" />
-                <span>Create page</span>
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ── Image ── */}
-        {item.type === "image" && (
-          <div className="my-2 p-8 rounded-lg border-2 border-dashed border-foreground/10 flex flex-col items-center gap-2 text-foreground/40 hover:border-foreground/20 hover:bg-foreground/[0.02] transition cursor-pointer">
-            <ImageIcon className="h-6 w-6" />
-            <span className="text-sm">Click to add an image</span>
-          </div>
-        )}
-
-        {/* ── Video ── */}
-        {item.type === "video" && (
-          <div className="my-2 p-8 rounded-lg border-2 border-dashed border-foreground/10 flex flex-col items-center gap-2 text-foreground/40 hover:border-foreground/20 hover:bg-foreground/[0.02] transition cursor-pointer">
-            <Video className="h-6 w-6" />
-            <span className="text-sm">Add video URL (YouTube, Vimeo…)</span>
-          </div>
-        )}
-
-        {/* ── Audio ── */}
-        {item.type === "audio" && (
-          <div className="my-1 p-4 rounded-lg border border-foreground/10 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-purple-500/10"><Volume2 className="h-4 w-4 text-purple-500" /></div>
-            <span className="text-sm text-foreground/60">{item.text || "Audio block"}</span>
-          </div>
-        )}
-
-        {/* ── File Upload ── */}
-        {item.type === "file" && (
-          <FileUploadBlock
-            url={item.url}
-            fileName={item.fileName}
-            fileSize={item.fileSize}
-            onUpdateFile={(fileUrl, name, size) => onUpdateFile?.(item.id, fileUrl, name, size)}
-          />
-        )}
-
-        {/* ── Web Bookmark ── */}
-        {item.type === "web_bookmark" && (
-          <WebBookmarkBlock
-            url={item.url}
-            onUpdateUrl={(bookmarkUrl) => onUpdateUrl?.(item.id, bookmarkUrl)}
-          />
-        )}
-
-        {/* ── Table ── */}
-        {item.type === "table" && (() => {
-          const table = item.tableData || [
-            ["Header 1", "Header 2", "Header 3"],
-            ["Row 1, Cell 1", "Row 1, Cell 2", "Row 1, Cell 3"],
-            ["Row 2, Cell 1", "Row 2, Cell 2", "Row 2, Cell 3"],
-          ];
-          return (
-            <div className="my-2 overflow-x-auto rounded-lg border border-foreground/10 p-2 space-y-2">
-              <table className="w-full text-sm border-collapse border border-foreground/10">
-                <tbody>
-                  {table.map((row, rIdx) => (
-                    <tr key={rIdx} className="border-b border-foreground/10 last:border-0">
-                      {row.map((cell, cIdx) => (
-                        <td
-                          key={cIdx}
-                          className={`p-0 border-r border-foreground/10 last:border-r-0 ${
-                            rIdx === 0 ? "bg-foreground/[0.03] font-semibold" : ""
-                          }`}
-                        >
-                          <input
-                            type="text"
-                            value={cell}
-                            onChange={(e) => {
-                              const nextData = table.map((r, ri) =>
-                                ri === rIdx
-                                  ? r.map((c, ci) => (ci === cIdx ? e.target.value : c))
-                                  : r
-                              );
-                              onUpdateTableData?.(item.id, nextData);
-                            }}
-                            placeholder={rIdx === 0 ? `Column ${cIdx + 1}` : ""}
-                            className="w-full px-3 py-1.5 bg-transparent text-xs text-foreground outline-none placeholder:text-foreground/20"
-                          />
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div className="flex items-center gap-2 pt-1 text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const cols = table[0]?.length || 3;
-                    const nextData = [...table, Array(cols).fill("")];
-                    onUpdateTableData?.(item.id, nextData);
-                  }}
-                  className="px-2.5 py-1 rounded bg-foreground/5 hover:bg-foreground/10 text-foreground/70 font-medium transition cursor-pointer"
-                >
-                  + Add Row
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const nextData = table.map((row) => [...row, ""]);
-                    onUpdateTableData?.(item.id, nextData);
-                  }}
-                  className="px-2.5 py-1 rounded bg-[#2383e2]/10 hover:bg-[#2383e2]/20 text-[#2383e2] font-medium transition cursor-pointer"
-                >
-                  + Add Column
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-
-        {/* ── Database Block (Multi-View) ── */}
-        {item.type === "kanban" && (
-          <ErrorBoundary fallbackTitle="Database Block Error" fallbackMessage="Could not render the database view.">
-            <DatabaseBlock
-              blockId={item.id}
-              columns={item.kanbanColumns}
-              onColumnsChange={(id, cols) => onUpdateKanbanColumns?.(id, cols)}
-            />
-          </ErrorBoundary>
-        )}
-      </div>
-
-    </div>
-  );
-}, areBlockPropsEqual);
 
 // ── Main Editor ───────────────────────────────────────────────────────────────
 export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, initialIcon, isAiMeetingNote, childPages, onSelectSubPage }: EditorProps) {
@@ -607,9 +61,18 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   const [items, setItems] = useState<ChecklistItem[]>(() =>
     initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]
   );
+  const itemsRef = useRef<ChecklistItem[]>(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle" | "error">("idle");
   const [remoteCursors, setRemoteCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
+
+  const { scheduleAutosave, immediatelySave, cancelAutosave, retryAutosave, markDirty } = useAutosave({
+    pageId,
+    onStatusChange: setSaveStatus,
+  });
 
   useEffect(() => {
     if (initialIcon) setPageEmoji(initialIcon);
@@ -646,6 +109,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
 
   const handleTitleChange = useCallback((newTitle: string) => {
     setCurrentTitle(newTitle);
+    markDirty();
     if (!pageId) return;
 
     if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
@@ -662,7 +126,20 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     }, 300);
   }, [pageId]);
 
-  const { scheduleAutosave, immediatelySave, cancelAutosave, retryAutosave } = useAutosave({ pageId, onStatusChange: setSaveStatus });
+  const handleTitleBlur = useCallback(async () => {
+    if (!pageId) return;
+    if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
+    cancelAutosave();
+    const title = currentTitle.trim() || "Untitled";
+    try {
+      immediatelySave(title, items);
+      window.dispatchEvent(
+        new CustomEvent("page-updated", { detail: { title, updatedAt: new Date() } })
+      );
+    } catch (error) {
+      console.error("Title save failed:", error);
+    }
+  }, [pageId, cancelAutosave, currentTitle, immediatelySave, items]);
 
   // Helper to extract clean plain-text representation of all blocks in the editor
   const getPagePlainText = useCallback(() => {
@@ -741,22 +218,24 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
           newBlocks = [makeBlock(detail.type || "paragraph", detail.text)];
         }
 
-        setItems((prev) => {
-          // If the editor currently only has 1 empty paragraph, replace it with newBlocks
-          const isInitialEmpty =
-            prev.length === 1 &&
-            (!prev[0].text || !prev[0].text.trim()) &&
-            (prev[0].type === "paragraph" || !prev[0].type);
-          const nextItems = isInitialEmpty ? newBlocks : [...prev, ...newBlocks];
-          const activeTitleToSave = currentTitleRef.current || "Untitled";
-          immediatelySave(activeTitleToSave, nextItems);
-          return nextItems;
-        });
+        const currentItems = itemsRef.current;
+        const isInitialEmpty =
+          currentItems.length === 1 &&
+          (!currentItems[0].text || !currentItems[0].text.trim()) &&
+          (currentItems[0].type === "paragraph" || !currentItems[0].type);
+        const nextItems = isInitialEmpty ? newBlocks : [...currentItems, ...newBlocks];
+
+        setItems(nextItems);
+        itemsRef.current = nextItems;
+
+        markDirty();
+        const activeTitleToSave = currentTitleRef.current || "Untitled";
+        immediatelySave(activeTitleToSave, nextItems);
       }
     };
     window.addEventListener("ai-append-block", handleAiAppend);
     return () => window.removeEventListener("ai-append-block", handleAiAppend);
-  }, [immediatelySave]);
+  }, [immediatelySave, markDirty]);
 
   const handleCoverChange = useCallback(
     async (newCoverUrl?: string) => {
@@ -856,6 +335,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   }, []);
 
   const updateText = useCallback((id: string, text: string) => {
+    markDirty();
     setItems((prev) => {
       const block = prev.find((b) => b.id === id);
       if (!block) return prev;
@@ -1360,9 +840,6 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     );
   }
 
-  const aiItems = slashFiltered.filter(s => s.category === "AI");
-  const basicItems = slashFiltered.filter(s => s.category === "Basic");
-  const mediaItems = slashFiltered.filter(s => s.category === "Media");
 
   return (
     <div
@@ -1414,89 +891,38 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       <PageCoverBanner url={coverUrl} onUpdateCover={handleCoverChange} />
 
       <div id="editor-page-container" className="max-w-[720px] mx-auto px-4 sm:px-8 md:px-12 lg:px-20 pt-8 sm:pt-12 pb-60 select-text">
-        {/* Cover & Quick Actions Header */}
-        <div className="mb-2 flex items-center gap-1 opacity-0 hover:opacity-100 transition-opacity">
-          {!coverUrl && (
-            <button
-              type="button"
-              onClick={() => handleCoverChange("https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop")}
-              className="text-xs text-muted-foreground hover:text-foreground font-medium px-2 py-1 rounded-md hover:bg-foreground/5 transition cursor-pointer"
-            >
-              🖼️ Add cover
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => {
-              const newBlock = makeBlock("page", "Untitled");
-              setItems((prev) => [...prev, newBlock]);
-              setTimeout(() => onSelectSubPage(newBlock.id, undefined, "Untitled"), 50);
-            }}
-            className="text-xs text-muted-foreground hover:text-foreground font-medium px-2 py-1 rounded-md hover:bg-foreground/5 transition cursor-pointer"
-          >
-            📄 Add sub-page
-          </button>
-        </div>
-
-        {/* Emoji */}
-        <div className="relative mb-3">
-          <button
-            type="button"
-            onClick={e => { e.stopPropagation(); setShowEmojiPicker(!showEmojiPicker); }}
-            className="text-5xl rounded-xl p-1.5 hover:bg-foreground/5 hover:scale-105 active:scale-95 transition select-none inline-block cursor-pointer"
-            title="Change icon"
-          >
-            {pageEmoji}
-          </button>
-          {showEmojiPicker && (
-            <EmojiDropdown onSelect={handleEmojiChange} onClose={() => setShowEmojiPicker(false)} />
-          )}
-        </div>
-
-        {/* Title */}
-        <div className="relative group/title-container mb-6 flex items-start gap-2">
-          <textarea
-            ref={titleRef}
-            value={currentTitle}
-            onChange={e => handleTitleChange(e.target.value)}
-            onBlur={async () => {
-              if (!pageId) return;
-              if (titleTimerRef.current) clearTimeout(titleTimerRef.current);
-              cancelAutosave();
-              const title = currentTitle.trim() || "Untitled";
-              try {
-                // Flush title and blocks together so blurring the title cannot
-                // cancel a pending block save.
-                immediatelySave(title, items);
-                window.dispatchEvent(new CustomEvent("page-updated", { detail: { title, updatedAt: new Date() } }));
-              } catch (error) {
-                console.error("Title save failed:", error);
-              }
-            }}
-            onKeyDown={e => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                if (items[0]) focusBlock(items[0].id);
-              }
-            }}
-            placeholder="Untitled"
-            rows={1}
-            className="w-full resize-none overflow-hidden bg-transparent text-[2.6rem] font-bold tracking-tight text-foreground outline-none placeholder:text-foreground/20 leading-tight select-text cursor-text"
-            style={{ height: "auto" }}
-          />
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              titleRef.current?.focus();
-              titleRef.current?.select();
-            }}
-            className="opacity-0 group-hover/title-container:opacity-100 p-2 rounded-xl hover:bg-accent text-muted-foreground hover:text-foreground transition shrink-0 mt-2"
-            title="Click to edit title"
-          >
-            <SquarePen className="h-5 w-5" />
-          </button>
-        </div>
+        {/* Editor Header: Cover, Icon, Title */}
+        <EditorHeader
+          pageEmoji={pageEmoji}
+          showEmojiPicker={showEmojiPicker}
+          coverUrl={coverUrl}
+          currentTitle={currentTitle}
+          titleRef={titleRef}
+          onEmojiClick={(e) => {
+            e.stopPropagation();
+            setShowEmojiPicker(!showEmojiPicker);
+          }}
+          onEmojiSelect={handleEmojiChange}
+          onEmojiClose={() => setShowEmojiPicker(false)}
+          onAddCover={() =>
+            handleCoverChange(
+              "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop"
+            )
+          }
+          onAddSubPage={() => {
+            const newBlock = makeBlock("page", "Untitled");
+            setItems((prev) => [...prev, newBlock]);
+            setTimeout(() => onSelectSubPage(newBlock.id, undefined, "Untitled"), 50);
+          }}
+          onTitleChange={handleTitleChange}
+          onTitleBlur={handleTitleBlur}
+          onTitleKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              if (items[0]) focusBlock(items[0].id);
+            }
+          }}
+        />
 
         {/* Blocks */}
         <div className="space-y-px">
@@ -1505,7 +931,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
 
             return (
               <div key={item.id} className="relative">
-                <Block
+                <BlockItem
                   item={item}
                   seqNumber={seqNumber}
                   isFocused={focusedId === item.id}
@@ -1528,96 +954,17 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                   registerRef={registerRef}
                 />
 
-                  {/* Slash menu attached to this block */}
-                  {slash.open && slash.blockId === item.id && (
-                    <div
-                      className="absolute left-0 top-full z-50 mt-1 w-80 max-h-96 overflow-y-auto bg-white dark:bg-[#1c1c1c] border border-black/[0.08] dark:border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1.5"
-                      onMouseDown={e => e.preventDefault()}
-                    >
-                      {slashFiltered.length === 0 ? (
-                        <p className="px-3 py-2 text-xs text-foreground/40">No results</p>
-                      ) : (
-                        <>
-                          {aiItems.length > 0 && (
-                            <>
-                              <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-purple-500 uppercase tracking-widest flex items-center gap-1">
-                                <span>✨ Notion AI</span>
-                              </p>
-                              {aiItems.map((s) => {
-                                const Icon = s.icon;
-                                const gi = slashFiltered.indexOf(s);
-                                return (
-                                  <button
-                                    key={s.label}
-                                    type="button"
-                                    onMouseDown={() => applySlash(s)}
-                                    className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${
-                                      slashIdx === gi
-                                        ? "bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-semibold"
-                                        : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"
-                                    }`}
-                                  >
-                                    <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-950/60 border border-purple-300/40 dark:border-purple-800/40 shrink-0 shadow-sm">
-                                      <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
-                                    </div>
-                                    <div>
-                                      <div className="text-[13px] font-medium text-foreground">{s.label}</div>
-                                      <div className="text-[11px] text-foreground/40">{s.description}</div>
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </>
-                          )}
-                          {basicItems.length > 0 && (
-                            <>
-                              <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">Basic blocks</p>
-                              {basicItems.map(s => {
-                                const Icon = s.icon;
-                                const gi = slashFiltered.indexOf(s);
-                                return (
-                                  <button key={s.label} type="button" onMouseDown={() => applySlash(s)}
-                                    className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${slashIdx === gi ? "bg-[#f0f0ef] dark:bg-white/[0.06]" : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"}`}>
-                                    <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
-                                      <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
-                                    </div>
-                                    <div>
-                                      <div className="text-[13px] font-medium text-foreground">{s.label}</div>
-                                      <div className="text-[11px] text-foreground/40">{s.description}</div>
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </>
-                          )}
-                          {mediaItems.length > 0 && (
-                            <>
-                              <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">Media</p>
-                              {mediaItems.map(s => {
-                                const Icon = s.icon;
-                                const gi = slashFiltered.indexOf(s);
-                                return (
-                                  <button key={s.label} type="button" onMouseDown={() => applySlash(s)}
-                                    className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${slashIdx === gi ? "bg-[#f0f0ef] dark:bg-white/[0.06]" : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"}`}>
-                                    <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
-                                      <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
-                                    </div>
-                                    <div>
-                                      <div className="text-[13px] font-medium text-foreground">{s.label}</div>
-                                      <div className="text-[11px] text-foreground/40">{s.description}</div>
-                                    </div>
-                                  </button>
-                                );
-                              })}
-                            </>
-                          )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                {/* Slash menu attached to this block */}
+                {slash.open && slash.blockId === item.id && (
+                  <SlashCommandMenu
+                    filteredItems={slashFiltered}
+                    selectedIndex={slashIdx}
+                    onSelect={applySlash}
+                  />
+                )}
+              </div>
+            );
+          })}
 
           {/* Empty state hint */}
           {items.length === 1 && !items[0].text && focusedId !== items[0].id && (

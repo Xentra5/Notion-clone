@@ -122,7 +122,11 @@ async function revalidatePagesList(): Promise<Page[]> {
 }
 
 // GET /api/pages/[id] — 0ms Local-First document read with SWR
-export async function getPage(id: string, forceRefresh = false): Promise<Page> {
+export async function getPage(
+  id: string,
+  forceRefresh = false,
+  onFreshData?: (fresh: Page) => void
+): Promise<Page> {
   if (!id) throw new Error("Page ID is required");
 
   const now = Date.now();
@@ -138,8 +142,12 @@ export async function getPage(id: string, forceRefresh = false): Promise<Page> {
     const localDoc = await localStore.getPageLocal(id);
     if (localDoc) {
       pageDocCache.set(id, { data: localDoc, timestamp: now });
-      // Asynchronously revalidate in background without blocking UI
-      void revalidatePage(id);
+      // Asynchronously revalidate in background without blocking UI.
+      // When fresh data arrives, notify the caller so it can update the UI
+      // even though this is a same-tab operation.
+      revalidatePage(id).then((fresh) => {
+        if (onFreshData) onFreshData(fresh);
+      }).catch(() => {/* ignore revalidation errors */});
       return localDoc;
     }
   }
@@ -216,15 +224,27 @@ export async function updatePage(
 ): Promise<Page> {
   // 1. Optimistically apply change to local cache immediately
   const existing = pageDocCache.get(id)?.data || (await localStore.getPageLocal(id));
-  if (existing) {
-    const optimisticPage: Page = {
-      ...existing,
-      ...data,
-      updatedAt: new Date().toISOString(),
-    };
-    pageDocCache.set(id, { data: optimisticPage, timestamp: Date.now() });
-    void localStore.setPageLocal(optimisticPage);
-  }
+  const optimisticPage: Page = existing
+    ? {
+        ...existing,
+        ...data,
+        updatedAt: new Date().toISOString(),
+      }
+    : {
+        _id: id,
+        userId: "",
+        title: data.title || "Untitled",
+        category: "Private",
+        blocks: (data.blocks as never) || [],
+        icon: "📄",
+        coverImage: "",
+        isAiMeetingNote: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        ...data,
+      };
+  pageDocCache.set(id, { data: optimisticPage, timestamp: Date.now() });
+  void localStore.setPageLocal(optimisticPage);
 
   // 2. Dispatch network update with background retry queue fallback
   try {

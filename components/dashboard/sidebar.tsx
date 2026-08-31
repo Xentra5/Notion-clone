@@ -4,7 +4,12 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
-import { PricingModal } from "./pricing-modal";
+import dynamic from "next/dynamic";
+
+const PricingModal = dynamic(
+  () => import("./pricing-modal").then((mod) => mod.PricingModal),
+  { ssr: false }
+);
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RenameModal } from "@/components/ui/rename-modal";
 import { getPages, createPage, updatePage, deletePage, type Page, type PageBlock } from "@/lib/actions/pages";
@@ -863,13 +868,26 @@ export function Sidebar({
           </button>
 
           {expandedSections.agents && (
-            <button
-              onClick={onToggleAi}
-              className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
-            >
-              <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-[11px]">New agent</span>
-            </button>
+            <div className="space-y-0.5">
+              <button
+                onClick={() => router.push("/dashboard/agent")}
+                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
+              >
+                <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="text-[11px]">New agent</span>
+              </button>
+              <button
+                onClick={() => router.push("/dashboard/agent")}
+                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-md transition text-left ${
+                  pathname === "/dashboard/agent"
+                    ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
+                    : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
+                }`}
+              >
+                <span className="text-sm">🤖</span>
+                <span className="text-[11px]">AI Agent</span>
+              </button>
+            </div>
           )}
         </div>
 

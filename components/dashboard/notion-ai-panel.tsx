@@ -55,6 +55,13 @@ interface SlashCmdItem {
 
 const AI_SLASH_COMMANDS: SlashCmdItem[] = [
   {
+    cmd: "/agent ",
+    label: "AI Agent",
+    desc: "Autonomous agent: create events, pages, search & more",
+    icon: "🤖",
+    badgeClass: "bg-violet-600 text-white",
+  },
+  {
     cmd: "/summary",
     label: "Summarize Page",
     desc: "AI summary of the current page (or full workspace)",
@@ -289,7 +296,7 @@ function ChatMessageText({
   onInsert,
 }: {
   text: string;
-  onInsert?: (content: string, type?: string) => void;
+  onInsert?: (content: string, type?: string, lang?: string) => void;
 }) {
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [insertedIdx, setInsertedIdx] = useState<number | null>(null);
@@ -328,7 +335,7 @@ function ChatMessageText({
 
   const handleInsert = (content: string, type: string, idx: number, lang?: string) => {
     if (onInsert) {
-      onInsert(content, type);
+      onInsert(content, type, lang);
     } else {
       window.dispatchEvent(
         new CustomEvent("ai-append-block", {
@@ -643,29 +650,53 @@ export function NotionAiPanel({
         }
       }
 
-      // NOTE: We intentionally do NOT call `update()` here on every message.
-      // Calling useSession().update() triggers a full session refresh that
-      // re-renders the entire app (Layout, Sidebar, TopBar, Editor).
-      // The usage count is already incremented server-side; the session is
-      // only refreshed when the limit is actually reached (above).
-      const ragRes = await fetch("/api/ai/rag-query", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          question: textToSend,
-          pageId: currentPageId,
-          pageTitle: livePageTitle || currentPageTitle,
-          pageContent: livePageContent,
-          history: messages.map(({ role, text }) => ({ role, text })),
-        }),
-      });
+      // Detect /agent command — route to the tool-calling agent endpoint
+      const isAgentCmd = /^\/agent\b/i.test(textToSend) || cmdToUse?.cmd?.trim() === "/agent";
+
+      let ragRes: Response;
+      if (isAgentCmd) {
+        const agentQuery = textToSend.replace(/^\/agent\s*/i, "").trim() || textToSend;
+        ragRes = await fetch("/api/ai/agent", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            message: agentQuery,
+            history: messages.map(({ role, text }) => ({ role, text })),
+          }),
+        });
+      } else {
+        // NOTE: We intentionally do NOT call `update()` here on every message.
+        // Calling useSession().update() triggers a full session refresh that
+        // re-renders the entire app (Layout, Sidebar, TopBar, Editor).
+        // The usage count is already incremented server-side; the session is
+        // only refreshed when the limit is actually reached (above).
+        ragRes = await fetch("/api/ai/rag-query", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: textToSend,
+            pageId: currentPageId,
+            pageTitle: livePageTitle || currentPageTitle,
+            pageContent: livePageContent,
+            history: messages.map(({ role, text }) => ({ role, text })),
+          }),
+        });
+      }
 
       const data = await ragRes.json().catch(() => ({}));
       if (!ragRes.ok) {
         throw new Error(data.error || `AI request failed (${ragRes.status})`);
       }
 
-      const answerText = data.answer || "I processed your request.";
+      // Build tool-call breadcrumb text for agent responses
+      const toolCalls: { tool: string; input: string; output: string }[] = Array.isArray(data.toolCalls) ? data.toolCalls : [];
+      const toolSummary = toolCalls.length > 0
+        ? "\n\n" + toolCalls.map((tc: { tool: string; output: string }) =>
+            `🔧 **${tc.tool.replace(/_/g, " ")}**: ${tc.output.slice(0, 120)}${tc.output.length > 120 ? "..." : ""}`
+          ).join("\n")
+        : "";
+
+      const answerText = (data.answer || "I processed your request.") + toolSummary;
       const assistantMsg: ChatMessage = {
         id: createMessageId("assistant"),
         role: "assistant",
@@ -680,6 +711,11 @@ export function NotionAiPanel({
         return savedMessages;
       });
       await saveChat(savedMessages);
+
+      // Notify workspace sidebar if agent created/modified something
+      if (toolCalls.some((tc) => tc.tool === "create_page" || tc.tool === "create_calendar_event")) {
+        window.dispatchEvent(new Event("page-updated"));
+      }
 
       // Append block to active page ONLY when server explicitly instructs it
       // (slash commands: /code, /write, /kanban, /table, /search)
@@ -888,10 +924,14 @@ export function NotionAiPanel({
                       text={msg.text}
                       onInsert={
                         msg.role === "assistant"
-                          ? (content, type) => {
+                          ? (content, type, lang) => {
                               window.dispatchEvent(
                                 new CustomEvent("ai-append-block", {
-                                  detail: { text: content, type: type || "paragraph" },
+                                  detail: {
+                                    text: content,
+                                    type: type || "paragraph",
+                                    ...(lang ? { language: lang } : {}),
+                                  },
                                 })
                               );
                               setWriteAction(`✅ Added to ${currentPageTitle}`);

@@ -77,7 +77,18 @@ export default function PageRoute({ params }: PageRouteProps) {
   useEffect(() => {
     let cancelled = false;
 
-    getPage(pageId)
+    getPage(
+      pageId,
+      false,
+      // Called when IndexedDB had stale data and background revalidation fetched fresh data.
+      // Only update the page if the user hasn't already started editing (no dirty state).
+      (fresh) => {
+        if (!cancelled) {
+          setPage(fresh);
+          hasLoadedOnce.current = true;
+        }
+      }
+    )
       .then((p) => { if (!cancelled) { setPage(p); setNotFound(false); hasLoadedOnce.current = true; } })
       .catch(() => { if (!cancelled) { setPage(null); setNotFound(true); } });
 
@@ -114,6 +125,18 @@ export default function PageRoute({ params }: PageRouteProps) {
     () => (page?.blocks ? page.blocks.map(toChecklistItem) : []),
     [page]
   );
+
+  // Tracks how many times fresh server data has replaced stale local data.
+  // Used as part of the Editor key so it remounts when real blocks arrive
+  // after the page initially rendered with a stale empty cache hit.
+  const dataVersionRef = useRef(0);
+  const prevBlocksWereEmpty = useRef(false);
+  if (initialBlocks.length === 0 || (initialBlocks.length === 1 && !initialBlocks[0].text?.trim())) {
+    prevBlocksWereEmpty.current = true;
+  } else if (prevBlocksWereEmpty.current) {
+    prevBlocksWereEmpty.current = false;
+    dataVersionRef.current += 1;
+  }
 
   // Handle sub-page click / creation
   const handleSelectSubPage = useCallback(
@@ -197,7 +220,7 @@ export default function PageRoute({ params }: PageRouteProps) {
 
   return (
     <DocumentCanvas
-      key={pageId}
+      key={`${pageId}-v${dataVersionRef.current}`}
       activeTitle={page.title}
       pageId={pageId}
       initialBlocks={initialBlocks}

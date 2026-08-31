@@ -1,21 +1,45 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
-import { NotionAiPanel } from "@/components/dashboard/notion-ai-panel";
-import { SearchModal } from "@/components/dashboard/modals/search-modal";
-import { CalendarModal } from "@/components/dashboard/modals/calendar-modal";
-import { SettingsModal } from "@/components/dashboard/modals/settings-modal";
-import { TrashModal } from "@/components/dashboard/modals/trash-modal";
-import { AiChatModal } from "@/components/dashboard/modals/ai-chat-modal";
-import { CommandPalette } from "@/components/dashboard/command-palette";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { getPage, deletePage } from "@/lib/actions/pages";
 import { UtilityPage } from "@/components/dashboard/utility-page";
+
+// Lazy-load heavy modals on demand to eliminate initial workspace bundle bloat
+const NotionAiPanel = dynamic(
+  () => import("@/components/dashboard/notion-ai-panel").then((mod) => mod.NotionAiPanel),
+  { ssr: false }
+);
+const SearchModal = dynamic(
+  () => import("@/components/dashboard/modals/search-modal").then((mod) => mod.SearchModal),
+  { ssr: false }
+);
+const CalendarModal = dynamic(
+  () => import("@/components/dashboard/modals/calendar-modal").then((mod) => mod.CalendarModal),
+  { ssr: false }
+);
+const SettingsModal = dynamic(
+  () => import("@/components/dashboard/modals/settings-modal").then((mod) => mod.SettingsModal),
+  { ssr: false }
+);
+const TrashModal = dynamic(
+  () => import("@/components/dashboard/modals/trash-modal").then((mod) => mod.TrashModal),
+  { ssr: false }
+);
+const AiChatModal = dynamic(
+  () => import("@/components/dashboard/modals/ai-chat-modal").then((mod) => mod.AiChatModal),
+  { ssr: false }
+);
+const CommandPalette = dynamic(
+  () => import("@/components/dashboard/command-palette").then((mod) => mod.CommandPalette),
+  { ssr: false }
+);
 
 export default function DashboardLayout({
   children,
@@ -121,18 +145,7 @@ export default function DashboardLayout({
     }
   }
 
-  if (status === "loading") {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background text-foreground animate-pulse">
-        <div className="flex flex-col items-center gap-3">
-          <div className="h-8 w-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
-          <span className="text-xs text-muted-foreground font-medium tracking-wide">
-            Loading Notion workspace...
-          </span>
-        </div>
-      </div>
-    );
-  }
+
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background font-sans antialiased text-foreground">

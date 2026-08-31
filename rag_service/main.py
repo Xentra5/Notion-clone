@@ -17,13 +17,10 @@ try:
 except Exception:
     pass
 
-# ─── LangChain Imports ────────────────────────────────────────────────────────
+# ─── LangChain Warnings Suppression ──────────────────────────────────────────
 import warnings
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="langchain")
 warnings.filterwarnings("ignore", message=".*langchain.*", category=DeprecationWarning)
-from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_community.vectorstores import Chroma
 
 app = FastAPI(title="Notion RAG AI Microservice")
 
@@ -38,19 +35,36 @@ app.add_middleware(
 # Global mutex lock to ensure SQLite write serialization
 db_lock = threading.Lock()
 
-# ─── Vector Store Setup ───────────────────────────────────────────────────────
+# ─── Lazy Vector Store Setup ───────────────────────────────────────────────────
 CHROMA_DIR = os.path.join(os.path.dirname(__file__), "chroma_db")
 os.makedirs(CHROMA_DIR, exist_ok=True)
 
-print("Loading SentenceTransformer embedding model (all-MiniLM-L6-v2)...")
-embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+_embedding_model = None
+_vector_store = None
 
-vector_store = Chroma(
-    collection_name="notion_workspace",
-    embedding_function=embedding_model,
-    persist_directory=CHROMA_DIR,
-)
-print("ChromaDB vector store ready.")
+def get_vector_store():
+    global _embedding_model, _vector_store
+    if _vector_store is None:
+        with db_lock:
+            if _vector_store is None:
+                print("[RAG] 🧠 Loading SentenceTransformer embedding model (all-MiniLM-L6-v2) on demand...")
+                from langchain_community.embeddings import HuggingFaceEmbeddings
+                from langchain_community.vectorstores import Chroma
+                _embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+                _vector_store = Chroma(
+                    collection_name="notion_workspace",
+                    embedding_function=_embedding_model,
+                    persist_directory=CHROMA_DIR,
+                )
+                print("[RAG] ✅ ChromaDB vector store initialized.")
+    return _vector_store
+
+class LazyVectorStore:
+    """Proxy object that defers expensive PyTorch/ChromaDB initialization until first real query."""
+    def __getattr__(self, name):
+        return getattr(get_vector_store(), name)
+
+vector_store = LazyVectorStore()
 
 
 # ─── Helper Functions ─────────────────────────────────────────────────────────
@@ -127,6 +141,7 @@ def index_page(req: IndexPageRequest):
             return {"status": "skipped", "message": "No text content"}
         combined = f"Page Title: {req.title}\n" + "\n".join(parts)
 
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
         splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=80)
         chunks = splitter.split_text(combined)
 
@@ -153,6 +168,7 @@ def index_page(req: IndexPageRequest):
 def index_pages_batch(req: IndexPagesBatchRequest):
     """Batch index multiple workspace pages sequentially under lock."""
     try:
+        from langchain_text_splitters import RecursiveCharacterTextSplitter
         splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=80)
         indexed_count = 0
 
@@ -596,3 +612,379 @@ Rules:
         actionItems=["Review the transcript in the Live Transcript tab."],
         topics=["Meeting recording"],
     )
+
+
+# ─── AI Agent ─────────────────────────────────────────────────────────────────
+
+class AgentRequest(BaseModel):
+    message: str
+    sessionToken: str          # forwarded session cookie value from Next.js
+    nextjsBaseUrl: str         # e.g. http://localhost:3000
+    workspaceId: str           # user email used as workspace id
+    geminiApiKey: Optional[str] = None
+    history: List[dict] = Field(default_factory=list)
+
+class AgentToolCall(BaseModel):
+    tool: str
+    input: str
+    output: str
+
+class AgentResponse(BaseModel):
+    answer: str
+    toolCalls: List[AgentToolCall] = Field(default_factory=list)
+    action: Optional[str] = None
+    blockType: Optional[str] = None
+    content: Optional[str] = None
+
+
+def _make_nextjs_headers(session_token: str) -> dict:
+    """Build headers with the session cookie so Next.js API routes authenticate the agent."""
+    return {
+        "Content-Type": "application/json",
+        "Cookie": (
+            f"next-auth.session-token={session_token}; "
+            f"__Secure-next-auth.session-token={session_token}"
+        ),
+    }
+
+
+def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool_calls_log: list):
+    """
+    Returns a list of LangChain @tool functions that make authenticated HTTP calls
+    back to the Next.js API routes.
+    """
+    import requests as req_lib
+    from langchain.tools import tool
+
+    headers = _make_nextjs_headers(session_token)
+
+    @tool
+    def create_calendar_event(title: str, date: str, start_time: str = "", end_time: str = "",
+                               description: str = "", location: str = "", color: str = "blue") -> str:
+        """
+        Create a new calendar event for the user.
+        Args:
+            title: Event title (required)
+            date: Date in YYYY-MM-DD format (required)
+            start_time: Start time in HH:MM 24h format e.g. '14:30' (optional)
+            end_time: End time in HH:MM 24h format e.g. '15:30' (optional)
+            description: Event description (optional)
+            location: Event location (optional)
+            color: One of: blue, red, green, yellow, purple, pink, orange, gray (optional)
+        Returns:
+            Confirmation message with the created event details.
+        """
+        payload = {
+            "title": title,
+            "date": date,
+            "startTime": start_time,
+            "endTime": end_time,
+            "description": description,
+            "location": location,
+            "color": color,
+        }
+        try:
+            r = req_lib.post(f"{base_url}/api/calendar", json=payload, headers=headers, timeout=10)
+            if r.status_code in (200, 201):
+                event = r.json().get("event", {})
+                result = f"✅ Calendar event created: '{event.get('title', title)}' on {event.get('date', date)}"
+                if event.get("startTime"):
+                    result += f" at {event['startTime']}"
+                tool_calls_log.append({"tool": "create_calendar_event", "input": str(payload), "output": result})
+                return result
+            else:
+                err = r.json().get("error", r.text)
+                tool_calls_log.append({"tool": "create_calendar_event", "input": str(payload), "output": f"Error: {err}"})
+                return f"Failed to create event: {err}"
+        except Exception as e:
+            tool_calls_log.append({"tool": "create_calendar_event", "input": str(payload), "output": f"Error: {e}"})
+            return f"Error creating calendar event: {e}"
+
+    @tool
+    def list_calendar_events(limit: int = 10) -> str:
+        """
+        List upcoming calendar events for the user.
+        Args:
+            limit: Max number of events to return (default 10)
+        Returns:
+            A formatted list of upcoming calendar events.
+        """
+        try:
+            r = req_lib.get(f"{base_url}/api/calendar", headers=headers, timeout=10)
+            if r.status_code == 200:
+                events = r.json().get("events", [])[:limit]
+                if not events:
+                    result = "No calendar events found."
+                else:
+                    lines = []
+                    for e in events:
+                        line = f"• {e.get('title', 'Untitled')} — {e.get('date', '')}"
+                        if e.get("startTime"):
+                            line += f" {e['startTime']}"
+                        if e.get("endTime"):
+                            line += f"–{e['endTime']}"
+                        if e.get("location"):
+                            line += f" @ {e['location']}"
+                        lines.append(line)
+                    result = f"📅 Upcoming events ({len(events)}):\n" + "\n".join(lines)
+                tool_calls_log.append({"tool": "list_calendar_events", "input": str(limit), "output": result})
+                return result
+            else:
+                tool_calls_log.append({"tool": "list_calendar_events", "input": str(limit), "output": "Error fetching events"})
+                return "Failed to fetch calendar events."
+        except Exception as e:
+            tool_calls_log.append({"tool": "list_calendar_events", "input": str(limit), "output": f"Error: {e}"})
+            return f"Error fetching calendar events: {e}"
+
+    @tool
+    def create_page(title: str, content: str = "", category: str = "Private") -> str:
+        """
+        Create a new page (note) in the user's workspace.
+        Args:
+            title: Page title (required)
+            content: Page content as plain text or markdown (optional)
+            category: One of 'Private', 'Shared', 'Meetings' (default: 'Private')
+        Returns:
+            Confirmation with the new page ID.
+        """
+        blocks = []
+        if content.strip():
+            for line in content.strip().split("\n"):
+                if line.strip():
+                    blocks.append({
+                        "id": f"agent-block-{len(blocks)}",
+                        "type": "paragraph",
+                        "properties": {"text": line.strip()},
+                    })
+        payload = {
+            "title": title,
+            "category": category if category in ("Private", "Shared", "Meetings") else "Private",
+            "blocks": blocks,
+        }
+        try:
+            r = req_lib.post(f"{base_url}/api/pages", json=payload, headers=headers, timeout=10)
+            if r.status_code in (200, 201):
+                page = r.json().get("page", {})
+                page_id = page.get("_id", "")
+                result = f"✅ Page created: '{page.get('title', title)}' (ID: {page_id})"
+                tool_calls_log.append({"tool": "create_page", "input": title, "output": result})
+                return result
+            else:
+                err = r.json().get("error", r.text)
+                tool_calls_log.append({"tool": "create_page", "input": title, "output": f"Error: {err}"})
+                return f"Failed to create page: {err}"
+        except Exception as e:
+            tool_calls_log.append({"tool": "create_page", "input": title, "output": f"Error: {e}"})
+            return f"Error creating page: {e}"
+
+    @tool
+    def list_pages(limit: int = 10) -> str:
+        """
+        List the user's workspace pages.
+        Args:
+            limit: Max pages to return (default 10)
+        Returns:
+            A formatted list of workspace pages.
+        """
+        try:
+            r = req_lib.get(f"{base_url}/api/pages", headers=headers, timeout=10)
+            if r.status_code == 200:
+                pages = r.json().get("pages", [])[:limit]
+                if not pages:
+                    result = "No pages found in workspace."
+                else:
+                    lines = [
+                        f"• {p.get('icon', '📄')} {p.get('title', 'Untitled')} [{p.get('category', '')}]"
+                        for p in pages
+                    ]
+                    result = f"📄 Workspace pages ({len(pages)}):\n" + "\n".join(lines)
+                tool_calls_log.append({"tool": "list_pages", "input": str(limit), "output": result})
+                return result
+            else:
+                tool_calls_log.append({"tool": "list_pages", "input": str(limit), "output": "Error fetching pages"})
+                return "Failed to fetch pages."
+        except Exception as e:
+            tool_calls_log.append({"tool": "list_pages", "input": str(limit), "output": f"Error: {e}"})
+            return f"Error fetching pages: {e}"
+
+    @tool
+    def search_workspace(query: str) -> str:
+        """
+        Semantic search through the user's workspace notes using RAG (vector similarity).
+        Args:
+            query: What to search for in the workspace
+        Returns:
+            Relevant excerpts from workspace pages.
+        """
+        try:
+            results = get_vector_store().similarity_search_with_score(
+                query, k=4, filter={"workspaceId": {"$eq": workspaceId}}
+            )
+            relevant = [
+                f"[{doc.metadata.get('title', 'Untitled')}]: {doc.page_content}"
+                for doc, score in results if score < 1.35
+            ]
+            if not relevant:
+                result = "No relevant workspace content found for that query."
+            else:
+                result = "🔍 Workspace search results:\n\n" + "\n\n".join(relevant)
+            tool_calls_log.append({"tool": "search_workspace", "input": query, "output": result[:300] + "..."})
+            return result
+        except Exception as e:
+            tool_calls_log.append({"tool": "search_workspace", "input": query, "output": f"Error: {e}"})
+            return f"Error searching workspace: {e}"
+
+    @tool
+    def web_search(query: str) -> str:
+        """
+        Search the web using DuckDuckGo for real-time information.
+        Args:
+            query: Search query string
+        Returns:
+            Live search results from the web.
+        """
+        try:
+            from langchain_community.utilities import DuckDuckGoSearchAPIWrapper
+            from langchain_community.tools import DuckDuckGoSearchResults
+            wrapper = DuckDuckGoSearchAPIWrapper(max_results=4)
+            tool_instance = DuckDuckGoSearchResults(api_wrapper=wrapper, output_format="list")
+            raw = tool_instance.invoke(query)
+            if isinstance(raw, list) and raw:
+                formatted = "\n\n".join(
+                    f"**{i+1}. {r.get('title', 'Result')}**\n{r.get('snippet', '')}\n🔗 {r.get('link', '')}"
+                    for i, r in enumerate(raw) if isinstance(r, dict)
+                )
+                result = f"🌐 Web search results for '{query}':\n\n{formatted}"
+            else:
+                result = f"No web results found for '{query}'."
+            tool_calls_log.append({"tool": "web_search", "input": query, "output": result[:300] + "..."})
+            return result
+        except Exception as e:
+            tool_calls_log.append({"tool": "web_search", "input": query, "output": f"Error: {e}"})
+            return f"Error searching the web: {e}"
+
+    return [
+        create_calendar_event,
+        list_calendar_events,
+        create_page,
+        list_pages,
+        search_workspace,
+        web_search,
+    ]
+
+
+@app.post("/agent", response_model=AgentResponse)
+def run_agent(req: AgentRequest):
+    """
+    LangChain tool-calling AI Agent endpoint.
+    Receives a natural language message and uses Gemini + LangChain tools
+    to autonomously create calendar events, pages, search workspace, etc.
+    """
+    api_key = (
+        req.geminiApiKey or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
+    ).strip().strip('"').strip("'")
+
+    if not api_key or api_key.startswith("your-") or len(api_key) < 20:
+        return AgentResponse(
+            answer=(
+                "⚠️ **Gemini API key not configured.** "
+                "Please add `GEMINI_API_KEY` to your `.env` file to use the AI Agent."
+            ),
+            toolCalls=[],
+        )
+
+    tool_calls_log: list = []
+
+    try:
+        from langchain_google_genai import ChatGoogleGenerativeAI
+        from langchain.agents import AgentExecutor, create_tool_calling_agent
+        from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+        from langchain_core.messages import HumanMessage, AIMessage
+
+        # Build authenticated tool set
+        tools = _build_agent_tools(req.nextjsBaseUrl, req.sessionToken, req.workspaceId, tool_calls_log)
+
+        llm = ChatGoogleGenerativeAI(
+            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            google_api_key=api_key,
+            temperature=0.3,
+        )
+
+        import datetime
+        today = datetime.datetime.now().strftime("%A, %B %d, %Y at %H:%M")
+
+        prompt = ChatPromptTemplate.from_messages([
+            ("system", f"""You are Notion AI Agent — an intelligent assistant that can perform actions inside the user's Notion workspace on their behalf.
+
+Today is: {today}
+
+You have access to these tools:
+- create_calendar_event: Create a calendar event (requires title + date in YYYY-MM-DD format)
+- list_calendar_events: List the user's upcoming events
+- create_page: Create a new workspace page/note
+- list_pages: List the user's workspace pages
+- search_workspace: Semantic search through workspace notes
+- web_search: Live DuckDuckGo web search
+
+RULES:
+- Always USE tools to fulfill requests — don't just describe what you would do.
+- For relative dates like "tomorrow" or "next Monday", calculate the actual YYYY-MM-DD date from today ({today}).
+- After tool calls, summarize what was done clearly and helpfully.
+- Understand intent even if the user has typos or informal phrasing.
+- If unsure about details like time, use sensible defaults and mention them.
+- NEVER comment on typos or grammar.
+"""),
+            MessagesPlaceholder("chat_history"),
+            ("human", "{input}"),
+            MessagesPlaceholder("agent_scratchpad"),
+        ])
+
+        # Build conversation history messages
+        chat_history = []
+        for turn in (req.history or [])[-10:]:
+            role = turn.get("role", "user")
+            text = str(turn.get("text", ""))[:3000]
+            if role == "user":
+                chat_history.append(HumanMessage(content=text))
+            elif role == "assistant":
+                chat_history.append(AIMessage(content=text))
+
+        agent = create_tool_calling_agent(llm, tools, prompt)
+        executor = AgentExecutor(
+            agent=agent,
+            tools=tools,
+            verbose=True,
+            max_iterations=6,
+            handle_parsing_errors=True,
+            return_intermediate_steps=False,
+        )
+
+        result = executor.invoke({
+            "input": req.message,
+            "chat_history": chat_history,
+        })
+
+        answer = str(result.get("output", "I processed your request."))
+
+        return AgentResponse(
+            answer=answer,
+            toolCalls=[AgentToolCall(**tc) for tc in tool_calls_log],
+        )
+
+    except Exception as e:
+        print(f"[/agent error] {e}")
+        import traceback
+        traceback.print_exc()
+
+        # Graceful degradation — try plain LLM without tools
+        fallback_answer = _llm(
+            system="You are Notion AI Agent. Answer the user's question helpfully.",
+            context="",
+            user_query=req.message,
+            api_key=api_key,
+            history=req.history,
+        )
+        return AgentResponse(
+            answer=fallback_answer,
+            toolCalls=tool_calls_log,
+        )

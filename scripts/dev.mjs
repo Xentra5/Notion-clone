@@ -36,15 +36,19 @@ const rag = start(pythonCommand, [
   "uvicorn",
   "main:app",
   "--reload",
+  "--reload-dir",
+  ragDir,
   "--port",
   "8000",
   "--app-dir",
   ragDir,
 ]);
 
-console.log("[dev] Starting Next.js (Webpack mode for Windows stability)...");
+const useTurbopack = process.env.TURBO !== "0";
+const nextModeFlag = useTurbopack ? "--turbopack" : "--webpack";
+console.log(`[dev] Starting Next.js (${nextModeFlag} mode)...`);
 const nextBin = resolve(root, "node_modules", "next", "dist", "bin", "next");
-const next = start(process.execPath, [nextBin, "dev", "--webpack"]);
+const next = start(process.execPath, [nextBin, "dev", nextModeFlag]);
 
 function stop() {
   if (shuttingDown) return;
