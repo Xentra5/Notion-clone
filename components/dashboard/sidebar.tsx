@@ -1,10 +1,11 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter, usePathname } from "next/navigation";
 import { toast } from "sonner";
 import dynamic from "next/dynamic";
+import { useWorkspaceStore } from "@/store/workspace-store";
 
 const PricingModal = dynamic(
   () => import("./pricing-modal").then((mod) => mod.PricingModal),
@@ -145,7 +146,7 @@ function PageTreeNode({
           ) : (
             <span className="w-3.5 shrink-0" />
           )}
-          <span className="shrink-0 text-sm">{page.icon || "📄"}</span>
+          <span className="shrink-0 text-sm">{page.icon || "ðŸ“„"}</span>
           {renamingPageId === page._id ? (
             <input
               autoFocus
@@ -210,7 +211,7 @@ function PageTreeNode({
         )}
       </div>
 
-      {/* Move-into dropdown — fixed-position so it never clips inside scrollable sidebar */}
+      {/* Move-into dropdown â€” fixed-position so it never clips inside scrollable sidebar */}
       {moveMenuPos && typeof window !== "undefined" && (
         <div
           className="fixed z-[9999] bg-popover border border-border rounded-xl shadow-2xl p-1.5 min-w-[210px] animate-in fade-in duration-100"
@@ -218,7 +219,7 @@ function PageTreeNode({
           onMouseDown={(e) => e.stopPropagation()}
         >
           <p className="px-2 py-1 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider truncate">
-            Move &quot;{page.title}&quot; into…
+            Move &quot;{page.title}&quot; intoâ€¦
           </p>
           {/* "Move to top level" shown only if this page is already nested */}
           {page.parentPageId && (
@@ -226,8 +227,8 @@ function PageTreeNode({
               onClick={() => { onMoveInto(page._id, null); setMoveMenuPos(null); }}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent text-[11px] text-foreground transition font-medium"
             >
-              <span>📂</span>
-              <span>↑ Move to top level</span>
+              <span>ðŸ“‚</span>
+              <span>â†‘ Move to top level</span>
             </button>
           )}
           {candidateParents.length === 0 && !page.parentPageId && (
@@ -239,7 +240,7 @@ function PageTreeNode({
               onClick={() => { onMoveInto(page._id, p._id); setMoveMenuPos(null); }}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent text-[11px] text-foreground transition"
             >
-              <span className="shrink-0">{p.icon || "📄"}</span>
+              <span className="shrink-0">{p.icon || "ðŸ“„"}</span>
               <span className="truncate flex-1">{p.title}</span>
               {p.parentPageId && (
                 <span className="ml-auto text-[9px] text-muted-foreground shrink-0 italic">nested</span>
@@ -279,25 +280,14 @@ function PageTreeNode({
 
 interface SidebarProps {
   activePage: string;
-  onSelectPage: (title: string) => void;
-  onOpenSearch: () => void;
-  onToggleAi: () => void;
-  onOpenCalendar: () => void;
-  onOpenSettings: () => void;
-  onOpenTrash: () => void;
-  onOpenUtility: (page: "Library" | "My Tasks" | "Marketplace" | "Help") => void;
 }
 
-export function Sidebar({
-  activePage,
-  onSelectPage,
-  onOpenSearch,
-  onToggleAi,
-  onOpenCalendar,
-  onOpenSettings,
-  onOpenTrash,
-  onOpenUtility,
-}: SidebarProps) {
+export function Sidebar({ activePage }: SidebarProps) {
+  const {
+    toggleAi, openSearch, openCalendar, openSettings, openTrash,
+    setUtilityPage, setActivePage, toggleSidebar, refreshPages,
+    pagesVersion,
+  } = useWorkspaceStore();
   const router = useRouter();
   const pathname = usePathname();
   const { data: session, status } = useSession();
@@ -359,36 +349,18 @@ export function Sidebar({
     }
   }, [status, loadPages]);
 
+  // Refresh pages whenever the store signals a structural change
   useEffect(() => {
-    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
-    // Debounce page-updated to avoid rapid refetches during autosave cycles
-    const refreshPagesDebounced = () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      debounceTimer = setTimeout(() => { void loadPages(); }, 300);
-    };
-    // page-created should refresh immediately (user expects to see the new page)
-    const refreshPagesImmediate = () => { void loadPages(); };
-    window.addEventListener("page-updated", refreshPagesDebounced);
-    window.addEventListener("page-created", refreshPagesImmediate);
-    // Subscribe to local store for multi-tab sync.
-    // Only react to structural events that change the sidebar tree —
-    // NOT page_updated (autosave), which would cause excess GET /api/pages
-    // calls every time the user types a character in the editor.
+    if (status === "authenticated") void loadPages();
+  }, [pagesVersion, loadPages, status]);
+
+  useEffect(() => {
+    // Subscribe to local store for multi-tab sync (cross-tab page_created/deleted)
     const STRUCTURAL_EVENTS = new Set(["page_created", "page_deleted", "pages_list_updated"]);
     const unsubscribeLocal = localStore.subscribe((evt) => {
-      if (STRUCTURAL_EVENTS.has(evt.type)) {
-        evt.type === "page_created"
-          ? void loadPages()          // Immediate: user expects to see the new page right away
-          : refreshPagesDebounced(); // Debounced: list refresh is sufficient for deletions & bulk updates
-      }
+      if (STRUCTURAL_EVENTS.has(evt.type)) void loadPages();
     });
-
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-      unsubscribeLocal();
-      window.removeEventListener("page-updated", refreshPagesDebounced);
-      window.removeEventListener("page-created", refreshPagesImmediate);
-    };
+    return () => unsubscribeLocal();
   }, [loadPages]);
 
   const userName = session?.user?.name || "o";
@@ -415,7 +387,7 @@ export function Sidebar({
     try {
       const newPage = await createPage({ title: "Untitled", category: "Private" });
       await loadPages();
-      window.dispatchEvent(new CustomEvent("page-created", { detail: { page: newPage } }));
+      refreshPages();
       toast.success("New page created");
       router.push(`/dashboard/${newPage._id}`);
     } catch (e) {
@@ -432,7 +404,7 @@ export function Sidebar({
     try {
       const newPage = await createPage({ title: "Untitled", parentPageId, category: "Private" });
       await loadPages();
-      window.dispatchEvent(new CustomEvent("page-created", { detail: { page: newPage } }));
+      refreshPages();
       toast.success("New sub-page created");
       router.push(`/dashboard/${newPage._id}`);
     } catch (e) {
@@ -447,7 +419,7 @@ export function Sidebar({
     try {
       await updatePage(pageId, { parentPageId: newParentId ?? "" });
       await loadPages();
-      window.dispatchEvent(new CustomEvent("page-updated"));
+      refreshPages();
       toast.success(newParentId ? "Page moved" : "Page moved to top level");
     } catch (err) {
       toast.error("Failed to move page");
@@ -527,7 +499,7 @@ export function Sidebar({
       await deletePage(id);
       await loadPages();
       toast.success("Page moved to Trash");
-      window.dispatchEvent(new Event("page-updated"));
+      refreshPages();
     } catch (err) {
       toast.error("Failed to delete page");
       console.error("Failed to delete page:", err);
@@ -611,28 +583,28 @@ export function Sidebar({
         {/* Top Quick Actions Row */}
         <div className="flex items-center justify-between px-1 py-1 text-muted-foreground">
           <button
-            onClick={() => onSelectPage("Home")}
+            onClick={() => { router.push("/dashboard"); setActivePage({ title: "Getting Started with Notion" }); }}
             className="p-1.5 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition"
             title="Home"
           >
             <Home className="h-4 w-4" />
           </button>
           <button
-            onClick={onOpenSearch}
+            onClick={openSearch}
             className="p-1.5 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition"
             title="Search (Cmd+K)"
           >
             <Search className="h-4 w-4" />
           </button>
           <button
-            onClick={onToggleAi}
+            onClick={toggleAi}
             className="p-1.5 rounded-md hover:bg-sidebar-accent hover:text-purple-600 dark:hover:text-purple-300 transition"
             title="Notion AI"
           >
             <Sparkles className="h-4 w-4" />
           </button>
           <button
-            onClick={onOpenSettings}
+            onClick={openSettings}
             className="p-1.5 rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground transition"
             title="Settings"
           >
@@ -673,7 +645,7 @@ export function Sidebar({
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="shrink-0 text-sm">{page.icon || "📄"}</span>
+                        <span className="shrink-0 text-sm">{page.icon || "ðŸ“„"}</span>
                         <span className="truncate text-[11px] flex-1">{page.title}</span>
                       </div>
                       <button
@@ -718,7 +690,7 @@ export function Sidebar({
           {expandedSections.meetings && (
             <div className="space-y-1.5 pt-0.5">
               <div
-                onClick={onOpenCalendar}
+                onClick={openCalendar}
                 className="cursor-pointer bg-card border border-border rounded-xl p-2.5 space-y-1 hover:border-border/80 hover:bg-neutral-100 dark:hover:bg-[#242424] transition group shadow-sm"
               >
                 <div className="flex items-center gap-2">
@@ -884,7 +856,7 @@ export function Sidebar({
                     : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
                 }`}
               >
-                <span className="text-sm">🤖</span>
+                <span className="text-sm">ðŸ¤–</span>
                 <span className="text-[11px]">AI Agent</span>
               </button>
             </div>
@@ -961,7 +933,7 @@ export function Sidebar({
             <div className="space-y-0.5">
               <button
                 onClick={() => {
-                  window.dispatchEvent(new CustomEvent("page-updated"));
+                  refreshPages();
                   toast.info("Shared pages synced with collaborators");
                 }}
                 className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
@@ -1019,35 +991,35 @@ export function Sidebar({
         {/* Bottom Utility Items */}
         <div className="pt-3 border-t border-sidebar-border space-y-0.5">
           <button
-            onClick={() => onOpenUtility("Library")}
+            onClick={() => { setUtilityPage("Library"); setActivePage({ title: "Library" }); }}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Library</span>
           </button>
           <button
-            onClick={() => onOpenUtility("My Tasks")}
+            onClick={() => { setUtilityPage("My Tasks"); setActivePage({ title: "My Tasks" }); }}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />
             <span>My Tasks</span>
           </button>
           <button
-            onClick={() => onOpenUtility("Marketplace")}
+            onClick={() => { setUtilityPage("Marketplace"); setActivePage({ title: "Marketplace" }); }}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <ShoppingBag className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Marketplace</span>
           </button>
           <button
-            onClick={() => onOpenUtility("Help")}
+            onClick={() => { setUtilityPage("Help"); setActivePage({ title: "Help" }); }}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Help</span>
           </button>
           <button
-            onClick={onOpenTrash}
+            onClick={openTrash}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <Trash2 className="h-3.5 w-3.5 text-muted-foreground" />
@@ -1106,7 +1078,7 @@ export function Sidebar({
             <button
               onClick={() => {
                 setNewMenuOpen(false);
-                onToggleAi();
+                toggleAi();
               }}
               className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-accent hover:text-purple-600 dark:hover:text-purple-300 transition text-left font-medium"
             >
@@ -1175,3 +1147,4 @@ export function Sidebar({
     </aside>
   );
 }
+

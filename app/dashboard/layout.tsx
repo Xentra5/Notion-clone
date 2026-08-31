@@ -1,6 +1,6 @@
-"use client";
+﻿"use client";
 
-import { useState, useEffect } from "react";
+import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
 import { useParams, useRouter } from "next/navigation";
@@ -8,8 +8,9 @@ import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
-import { getPage, deletePage } from "@/lib/actions/pages";
+import { deletePage, getPage } from "@/lib/actions/pages";
 import { UtilityPage } from "@/components/dashboard/utility-page";
+import { useWorkspaceStore } from "@/store/workspace-store";
 
 // Lazy-load heavy modals on demand to eliminate initial workspace bundle bloat
 const NotionAiPanel = dynamic(
@@ -41,102 +42,75 @@ const CommandPalette = dynamic(
   { ssr: false }
 );
 
-export default function DashboardLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { status } = useSession();
   const params = useParams();
-  // pageId is present when the URL is /dashboard/[pageId], absent on /dashboard
   const pageId = params?.pageId as string | undefined;
 
-  const [activeTitle, setActiveTitle] = useState("Getting Started with Notion");
-  const [lastEditedAt, setLastEditedAt] = useState<string | Date | undefined>(undefined);
-  const [isAiOpen, setIsAiOpen] = useState(false);
-  const [isAiSplitView, setIsAiSplitView] = useState(false);
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [isTrashOpen, setIsTrashOpen] = useState(false);
-  const [isQuickAiOpen, setIsQuickAiOpen] = useState(false);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [utilityPage, setUtilityPage] = useState<"Library" | "My Tasks" | "Marketplace" | "Help" | null>(null);
-  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const {
+    activePage, setActivePage,
+    isAiOpen, closeAi, isAiSplitView, toggleSplitView,
+    isSearchOpen, closeSearch,
+    isCommandPaletteOpen, closeCommandPalette, toggleCommandPalette,
+    isCalendarOpen, closeCalendar,
+    isSettingsOpen, closeSettings,
+    isTrashOpen, closeTrash,
+    isQuickAiOpen, closeQuickAi,
+    sidebarOpen,
+    utilityPage, setUtilityPage,
+    deleteTargetId, setDeleteTargetId,
+  } = useWorkspaceStore();
 
-  // Auto-collapse sidebar when 50/50 split view is toggled
-  const handleToggleSplitView = () => {
-    setIsAiSplitView((prev) => {
-      const next = !prev;
-      if (next && window.innerWidth < 1280) {
-        setSidebarOpen(false);
-      }
-      return next;
-    });
-  };
-
-  // Redirect to login if user is not authenticated
+  // Redirect to login if not authenticated
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.replace("/login");
-    }
+    if (status === "unauthenticated") router.replace("/login");
   }, [status, router]);
 
-  // Global Cmd+K / Ctrl+K keyboard shortcut
+  // Global Cmd+K / Ctrl+K shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
-        setIsCommandPaletteOpen((prev) => !prev);
+        toggleCommandPalette();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, []);
+  }, [toggleCommandPalette]);
 
+  // Bridge legacy window custom events from deeply nested components to the store
   useEffect(() => {
-    const openQuickAi = () => setIsQuickAiOpen(true);
-    const openSettings = () => setIsSettingsOpen(true);
-    const openAiPanel = () => setIsAiOpen(true);
-    const syncPageTitle = (event: Event) => {
-      const title = (event as CustomEvent<{ title?: string }>).detail?.title;
-      if (title) {
-        setActiveTitle((prev) => (prev !== title ? title : prev));
-      }
-    };
+    const openQuickAi = () => useWorkspaceStore.getState().openQuickAi();
+    const openSettingsEvt = () => useWorkspaceStore.getState().openSettings();
+    const openAiPanel = () => useWorkspaceStore.getState().openAi();
     window.addEventListener("open-quick-ai", openQuickAi);
-    window.addEventListener("open-settings", openSettings);
+    window.addEventListener("open-settings", openSettingsEvt);
     window.addEventListener("trigger-ai-command", openAiPanel);
     window.addEventListener("open-ai-summary", openAiPanel);
-    window.addEventListener("page-updated", syncPageTitle);
     return () => {
       window.removeEventListener("open-quick-ai", openQuickAi);
-      window.removeEventListener("open-settings", openSettings);
+      window.removeEventListener("open-settings", openSettingsEvt);
       window.removeEventListener("trigger-ai-command", openAiPanel);
       window.removeEventListener("open-ai-summary", openAiPanel);
-      window.removeEventListener("page-updated", syncPageTitle);
     };
   }, []);
 
-  // When navigating to a real page URL, sync the TopBar title & updatedAt from the DB
+  // Sync active page info when navigating to a page URL
   useEffect(() => {
     if (!pageId) return;
+    setActivePage({ pageId });
     getPage(pageId)
-      .then((p) => {
-        setActiveTitle(p.title);
-        setLastEditedAt(p.updatedAt);
-      })
-      .catch(() => setActiveTitle("Page Not Found"));
-  }, [pageId]);
+      .then((p) => setActivePage({ pageId, title: p.title, updatedAt: p.updatedAt }))
+      .catch(() => setActivePage({ title: "Page Not Found" }));
+  }, [pageId, setActivePage]);
 
   async function handleConfirmDelete() {
     if (!deleteTargetId) return;
     try {
       await deletePage(deleteTargetId);
       toast.success("Page moved to Trash");
-      window.dispatchEvent(new Event("page-updated"));
+      useWorkspaceStore.getState().refreshPages();
       router.push("/dashboard");
     } catch {
       toast.error("Failed to delete page");
@@ -145,73 +119,38 @@ export default function DashboardLayout({
     }
   }
 
-
-
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-background font-sans antialiased text-foreground">
       {/* Left Sidebar */}
-      <div
-        className={`${
-          sidebarOpen ? "flex" : "hidden"
-        } md:flex h-full shrink-0 z-30`}
-      >
-        <Sidebar
-          // Pass pageId when on a real page route so the sidebar can highlight it.
-          // Fall back to activeTitle for special sentinel pages (AI Meeting Note, Home).
-          activePage={pageId ?? activeTitle}
-          onSelectPage={(title: string) => setActiveTitle(title)}
-          onOpenSearch={() => setIsSearchOpen(true)}
-          onToggleAi={() => setIsAiOpen(!isAiOpen)}
-          onOpenCalendar={() => setIsCalendarOpen(true)}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          onOpenTrash={() => setIsTrashOpen(true)}
-          onOpenUtility={(page: "Library" | "My Tasks" | "Marketplace" | "Help") => { setUtilityPage(page); setActiveTitle(page); }}
-        />
+      <div className={`${sidebarOpen ? "flex" : "hidden"} md:flex h-full shrink-0 z-30`}>
+        <Sidebar activePage={pageId ?? activePage.title} />
       </div>
 
       {/* Center Main Workspace Area */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-        <TopBar
-          activeTitle={activeTitle}
-          pageId={pageId}
-          updatedAt={lastEditedAt}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          onToggleAi={() => setIsAiOpen(!isAiOpen)}
-          isAiOpen={isAiOpen}
-          onDeletePage={(id) => setDeleteTargetId(id)}
-        />
-        {/* Page content (dashboard/page.tsx or dashboard/[pageId]/page.tsx) */}
-        {utilityPage ? <UtilityPage type={utilityPage} onBack={() => { setUtilityPage(null); setActiveTitle("Getting Started with Notion"); }} /> : children}
+        <TopBar pageId={pageId} />
+        {utilityPage
+          ? <UtilityPage type={utilityPage} onBack={() => { setUtilityPage(null); setActivePage({ title: "Getting Started with Notion" }); }} />
+          : children}
       </div>
 
       {/* Right Notion AI Panel */}
       <NotionAiPanel
         isOpen={isAiOpen}
-        onClose={() => setIsAiOpen(false)}
-        currentPageTitle={activeTitle}
+        onClose={closeAi}
+        currentPageTitle={activePage.title}
         currentPageId={pageId}
         isSplitView={isAiSplitView}
-        onToggleSplitView={handleToggleSplitView}
+        onToggleSplitView={toggleSplitView}
       />
 
       {/* Overlay Modals */}
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onOpenAi={() => setIsQuickAiOpen(true)}
-      />
-      <SearchModal
-        isOpen={isSearchOpen}
-        onClose={() => setIsSearchOpen(false)}
-        onSelectPage={(title) => setActiveTitle(title)}
-      />
-      <CalendarModal
-        isOpen={isCalendarOpen}
-        onClose={() => setIsCalendarOpen(false)}
-      />
-      <SettingsModal isOpen={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} />
-      <TrashModal isOpen={isTrashOpen} onClose={() => setIsTrashOpen(false)} />
-      <AiChatModal isOpen={isQuickAiOpen} onClose={() => setIsQuickAiOpen(false)} />
+      <CommandPalette isOpen={isCommandPaletteOpen} onClose={closeCommandPalette} onOpenAi={() => useWorkspaceStore.getState().openQuickAi()} />
+      <SearchModal isOpen={isSearchOpen} onClose={closeSearch} onSelectPage={(title) => setActivePage({ title })} />
+      <CalendarModal isOpen={isCalendarOpen} onClose={closeCalendar} />
+      <SettingsModal isOpen={isSettingsOpen} onClose={closeSettings} />
+      <TrashModal isOpen={isTrashOpen} onClose={closeTrash} />
+      <AiChatModal isOpen={isQuickAiOpen} onClose={closeQuickAi} />
       <ConfirmModal
         isOpen={!!deleteTargetId}
         onClose={() => setDeleteTargetId(null)}
@@ -220,7 +159,6 @@ export default function DashboardLayout({
         description="This page will be moved to your Trash. You can restore it anytime."
         confirmText="Delete"
       />
-
     </div>
   );
 }

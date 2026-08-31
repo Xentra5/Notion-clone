@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ import { CommentsPanel } from "@/components/dashboard/editor/CommentsPanel";
 import { LivePresenceBar } from "@/components/dashboard/editor/LivePresenceBar";
 import { blocksToMarkdown, downloadMarkdownFile, exportToPdfPrint } from "@/lib/export-import";
 import { Bell } from "lucide-react";
+import { useWorkspaceStore } from "@/store/workspace-store";
 
 function formatRelativeTime(dateInput?: string | Date | null): string {
   if (!dateInput) return "Edited just now";
@@ -57,26 +58,20 @@ function formatRelativeTime(dateInput?: string | Date | null): string {
 }
 
 interface TopBarProps {
-  activeTitle: string;
   pageId?: string;
-  updatedAt?: string | Date;
-  blocks?: PageBlock[];
-  onToggleSidebar?: () => void;
-  onToggleAi: () => void;
-  isAiOpen?: boolean;
-  onDeletePage?: (pageId: string) => void;
 }
 
-export function TopBar({
-  activeTitle,
-  pageId,
-  updatedAt,
-  blocks = [],
-  onToggleSidebar,
-  onToggleAi,
-  isAiOpen,
-  onDeletePage,
-}: TopBarProps) {
+export function TopBar({ pageId }: TopBarProps) {
+  const {
+    activePage, setActivePage,
+    toggleAi, isAiOpen,
+    toggleSidebar,
+    setDeleteTargetId,
+    refreshPages,
+  } = useWorkspaceStore();
+  const activeTitle = activePage.title;
+  const updatedAt = activePage.updatedAt;
+  const blocks: PageBlock[] = [];
   const [isStarred, setIsStarred] = useState(false);
   const [copied, setCopied] = useState(false);
   const [showMoreMenu, setShowMoreMenu] = useState(false);
@@ -100,53 +95,9 @@ export function TopBar({
   }, [updatedAt]);
 
   useEffect(() => {
-    queueMicrotask(() => setRenameTitleValue(activeTitle));
-  }, [activeTitle]);
-
-  useEffect(() => {
-    if (!pageId) {
-      queueMicrotask(() => setBreadcrumbs([]));
-      return;
-    }
-    let cancelled = false;
-    getPages()
-      .then((allPages) => {
-        if (cancelled) return;
-        const current = allPages.find((p) => p._id === pageId);
-        if (current) {
-          setIsStarred(Boolean(current.isStarred));
-          if (current.permission) setPermission(current.permission);
-        }
-        const chain: { id: string; title: string }[] = [];
-        let parentId = current?.parentPageId;
-        while (parentId) {
-          const parentDoc: Page | undefined = allPages.find((p) => p._id === parentId);
-          if (parentDoc) {
-            chain.unshift({ id: parentDoc._id, title: parentDoc.title });
-            parentId = parentDoc.parentPageId;
-          } else {
-            break;
-          }
-        }
-        setBreadcrumbs(chain);
-      })
-      .catch(() => {});
-    return () => { cancelled = true; };
-  }, [pageId, activeTitle]);
-
-  useEffect(() => {
-    function handlePageUpdate(e: Event) {
-      const customEvent = e as CustomEvent<{ title?: string; updatedAt?: Date | string; isStarred?: boolean; permission?: string }>;
-      if (customEvent.detail?.title) setRenameTitleValue(customEvent.detail.title);
-      if (typeof customEvent.detail?.isStarred === "boolean") setIsStarred(customEvent.detail.isStarred);
-      if (customEvent.detail?.permission) setPermission(customEvent.detail.permission);
-      setLastEdited(customEvent.detail?.updatedAt || new Date());
-    }
-    window.addEventListener("page-updated", handlePageUpdate);
-    return () => {
-      window.removeEventListener("page-updated", handlePageUpdate);
-    };
-  }, []);
+    // Sync title value when store's active page changes
+    queueMicrotask(() => setRenameTitleValue(activePage.title));
+  }, [activePage.title]);
 
   async function handleFinishTitleRename() {
     setIsRenamingTitle(false);
@@ -154,7 +105,7 @@ export function TopBar({
     const title = renameTitleValue.trim() || "Untitled";
     try {
       await updatePage(pageId, { title });
-      window.dispatchEvent(new CustomEvent("page-updated", { detail: { title, updatedAt: new Date() } }));
+      setActivePage({ title, updatedAt: new Date() }); refreshPages();
       toast.success("Page title updated");
     } catch (err) {
       toast.error("Failed to update page title");
@@ -186,9 +137,9 @@ export function TopBar({
       <header className="h-11 border-b border-border bg-background px-3 flex items-center justify-between text-xs text-muted-foreground select-none shrink-0 font-sans">
         {/* Left section: Sidebar toggle & Breadcrumbs */}
         <div className="flex items-center gap-2 overflow-hidden">
-          {onToggleSidebar && (
+          {toggleSidebar && (
             <button
-              onClick={onToggleSidebar}
+              onClick={toggleSidebar}
               className="p-1 rounded-md hover:bg-neutral-200 dark:hover:bg-[#252525] text-neutral-600 dark:text-[#9b9b9b] hover:text-neutral-900 dark:hover:text-white transition md:hidden"
               title="Toggle Sidebar"
             >
@@ -276,7 +227,7 @@ export function TopBar({
                       if (pageId) {
                         try {
                           await updatePage(pageId, { permission: "Private" });
-                          window.dispatchEvent(new CustomEvent("page-updated", { detail: { permission: "Private" } }));
+                          refreshPages();
                           toast.success("Page set to Private");
                         } catch { toast.error("Failed to update permission"); }
                       }
@@ -293,7 +244,7 @@ export function TopBar({
                       if (pageId) {
                         try {
                           await updatePage(pageId, { permission: "Workspace" });
-                          window.dispatchEvent(new CustomEvent("page-updated", { detail: { permission: "Workspace" } }));
+                          refreshPages();
                           toast.success("Page shared with Workspace");
                         } catch { toast.error("Failed to update permission"); }
                       }
@@ -310,7 +261,7 @@ export function TopBar({
                       if (pageId) {
                         try {
                           await updatePage(pageId, { permission: "Public" });
-                          window.dispatchEvent(new CustomEvent("page-updated", { detail: { permission: "Public" } }));
+                          refreshPages();
                           toast.success("Page published to Public Web");
                         } catch { toast.error("Failed to update permission"); }
                       }
@@ -405,9 +356,7 @@ export function TopBar({
               setIsStarred(nextStarred);
               try {
                 await updatePage(pageId, { isStarred: nextStarred });
-                window.dispatchEvent(
-                  new CustomEvent("page-updated", { detail: { isStarred: nextStarred, updatedAt: new Date() } })
-                );
+                refreshPages();
                 toast.success(nextStarred ? "Added to Starred" : "Removed from Starred");
               } catch {
                 setIsStarred(!nextStarred);
@@ -461,11 +410,11 @@ export function TopBar({
                   <span>Export / Print PDF</span>
                 </button>
                 <div className="h-[1px] bg-border my-1" />
-                {pageId && onDeletePage ? (
+                {pageId && setDeleteTargetId ? (
                   <button
                     onClick={() => {
                       setShowMoreMenu(false);
-                      onDeletePage(pageId);
+                      setDeleteTargetId(pageId);
                     }}
                     className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/40 text-red-600 dark:text-red-400 transition text-left"
                   >
@@ -484,7 +433,7 @@ export function TopBar({
 
           {/* Notion AI Toggle Button */}
           <button
-            onClick={onToggleAi}
+            onClick={toggleAi}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ml-1 ${
               isAiOpen
                 ? "bg-purple-900/30 border border-purple-800/50 text-purple-600 dark:text-purple-300"
@@ -516,3 +465,5 @@ export function TopBar({
     </>
   );
 }
+
+

@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { updatePage } from "@/lib/actions/pages";
 import type { ChecklistItem } from "./use-pages";
+import { workspaceStore } from "@/store/workspace-store";
 
 interface UseAutosaveOptions {
   pageId: string | undefined;
@@ -56,9 +57,9 @@ export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutos
               },
             })) as never,
           });
-          if (typeof window !== "undefined") {
-            window.dispatchEvent(new CustomEvent("page-updated", { detail: { updatedAt: new Date(), title: snap.title } }));
-          }
+          // Notify the store so TopBar title and timestamp update without window events
+          workspaceStore.getState().setActivePage({ title: snap.title, updatedAt: new Date() });
+          workspaceStore.getState().refreshPages();
         } catch (error) {
           if (!latestRef.current) latestRef.current = snap;
           throw error;
