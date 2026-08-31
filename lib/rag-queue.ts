@@ -218,7 +218,6 @@ class RagAsyncQueueEngine {
 
 // Global Singleton (survives HMR and Node runtime lifecycle)
 declare global {
-  // eslint-disable-next-line no-var
   var __ragAsyncQueue: RagAsyncQueueEngine | undefined;
 }
 

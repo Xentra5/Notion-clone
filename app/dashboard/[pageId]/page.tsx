@@ -129,14 +129,21 @@ export default function PageRoute({ params }: PageRouteProps) {
   // Tracks how many times fresh server data has replaced stale local data.
   // Used as part of the Editor key so it remounts when real blocks arrive
   // after the page initially rendered with a stale empty cache hit.
-  const dataVersionRef = useRef(0);
-  const prevBlocksWereEmpty = useRef(false);
-  if (initialBlocks.length === 0 || (initialBlocks.length === 1 && !initialBlocks[0].text?.trim())) {
-    prevBlocksWereEmpty.current = true;
-  } else if (prevBlocksWereEmpty.current) {
-    prevBlocksWereEmpty.current = false;
-    dataVersionRef.current += 1;
-  }
+  const [dataVersion, setDataVersion] = useState(0);
+  const prevBlocksWereEmptyRef = useRef(false);
+
+  useEffect(() => {
+    const isEmpty =
+      initialBlocks.length === 0 ||
+      (initialBlocks.length === 1 && !initialBlocks[0].text?.trim());
+
+    if (isEmpty) {
+      prevBlocksWereEmptyRef.current = true;
+    } else if (prevBlocksWereEmptyRef.current) {
+      prevBlocksWereEmptyRef.current = false;
+      setDataVersion((v) => v + 1);
+    }
+  }, [initialBlocks]);
 
   // Handle sub-page click / creation
   const handleSelectSubPage = useCallback(
@@ -220,7 +227,7 @@ export default function PageRoute({ params }: PageRouteProps) {
 
   return (
     <DocumentCanvas
-      key={`${pageId}-v${dataVersionRef.current}`}
+      key={`${pageId}-v${dataVersion}`}
       activeTitle={page.title}
       pageId={pageId}
       initialBlocks={initialBlocks}

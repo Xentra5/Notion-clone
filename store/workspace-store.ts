@@ -71,7 +71,7 @@ interface WorkspaceState {
   setDeleteTargetId: (id: string | null) => void;
 
   // -- Page list refresh -----------------------------------------------------
-  /** Incrementing counter — Sidebar watches this to re-fetch the page list */
+  /** Incrementing counter â€” Sidebar watches this to re-fetch the page list */
   pagesVersion: number;
   refreshPages: () => void;
 }

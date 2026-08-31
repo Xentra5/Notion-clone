@@ -387,7 +387,6 @@ export function hashQuery(input: string): string {
 
 // Global Singleton Cache Instance
 declare global {
-  // eslint-disable-next-line no-var
   var __appServerCache: MemoryCache | undefined;
 }
 

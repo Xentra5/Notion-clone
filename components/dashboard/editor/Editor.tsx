@@ -294,7 +294,6 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     setSlash({ blockId: "", query: "", open: false });
     setFocusedId(null);
     hasMounted.current = false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pageId]);
 
   // Auto-resize title textarea
