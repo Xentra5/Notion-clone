@@ -19,6 +19,24 @@ import { create } from "zustand";
 
 type UtilityPage = "Library" | "My Tasks" | "Marketplace" | "Help";
 
+export interface RemoteCollaborator {
+  id: string;
+  name: string;
+  email: string;
+  color: string;
+  activePageId?: string;
+  blockId?: string;
+}
+
+export interface RemoteCursor {
+  id: string;
+  name: string;
+  color: string;
+  x: number;
+  y: number;
+  blockId?: string;
+}
+
 interface ActivePageInfo {
   title: string;
   updatedAt?: Date | string;
@@ -58,6 +76,12 @@ interface WorkspaceState {
   openQuickAi: () => void;
   closeQuickAi: () => void;
 
+  // -- Real-time Collaboration -----------------------------------------------
+  collaborators: RemoteCollaborator[];
+  setCollaborators: (collabs: RemoteCollaborator[]) => void;
+  remoteCursors: RemoteCursor[];
+  setRemoteCursors: (cursors: RemoteCursor[]) => void;
+
   // -- Sidebar ---------------------------------------------------------------
   sidebarOpen: boolean;
   toggleSidebar: () => void;
@@ -83,6 +107,12 @@ export const useWorkspaceStore = create<WorkspaceState>((set) => ({
   activePage: { title: "Getting Started with Notion" },
   setActivePage: (info) =>
     set((s) => ({ activePage: { ...s.activePage, ...info } })),
+
+  // -- Real-time Collaboration -----------------------------------------------
+  collaborators: [],
+  setCollaborators: (collaborators) => set({ collaborators }),
+  remoteCursors: [],
+  setRemoteCursors: (remoteCursors) => set({ remoteCursors }),
 
   // -- Modals ----------------------------------------------------------------
   isAiOpen: false,

@@ -19,6 +19,8 @@ import {
 } from "./SlashCommandMenu";
 import { EditorHeader } from "./EditorHeader";
 import { useAutosave } from "@/hooks/use-autosave";
+import { useCollaboration } from "@/hooks/use-collaboration";
+import { useWorkspaceStore } from "@/store/workspace-store";
 import { updatePage, deletePage, type Page } from "@/lib/actions/pages";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -67,7 +69,14 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   }, [items]);
   const [focusedId, setFocusedId] = useState<string | null>(null);
   const [saveStatus, setSaveStatus] = useState<"saved" | "saving" | "idle" | "error">("idle");
-  const [remoteCursors, setRemoteCursors] = useState<{ id: string; name: string; color: string; x: number; y: number }[]>([]);
+
+  const { collaborators, remoteCursors, broadcastBlockFocus } = useCollaboration({ pageId });
+
+  // Sync real-time collaborators to the central workspace store for LivePresenceBar
+  const setStoreCollaborators = useWorkspaceStore((s) => s.setCollaborators);
+  useEffect(() => {
+    setStoreCollaborators(collaborators);
+  }, [collaborators, setStoreCollaborators]);
 
   const { scheduleAutosave, immediatelySave, cancelAutosave, retryAutosave, markDirty } = useAutosave({
     pageId,
@@ -250,37 +259,12 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     [pageId]
   );
 
-  // BroadcastChannel multi-cursor collaboration listener
+  // Active block focus clears on unmount or blur
   useEffect(() => {
-    if (!pageId) return;
-    const channel = new BroadcastChannel(`notion-cursor-${pageId}`);
-
-    const handleMouseMove = (e: MouseEvent) => {
-      channel.postMessage({
-        type: "cursor-move",
-        id: "tab-session",
-        name: "Collaborator",
-        color: "#2383e2",
-        x: e.clientX,
-        y: e.clientY,
-      });
-    };
-
-    const handleMessage = (e: MessageEvent) => {
-      if (e.data && e.data.type === "cursor-move") {
-        setRemoteCursors([e.data]);
-      }
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    channel.addEventListener("message", handleMessage);
-
     return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      channel.removeEventListener("message", handleMessage);
-      channel.close();
+      broadcastBlockFocus(undefined);
     };
-  }, [pageId]);
+  }, [broadcastBlockFocus]);
 
   // Sync when navigating to a new page — only fires on pageId change.
   // activeTitle, initialBlocks, initialCoverImage are intentionally omitted:
@@ -318,6 +302,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
 
   const focusBlock = useCallback((id: string, atEnd = false) => {
     setFocusedId(id);
+    broadcastBlockFocus(id);
     requestAnimationFrame(() => {
       const el = blockRefs.current.get(id);
       if (!el) return;
@@ -331,7 +316,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
         s?.addRange(r);
       }
     });
-  }, []);
+  }, [broadcastBlockFocus]);
 
   const updateText = useCallback((id: string, text: string) => {
     markDirty();
