@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -33,6 +33,7 @@ import { LivePresenceBar } from "@/components/dashboard/editor/LivePresenceBar";
 import { blocksToMarkdown, downloadMarkdownFile, exportToPdfPrint } from "@/lib/export-import";
 import { Bell } from "lucide-react";
 import { useWorkspaceStore } from "@/store/workspace-store";
+import { AnimatedBotLogo } from "@/components/dashboard/animated-bot-logo";
 
 function formatRelativeTime(dateInput?: string | Date | null): string {
   if (!dateInput) return "Edited just now";
@@ -431,18 +432,18 @@ export function TopBar({ pageId }: TopBarProps) {
           <ThemeToggle />
           <div className="h-7 w-[1px] bg-border mx-1" />
 
-          {/* Notion AI Toggle Button */}
+          {/* Project HR Toggle Button */}
           <button
             onClick={toggleAi}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold transition ml-1 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition ml-1 ${
               isAiOpen
-                ? "bg-purple-900/30 border border-purple-800/50 text-purple-600 dark:text-purple-300"
-                : "hover:bg-neutral-200 dark:hover:bg-[#252525] text-purple-500 dark:text-purple-400"
+                ? "bg-white/15 border border-white/20 text-white"
+                : "hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
             }`}
-            title="Toggle Notion AI Side Panel"
+            title="Toggle Project HR Side Panel"
           >
-            <Sparkles className="h-3.5 w-3.5 fill-purple-500/20" />
-            <span className="hidden sm:inline">Notion AI</span>
+            <AnimatedBotLogo size="xs" />
+            <span className="hidden sm:inline">Project HR</span>
           </button>
         </div>
       </header>

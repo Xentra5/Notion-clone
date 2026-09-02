@@ -1,20 +1,21 @@
 import type { Metadata } from "next";
-import { Plus_Jakarta_Sans } from "next/font/google";
+import { Inter } from "next/font/google";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/components/auth/auth-provider";
 import { ThemeProvider } from "@/components/theme-provider";
 import "./globals.css";
 
-const plusJakartaSans = Plus_Jakarta_Sans({
+const inter = Inter({
   subsets: ["latin"],
   variable: "--font-sans",
   display: "swap",
+  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Notion | Connected workspace for modern teams",
+  title: "Project HR | Notion",
   description:
-    "Bring team knowledge, projects, docs, and AI-assisted workflows into one organized workspace.",
+    "Project HR intelligent workspace management, team workflows, and live web research.",
 
   icons: {
     icon: [
@@ -30,8 +31,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${plusJakartaSans.variable} h-full antialiased`} suppressHydrationWarning>
-      <body className="flex min-h-full flex-col">
+    <html lang="en" className={`${inter.variable} h-full antialiased`} suppressHydrationWarning>
+      <body className="flex min-h-full flex-col font-sans">
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

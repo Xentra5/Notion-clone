@@ -639,12 +639,16 @@ class AgentResponse(BaseModel):
 
 def _make_nextjs_headers(session_token: str) -> dict:
     """Build headers with the session cookie so Next.js API routes authenticate the agent."""
-    return {
-        "Content-Type": "application/json",
-        "Cookie": (
+    if ";" in session_token or "=" in session_token:
+        cookie_val = session_token
+    else:
+        cookie_val = (
             f"next-auth.session-token={session_token}; "
             f"__Secure-next-auth.session-token={session_token}"
-        ),
+        )
+    return {
+        "Content-Type": "application/json",
+        "Cookie": cookie_val,
     }
 
 
@@ -914,25 +918,23 @@ def run_agent(req: AgentRequest):
         today = datetime.datetime.now().strftime("%A, %B %d, %Y at %H:%M")
 
         prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""You are Notion AI Agent — an intelligent assistant that can perform actions inside the user's Notion workspace on their behalf.
+            ("system", f"""You are Project HR — a direct, fast, and capable autonomous AI assistant seamlessly integrated into the user's Notion workspace.
 
 Today is: {today}
 
-You have access to these tools:
-- create_calendar_event: Create a calendar event (requires title + date in YYYY-MM-DD format)
-- list_calendar_events: List the user's upcoming events
-- create_page: Create a new workspace page/note
+You have direct access to these workspace and live web tools:
+- create_calendar_event: Create a calendar event (requires title + date in YYYY-MM-DD format, optional start_time, end_time, description, location)
+- list_calendar_events: List upcoming calendar events for the user
+- create_page: Create a new page or document in the workspace (requires title, optional content, category: Private/Shared/Meetings)
 - list_pages: List the user's workspace pages
-- search_workspace: Semantic search through workspace notes
+- search_workspace: Semantic search through workspace notes using vector RAG
 - web_search: Live DuckDuckGo web search
 
 RULES:
-- Always USE tools to fulfill requests — don't just describe what you would do.
-- For relative dates like "tomorrow" or "next Monday", calculate the actual YYYY-MM-DD date from today ({today}).
-- After tool calls, summarize what was done clearly and helpfully.
-- Understand intent even if the user has typos or informal phrasing.
-- If unsure about details like time, use sensible defaults and mention them.
-- NEVER comment on typos or grammar.
+- Proactively USE tools to fulfill requests — when the user asks to create pages, schedule meetings, query notes, or search the web, execute the appropriate tool.
+- For relative dates like "tomorrow", "this Friday", or "next week", compute the exact YYYY-MM-DD date relative to today ({today}).
+- Provide clear, direct, insightful answers with clean markdown formatting.
+- If unsure about details, use sensible defaults and state them concisely.
 """),
             MessagesPlaceholder("chat_history"),
             ("human", "{input}"),
@@ -978,7 +980,7 @@ RULES:
 
         # Graceful degradation — try plain LLM without tools
         fallback_answer = _llm(
-            system="You are Notion AI Agent. Answer the user's question helpfully.",
+            system="You are Project HR. Answer the user's question helpfully.",
             context="",
             user_query=req.message,
             api_key=api_key,

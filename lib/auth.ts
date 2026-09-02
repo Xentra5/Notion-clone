@@ -59,6 +59,8 @@ export const authOptions: NextAuthOptions = {
           name: user.name || user.email.split('@')[0],
           email: user.email,
           image: user.image || '',
+          plan: user.plan || 'free',
+          aiUsageCount: typeof user.aiUsageCount === "number" ? user.aiUsageCount : 0,
         };
       },
     }),
@@ -117,17 +119,23 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         if (user.image) token.picture = user.image;
         token.plan = (user as { plan?: string }).plan || "free";
+        token.aiUsageCount = typeof (user as { aiUsageCount?: number }).aiUsageCount === "number"
+          ? (user as { aiUsageCount?: number }).aiUsageCount
+          : 0;
       }
 
-      if (trigger === "update") {
+      if (trigger === "update" || !token.plan || token.aiUsageCount === undefined) {
         if (session?.name) token.name = session.name;
         if (token.email) {
           try {
             await connectToDatabase();
-            const dbUser = await User.findOne({ email: (token.email as string).toLowerCase() }).select("_id plan image name").lean();
+            const dbUser = await User.findOne({ email: (token.email as string).toLowerCase() })
+              .select("_id plan image name aiUsageCount")
+              .lean();
             if (dbUser) {
               token.id = dbUser._id.toString();
               token.plan = dbUser.plan || "free";
+              token.aiUsageCount = typeof dbUser.aiUsageCount === "number" ? dbUser.aiUsageCount : 0;
               if (dbUser.image) token.picture = dbUser.image;
             }
           } catch (err) {
@@ -153,6 +161,7 @@ export const authOptions: NextAuthOptions = {
         if (token.plan) {
           session.user.plan = token.plan as string;
         }
+        session.user.aiUsageCount = typeof token.aiUsageCount === "number" ? token.aiUsageCount : 0;
       }
       return session;
     },

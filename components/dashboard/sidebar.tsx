@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
@@ -13,6 +13,7 @@ const PricingModal = dynamic(
 );
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RenameModal } from "@/components/ui/rename-modal";
+import { AnimatedBotLogo } from "@/components/dashboard/animated-bot-logo";
 import { getPages, createPage, updatePage, deletePage, type Page, type PageBlock } from "@/lib/actions/pages";
 import { localStore } from "@/lib/storage/local-store";
 import {
@@ -38,6 +39,7 @@ import {
   Users,
   CornerUpLeft,
   Star,
+  Bot,
 } from "lucide-react";
 
 const GETTING_STARTED_BLOCKS: PageBlock[] = [
@@ -146,7 +148,7 @@ function PageTreeNode({
           ) : (
             <span className="w-3.5 shrink-0" />
           )}
-          <span className="shrink-0 text-sm">{page.icon || "ðŸ“„"}</span>
+          <span className="shrink-0 text-sm">{page.icon || "📄"}</span>
           {renamingPageId === page._id ? (
             <input
               autoFocus
@@ -227,8 +229,8 @@ function PageTreeNode({
               onClick={() => { onMoveInto(page._id, null); setMoveMenuPos(null); }}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent text-[11px] text-foreground transition font-medium"
             >
-              <span>ðŸ“‚</span>
-              <span>â†‘ Move to top level</span>
+              <span>📁</span>
+              <span>↑ Move to top level</span>
             </button>
           )}
           {candidateParents.length === 0 && !page.parentPageId && (
@@ -240,7 +242,7 @@ function PageTreeNode({
               onClick={() => { onMoveInto(page._id, p._id); setMoveMenuPos(null); }}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent text-[11px] text-foreground transition"
             >
-              <span className="shrink-0">{p.icon || "ðŸ“„"}</span>
+              <span className="shrink-0">{p.icon || "📄"}</span>
               <span className="truncate flex-1">{p.title}</span>
               {p.parentPageId && (
                 <span className="ml-auto text-[9px] text-muted-foreground shrink-0 italic">nested</span>
@@ -645,7 +647,7 @@ export function Sidebar({ activePage }: SidebarProps) {
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="shrink-0 text-sm">{page.icon || "ðŸ“„"}</span>
+                        <span className="shrink-0 text-sm">{page.icon || "📄"}</span>
                         <span className="truncate text-[11px] flex-1">{page.title}</span>
                       </div>
                       <button
@@ -825,13 +827,13 @@ export function Sidebar({ activePage }: SidebarProps) {
           )}
         </div>
 
-        {/* Agents Section */}
+        {/* Project HR Section */}
         <div className="space-y-1">
           <button
             onClick={() => toggleSection("agents")}
             className="w-full flex items-center justify-between px-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition text-left"
           >
-            <span>Agents</span>
+            <span>Project HR</span>
             {expandedSections.agents ? (
               <ChevronDown className="h-3 w-3" />
             ) : (
@@ -846,7 +848,7 @@ export function Sidebar({ activePage }: SidebarProps) {
                 className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
               >
                 <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px]">New agent</span>
+                <span className="text-[11px]">New Project HR chat</span>
               </button>
               <button
                 onClick={() => router.push("/dashboard/agent")}
@@ -856,8 +858,8 @@ export function Sidebar({ activePage }: SidebarProps) {
                     : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
                 }`}
               >
-                <span className="text-sm">ðŸ¤–</span>
-                <span className="text-[11px]">AI Agent</span>
+                <AnimatedBotLogo size="xs" />
+                <span className="text-[11px] font-medium">Project HR</span>
               </button>
             </div>
           )}
@@ -1030,19 +1032,19 @@ export function Sidebar({ activePage }: SidebarProps) {
 
       {/* Upgrade Banner for Free Users */}
       {session?.user?.plan !== "pro" && (
-        <div className="mx-2 mb-2 p-3 bg-purple-950/20 hover:bg-purple-950/30 border border-purple-900/30 rounded-xl text-xs text-purple-300 transition flex flex-col gap-2">
-          <div className="flex items-center gap-1.5 font-bold text-white">
-            <Sparkles className="h-3.5 w-3.5 fill-purple-400/20 text-purple-400" />
-            <span>Notion Pro Upgrade</span>
+        <div className="mx-2 mb-2 p-3 bg-neutral-900/70 hover:bg-neutral-900/90 border border-neutral-800 rounded-xl text-xs text-neutral-300 transition flex flex-col gap-2 shadow-sm">
+          <div className="flex items-center gap-1.5 font-semibold text-white">
+            <Sparkles className="h-3.5 w-3.5 text-zinc-300" />
+            <span>Notion Pro</span>
           </div>
           <p className="text-[10px] text-neutral-400 leading-normal">
-            Unlock unlimited AI capabilities, advanced document features, and priority support.
+            Unlock unlimited Project HR Agent, calendar sync, and workspace tools.
           </p>
           <button
             onClick={() => setShowPricing(true)}
-            className="w-full py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg transition active:scale-95 text-center block"
+            className="w-full py-1.5 bg-white text-black hover:bg-neutral-200 font-semibold rounded-lg transition active:scale-95 text-center text-xs"
           >
-            Upgrade Now
+            Upgrade Plan
           </button>
         </div>
       )}

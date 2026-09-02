@@ -38,6 +38,8 @@ const rag = start(pythonCommand, [
   "--reload",
   "--reload-dir",
   ragDir,
+  "--host",
+  "127.0.0.1",
   "--port",
   "8000",
   "--app-dir",

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { PricingModal } from "./pricing-modal";
+import { AnimatedBotLogo } from "./animated-bot-logo";
 
 interface NotionAiPanelProps {
   isOpen: boolean;
@@ -775,9 +776,10 @@ export function NotionAiPanel({
 
           <button
             onClick={() => handleNewChat()}
-            className="flex items-center gap-1 font-semibold text-foreground px-1.5 py-0.5 rounded hover:bg-sidebar-accent transition"
+            className="flex items-center gap-1.5 font-semibold text-foreground px-2 py-1 rounded hover:bg-sidebar-accent transition text-xs"
           >
-            <span>New AI chat</span>
+            <AnimatedBotLogo size="xs" />
+            <span>Project HR AI</span>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
@@ -815,11 +817,16 @@ export function NotionAiPanel({
       {/* Main Content Area */}
       <div className="flex-1 overflow-y-auto p-5 space-y-6 no-scrollbar flex flex-col justify-between">
         {messages.length === 0 && !writeAction ? (
-          /* Initial Empty State matching Screenshot 2 */
+          /* Initial Empty State */
           <div className="space-y-6 pt-4 animate-in fade-in duration-300">
-            {/* Notion Hand-Drawn Sketch Face Avatar */}
-            <div className="h-16 w-16 rounded-full bg-card border border-border flex items-center justify-center shadow-lg">
-              <NotionSketchFace />
+            {/* Project HR Circular Bot Logo */}
+            <div className="flex items-center justify-start">
+              <AnimatedBotLogo
+                size="lg"
+                isThinking={isGenerating}
+                isTyping={input.trim().length > 0 && !isGenerating}
+                showStatusBadge={true}
+              />
             </div>
 
             {/* Main Greeting */}
@@ -899,19 +906,15 @@ export function NotionAiPanel({
                   msg.role === "user" ? "flex-row-reverse" : "flex-row"
                 }`}
               >
-                <div
-                  className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${
-                    msg.role === "user"
-                      ? "bg-[#0078df] text-white"
-                      : "bg-card border border-border text-purple-500 dark:text-purple-400"
-                  }`}
-                >
-                  {msg.role === "user" ? (
+                {msg.role === "user" ? (
+                  <div className="h-7 w-7 rounded-full flex items-center justify-center shrink-0 bg-[#0078df] text-white">
                     <UserIcon className="h-3.5 w-3.5" />
-                  ) : (
-                    <Bot className="h-3.5 w-3.5" />
-                  )}
-                </div>
+                  </div>
+                ) : (
+                  <div className="shrink-0 mt-0.5">
+                    <AnimatedBotLogo size="sm" showStatusBadge={true} />
+                  </div>
+                )}
                 <div className="max-w-[85%] space-y-2">
                   <div
                     className={`rounded-xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
@@ -962,9 +965,9 @@ export function NotionAiPanel({
             ))}
 
             {isGenerating && (
-              <div className="flex items-center gap-2 text-xs text-purple-500 dark:text-purple-400 pl-9 animate-pulse">
-                <Sparkles className="h-3.5 w-3.5 animate-spin" />
-                <span>Notion AI is processing...</span>
+              <div className="flex items-center gap-2.5 text-xs text-foreground pl-1 animate-pulse">
+                <AnimatedBotLogo size="xs" isThinking={true} />
+                <span className="text-zinc-300 font-medium">Project HR AI is reasoning & analyzing...</span>
               </div>
             )}
           </div>

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 
-const PYTHON_RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || "http://localhost:8000";
-const NEXTJS_BASE_URL = process.env.NEXTAUTH_URL || "http://localhost:3000";
+const PYTHON_RAG_SERVICE_URL = (process.env.RAG_SERVICE_URL || "http://127.0.0.1:8000").replace("localhost", "127.0.0.1");
+const NEXTJS_BASE_URL = (process.env.NEXTAUTH_URL || "http://127.0.0.1:3000").replace("localhost", "127.0.0.1");
 const RAW_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
 const GEMINI_API_KEY = RAW_KEY.replace(/^["'"']|["'"']$/g, "").trim();
 
@@ -12,6 +12,9 @@ const SESSION_COOKIE_NAMES = [
 ];
 
 function extractSessionToken(request: NextRequest): string {
+  const fullCookie = request.headers.get("cookie");
+  if (fullCookie) return fullCookie;
+
   for (const name of SESSION_COOKIE_NAMES) {
     const value = request.cookies.get(name)?.value;
     if (value) return value;
