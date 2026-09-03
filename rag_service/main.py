@@ -582,8 +582,6 @@ Rules:
                 google_api_key=api_key.strip(),
             )
             prompt = f"{SYSTEM}\n\nMeeting Title: {req.title}\n\nFull Transcript:\n{transcript}"
-            raw = str(llm.invoke(prompt).content).strip()
-
             # Robust JSON extraction handling fences or raw text
             json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
             if json_match:
@@ -623,6 +621,10 @@ class AgentRequest(BaseModel):
     workspaceId: str           # user email used as workspace id
     geminiApiKey: Optional[str] = None
     history: List[dict] = Field(default_factory=list)
+    persona: Optional[str] = "project_hr"
+    personaCustomPrompt: Optional[str] = None
+    memories: List[str] = Field(default_factory=list)
+    currentDate: Optional[str] = None
 
 class AgentToolCall(BaseModel):
     tool: str
@@ -691,9 +693,12 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
             r = req_lib.post(f"{base_url}/api/calendar", json=payload, headers=headers, timeout=10)
             if r.status_code in (200, 201):
                 event = r.json().get("event", {})
+                eid = event.get("_id", "")
                 result = f"✅ Calendar event created: '{event.get('title', title)}' on {event.get('date', date)}"
                 if event.get("startTime"):
                     result += f" at {event['startTime']}"
+                if eid:
+                    result += f" (ID: {eid})"
                 tool_calls_log.append({"tool": "create_calendar_event", "input": str(payload), "output": result})
                 return result
             else:
@@ -705,13 +710,77 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
             return f"Error creating calendar event: {e}"
 
     @tool
+    def update_calendar_event(event_id: str, title: str = "", date: str = "", start_time: str = "",
+                               end_time: str = "", description: str = "", location: str = "", color: str = "") -> str:
+        """
+        Revise, reschedule, or update an existing calendar event.
+        Args:
+            event_id: MongoDB ID of the calendar event (required)
+            title: New title (optional)
+            date: New date in YYYY-MM-DD format (optional)
+            start_time: New start time in HH:MM format (optional)
+            end_time: New end time in HH:MM format (optional)
+            description: New description (optional)
+            location: New location (optional)
+            color: New color (optional)
+        Returns:
+            Confirmation of update.
+        """
+        payload = {}
+        if title: payload["title"] = title
+        if date: payload["date"] = date
+        if start_time: payload["startTime"] = start_time
+        if end_time: payload["endTime"] = end_time
+        if description: payload["description"] = description
+        if location: payload["location"] = location
+        if color: payload["color"] = color
+
+        try:
+            r = req_lib.patch(f"{base_url}/api/calendar/{event_id}", json=payload, headers=headers, timeout=10)
+            if r.status_code == 200:
+                event = r.json().get("event", {})
+                result = f"✅ Calendar event updated: '{event.get('title', 'Event')}' on {event.get('date', '')} at {event.get('startTime', '')}"
+                tool_calls_log.append({"tool": "update_calendar_event", "input": str(payload), "output": result})
+                return result
+            else:
+                err = r.json().get("error", r.text)
+                tool_calls_log.append({"tool": "update_calendar_event", "input": str(payload), "output": f"Error: {err}"})
+                return f"Failed to update event: {err}"
+        except Exception as e:
+            tool_calls_log.append({"tool": "update_calendar_event", "input": str(payload), "output": f"Error: {e}"})
+            return f"Error updating calendar event: {e}"
+
+    @tool
+    def delete_calendar_event(event_id: str) -> str:
+        """
+        Cancel or delete an existing calendar event.
+        Args:
+            event_id: MongoDB ID of the calendar event (required)
+        Returns:
+            Confirmation of deletion.
+        """
+        try:
+            r = req_lib.delete(f"{base_url}/api/calendar/{event_id}", headers=headers, timeout=10)
+            if r.status_code == 200:
+                result = f"🗑️ Calendar event (ID: {event_id}) successfully deleted."
+                tool_calls_log.append({"tool": "delete_calendar_event", "input": event_id, "output": result})
+                return result
+            else:
+                err = r.json().get("error", r.text)
+                tool_calls_log.append({"tool": "delete_calendar_event", "input": event_id, "output": f"Error: {err}"})
+                return f"Failed to delete event: {err}"
+        except Exception as e:
+            tool_calls_log.append({"tool": "delete_calendar_event", "input": event_id, "output": f"Error: {e}"})
+            return f"Error deleting calendar event: {e}"
+
+    @tool
     def list_calendar_events(limit: int = 10) -> str:
         """
-        List upcoming calendar events for the user.
+        List upcoming calendar events for the user. Always use this tool to inspect scheduled events or find event IDs for updating/rescheduling.
         Args:
             limit: Max number of events to return (default 10)
         Returns:
-            A formatted list of upcoming calendar events.
+            A formatted list of upcoming calendar events with IDs, dates, and times.
         """
         try:
             r = req_lib.get(f"{base_url}/api/calendar", headers=headers, timeout=10)
@@ -722,7 +791,8 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
                 else:
                     lines = []
                     for e in events:
-                        line = f"• {e.get('title', 'Untitled')} — {e.get('date', '')}"
+                        eid = e.get("_id", "")
+                        line = f"• [ID: {eid}] {e.get('title', 'Untitled')} — {e.get('date', '')}"
                         if e.get("startTime"):
                             line += f" {e['startTime']}"
                         if e.get("endTime"):
@@ -743,7 +813,7 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
     @tool
     def create_page(title: str, content: str = "", category: str = "Private") -> str:
         """
-        Create a new page (note) in the user's workspace.
+        Create a new page (note or document) in the user's workspace.
         Args:
             title: Page title (required)
             content: Page content as plain text or markdown (optional)
@@ -782,13 +852,62 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
             return f"Error creating page: {e}"
 
     @tool
+    def update_page(page_id: str, title: str = "", content_to_append: str = "") -> str:
+        """
+        Revise or append content to an existing workspace page.
+        Args:
+            page_id: The ID of the page to update (required)
+            title: New title for the page (optional)
+            content_to_append: Markdown text to append as new blocks (optional)
+        Returns:
+            Confirmation of page update.
+        """
+        try:
+            # First fetch existing page blocks
+            get_res = req_lib.get(f"{base_url}/api/pages/{page_id}", headers=headers, timeout=10)
+            existing_blocks = []
+            current_title = title
+            if get_res.status_code == 200:
+                p_data = get_res.json().get("page", {})
+                existing_blocks = p_data.get("blocks", [])
+                if not current_title:
+                    current_title = p_data.get("title", "Untitled")
+
+            new_blocks = list(existing_blocks)
+            if content_to_append.strip():
+                for line in content_to_append.strip().split("\n"):
+                    if line.strip():
+                        new_blocks.append({
+                            "id": f"agent-block-{len(new_blocks)}",
+                            "type": "paragraph",
+                            "properties": {"text": line.strip()},
+                        })
+
+            patch_payload = {
+                "title": current_title,
+                "blocks": new_blocks,
+            }
+            r = req_lib.patch(f"{base_url}/api/pages/{page_id}", json=patch_payload, headers=headers, timeout=10)
+            if r.status_code == 200:
+                result = f"✅ Page '{current_title}' (ID: {page_id}) updated with new content."
+                tool_calls_log.append({"tool": "update_page", "input": f"{page_id} - {title}", "output": result})
+                return result
+            else:
+                err = r.json().get("error", r.text)
+                tool_calls_log.append({"tool": "update_page", "input": page_id, "output": f"Error: {err}"})
+                return f"Failed to update page: {err}"
+        except Exception as e:
+            tool_calls_log.append({"tool": "update_page", "input": page_id, "output": f"Error: {e}"})
+            return f"Error updating page: {e}"
+
+    @tool
     def list_pages(limit: int = 10) -> str:
         """
         List the user's workspace pages.
         Args:
             limit: Max pages to return (default 10)
         Returns:
-            A formatted list of workspace pages.
+            A formatted list of workspace pages with IDs.
         """
         try:
             r = req_lib.get(f"{base_url}/api/pages", headers=headers, timeout=10)
@@ -798,7 +917,7 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
                     result = "No pages found in workspace."
                 else:
                     lines = [
-                        f"• {p.get('icon', '📄')} {p.get('title', 'Untitled')} [{p.get('category', '')}]"
+                        f"• [ID: {p.get('_id', '')}] {p.get('icon', '📄')} {p.get('title', 'Untitled')} [{p.get('category', '')}]"
                         for p in pages
                     ]
                     result = f"📄 Workspace pages ({len(pages)}):\n" + "\n".join(lines)
@@ -814,24 +933,24 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
     @tool
     def search_workspace(query: str) -> str:
         """
-        Semantic search through the user's workspace notes using RAG (vector similarity).
+        Semantic search through the user's workspace notes using ChromaDB RAG (vector similarity).
         Args:
-            query: What to search for in the workspace
+            query: What to search for in the workspace notes
         Returns:
-            Relevant excerpts from workspace pages.
+            Relevant excerpts from workspace pages with citations.
         """
         try:
             results = get_vector_store().similarity_search_with_score(
-                query, k=4, filter={"workspaceId": {"$eq": workspaceId}}
+                query, k=5, filter={"workspaceId": {"$eq": workspaceId}}
             )
             relevant = [
-                f"[{doc.metadata.get('title', 'Untitled')}]: {doc.page_content}"
-                for doc, score in results if score < 1.35
+                f"[{doc.metadata.get('title', 'Untitled')} (PageID: {doc.metadata.get('pageId', '')})]: {doc.page_content}"
+                for doc, score in results if score < 1.45
             ]
             if not relevant:
-                result = "No relevant workspace content found for that query."
+                result = "No relevant workspace content found for that query in vector store."
             else:
-                result = "🔍 Workspace search results:\n\n" + "\n\n".join(relevant)
+                result = "🔍 Workspace RAG Search Results:\n\n" + "\n\n".join(relevant)
             tool_calls_log.append({"tool": "search_workspace", "input": query, "output": result[:300] + "..."})
             return result
         except Exception as e:
@@ -839,9 +958,33 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
             return f"Error searching workspace: {e}"
 
     @tool
+    def remember_fact(fact: str, category: str = "general") -> str:
+        """
+        Save an important user preference, schedule habit, or workspace fact to long-term persistent memory.
+        Args:
+            fact: The fact or preference to remember (e.g., 'User prefers afternoon meetings after 2pm')
+            category: One of 'preference', 'schedule_habit', 'workspace_fact', 'general'
+        Returns:
+            Confirmation that the fact is memorized.
+        """
+        try:
+            payload = {"content": fact, "category": category, "source": "agent_tool"}
+            r = req_lib.post(f"{base_url}/api/ai/agent/memory", json=payload, headers=headers, timeout=10)
+            if r.status_code in (200, 201):
+                result = f"🧠 Stored in long-term memory: '{fact}'"
+                tool_calls_log.append({"tool": "remember_fact", "input": fact, "output": result})
+                return result
+            else:
+                tool_calls_log.append({"tool": "remember_fact", "input": fact, "output": "Failed to store memory"})
+                return "Failed to save memory to database."
+        except Exception as e:
+            tool_calls_log.append({"tool": "remember_fact", "input": fact, "output": f"Error: {e}"})
+            return f"Error storing memory: {e}"
+
+    @tool
     def web_search(query: str) -> str:
         """
-        Search the web using DuckDuckGo for real-time information.
+        Search the live web using DuckDuckGo for current information.
         Args:
             query: Search query string
         Returns:
@@ -869,10 +1012,14 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
 
     return [
         create_calendar_event,
+        update_calendar_event,
+        delete_calendar_event,
         list_calendar_events,
         create_page,
+        update_page,
         list_pages,
         search_workspace,
+        remember_fact,
         web_search,
     ]
 
@@ -880,9 +1027,8 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
 @app.post("/agent", response_model=AgentResponse)
 def run_agent(req: AgentRequest):
     """
-    LangChain tool-calling AI Agent endpoint.
-    Receives a natural language message and uses Gemini + LangChain tools
-    to autonomously create calendar events, pages, search workspace, etc.
+    LangChain tool-calling AI Agent endpoint with multi-persona, long-term memory,
+    and workspace action execution (calendar scheduling/revisions, pages, RAG).
     """
     api_key = (
         req.geminiApiKey or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
@@ -901,72 +1047,121 @@ def run_agent(req: AgentRequest):
 
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
-        from langchain.agents import AgentExecutor, create_tool_calling_agent
-        from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-        from langchain_core.messages import HumanMessage, AIMessage
+        from langchain_core.messages import SystemMessage, HumanMessage, AIMessage, ToolMessage
 
-        # Build authenticated tool set
+        # Build authenticated LangChain tools
         tools = _build_agent_tools(req.nextjsBaseUrl, req.sessionToken, req.workspaceId, tool_calls_log)
+        tools_map = {t.name: t for t in tools}
 
         llm = ChatGoogleGenerativeAI(
-            model=os.getenv("GEMINI_MODEL", "gemini-2.0-flash"),
+            model=os.getenv("GEMINI_MODEL", "gemini-2.5-flash"),
             google_api_key=api_key,
-            temperature=0.3,
+            temperature=0.1,
         )
 
         import datetime
-        today = datetime.datetime.now().strftime("%A, %B %d, %Y at %H:%M")
+        today_dt = datetime.datetime.now()
+        today = today_dt.strftime("%A, %B %d, %Y at %H:%M")
+        today_date_only = today_dt.strftime("%Y-%m-%d")
 
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", f"""You are Project HR — a direct, fast, and capable autonomous AI assistant seamlessly integrated into the user's Notion workspace.
+        # Persona Instructions
+        persona_instructions = {
+            "project_hr": (
+                "You are Project HR — an empathetic, proactive, and organized People & Operations assistant inside Notion.\n"
+                "You excel at scheduling team syncs, 1-on-1s, onboarding plans, culture docs, and meeting agendas."
+            ),
+            "executive_assistant": (
+                "You are the Executive Assistant — an ultra-concise, fast, action-driven scheduling and workspace master.\n"
+                "You proactively manage calendars, execute revisions immediately, organize tasks, and cut straight to the point."
+            ),
+            "tech_lead": (
+                "You are the Tech Lead & Product Manager — structured, rigorous, and engineering-focused.\n"
+                "You build product roadmaps, technical specs, sprint plans, and turn discussions into concrete tasks."
+            ),
+            "note_taker": (
+                "You are the Personal Secretary & Document Architect.\n"
+                "You format ideas into beautiful Notion pages, organize thoughts, and structure notes cleanly."
+            ),
+        }
 
-Today is: {today}
+        persona_key = (req.persona or "project_hr").lower()
+        persona_intro = req.personaCustomPrompt or persona_instructions.get(persona_key, persona_instructions["project_hr"])
 
-You have direct access to these workspace and live web tools:
-- create_calendar_event: Create a calendar event (requires title + date in YYYY-MM-DD format, optional start_time, end_time, description, location)
-- list_calendar_events: List upcoming calendar events for the user
-- create_page: Create a new page or document in the workspace (requires title, optional content, category: Private/Shared/Meetings)
-- list_pages: List the user's workspace pages
-- search_workspace: Semantic search through workspace notes using vector RAG
-- web_search: Live DuckDuckGo web search
+        # Format memories
+        memories_text = "(none yet)"
+        if req.memories and len(req.memories) > 0:
+            memories_text = "\n".join(f"- {m}" for m in req.memories[:12])
 
-RULES:
-- Proactively USE tools to fulfill requests — when the user asks to create pages, schedule meetings, query notes, or search the web, execute the appropriate tool.
-- For relative dates like "tomorrow", "this Friday", or "next week", compute the exact YYYY-MM-DD date relative to today ({today}).
-- Provide clear, direct, insightful answers with clean markdown formatting.
-- If unsure about details, use sensible defaults and state them concisely.
-"""),
-            MessagesPlaceholder("chat_history"),
-            ("human", "{input}"),
-            MessagesPlaceholder("agent_scratchpad"),
-        ])
+        system_prompt_content = f"""{persona_intro}
 
-        # Build conversation history messages
-        chat_history = []
-        for turn in (req.history or [])[-10:]:
+CURRENT DATE & TIME: {today} (Reference ISO: {today_date_only})
+
+LONG-TERM USER MEMORY & PREFERENCES:
+{memories_text}
+
+AVAILABLE WORKSPACE & WEB TOOLS:
+- create_calendar_event: Schedule new events (requires title and date in YYYY-MM-DD).
+- update_calendar_event: Revise, reschedule, or change existing events.
+- delete_calendar_event: Cancel or delete calendar events.
+- list_calendar_events: View upcoming calendar events with their IDs.
+- create_page: Create a new Notion page/document.
+- update_page: Revise or append content to an existing page.
+- list_pages: List pages in the workspace.
+- search_workspace: Semantic search across workspace documents via ChromaDB vector store.
+- remember_fact: Store a user preference, habit, or key fact into persistent memory.
+- web_search: Real-time search via DuckDuckGo.
+
+CRITICAL EXECUTION RULES:
+1. ALWAYS EXECUTE TOOLS IMMEDIATELY (DO NOT ASK FOR PERMISSION OR EXTRA DETAILS):
+   - You are an autonomous executor. When the user asks to schedule (e.g. "Team sync tomorrow at 3pm", "meeting on Friday"), YOU MUST IMMEDIATELY CALL `create_calendar_event` on turn 1. DO NOT ask who to invite or ask for duration.
+   - Use sensible defaults: Title: derive from request (e.g. 'Team Sync'), Duration: 30 minutes (e.g. 15:00 to 15:30), Color: 'blue'.
+   - When the user asks to reschedule, move, or revise an event, first call `list_calendar_events` to locate the event ID, then call `update_calendar_event`.
+   - When the user asks to create or draft a page/doc, YOU MUST CALL `create_page` immediately with structured markdown content.
+   - When the user asks to add or edit notes on an existing page, call `update_page`.
+   - When the user asks you to remember something or shares a strong habit, call `remember_fact`.
+2. DATE COMPUTATION:
+   - Today is {today} ({today_date_only}).
+   - Compute relative dates ("tomorrow", "this Thursday", "next Monday") accurately based on today.
+   - For 12-hour times like "3pm", convert to 24-hour format "15:00", "3:30pm" -> "15:30".
+3. TONE & RESPONSE:
+   - Deliver clear, direct, insightful answers.
+   - After executing the tool, confirm the action taken (e.g. "✅ I've scheduled the Team Sync for tomorrow at 3:00 PM - 3:30 PM.") and let them know you can revise it anytime.
+"""
+
+        # Prepare messages
+        messages = [SystemMessage(content=system_prompt_content)]
+        for turn in (req.history or [])[-8:]:
             role = turn.get("role", "user")
             text = str(turn.get("text", ""))[:3000]
             if role == "user":
-                chat_history.append(HumanMessage(content=text))
+                messages.append(HumanMessage(content=text))
             elif role == "assistant":
-                chat_history.append(AIMessage(content=text))
+                messages.append(AIMessage(content=text))
+        messages.append(HumanMessage(content=req.message))
 
-        agent = create_tool_calling_agent(llm, tools, prompt)
-        executor = AgentExecutor(
-            agent=agent,
-            tools=tools,
-            verbose=True,
-            max_iterations=6,
-            handle_parsing_errors=True,
-            return_intermediate_steps=False,
-        )
+        # Invoke model with LangChain tools bound
+        llm_with_tools = llm.bind_tools(tools)
+        ai_msg = llm_with_tools.invoke(messages)
 
-        result = executor.invoke({
-            "input": req.message,
-            "chat_history": chat_history,
-        })
+        # If model invoked tools, execute them and generate final answer
+        if getattr(ai_msg, "tool_calls", None):
+            messages.append(ai_msg)
+            for tc in ai_msg.tool_calls:
+                t_name = tc.get("name", "")
+                t_args = tc.get("args", {})
+                t_id = tc.get("id", f"call_{len(tool_calls_log)}")
+                if t_name in tools_map:
+                    try:
+                        output = tools_map[t_name].invoke(t_args)
+                    except Exception as invoke_err:
+                        output = f"Error executing {t_name}: {invoke_err}"
+                    messages.append(ToolMessage(content=str(output), tool_call_id=t_id))
 
-        answer = str(result.get("output", "I processed your request."))
+            # Second turn generates natural language summary with the executed tool outputs
+            final_ai_msg = llm.invoke(messages)
+            answer = str(final_ai_msg.content or "I processed your request.")
+        else:
+            answer = str(ai_msg.content or "I processed your request.")
 
         return AgentResponse(
             answer=answer,
@@ -978,15 +1173,17 @@ RULES:
         import traceback
         traceback.print_exc()
 
-        # Graceful degradation — try plain LLM without tools
+        # Graceful degradation fallback
         fallback_answer = _llm(
-            system="You are Project HR. Answer the user's question helpfully.",
+            system=f"You are {req.persona or 'Project HR'}. Help the user directly.",
             context="",
+
             user_query=req.message,
             api_key=api_key,
             history=req.history,
         )
         return AgentResponse(
             answer=fallback_answer,
-            toolCalls=tool_calls_log,
+            toolCalls=[AgentToolCall(**tc) for tc in tool_calls_log],
         )
+

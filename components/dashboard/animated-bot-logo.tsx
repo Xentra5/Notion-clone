@@ -103,11 +103,11 @@ export function AnimatedBotLogo({
   // Professional, subtle ambient aura (Linear / Vercel dark mode palette)
   const ambientGlowClass = {
     idle: "bg-white/[0.06] opacity-60 scale-105",
-    typing: "bg-cyan-500/[0.12] opacity-80 scale-110 animate-pulse",
-    fast: "bg-sky-400/[0.14] opacity-90 scale-115 animate-pulse",
-    thinking: "bg-indigo-500/[0.15] opacity-90 scale-115",
-    deepsearch: "bg-blue-500/[0.18] opacity-90 scale-120",
-    error: "bg-rose-500/[0.14] opacity-90 scale-110 animate-pulse",
+    typing: "bg-cyan-500/[0.18] opacity-85 scale-115 animate-pulse",
+    fast: "bg-sky-400/[0.22] opacity-95 scale-120 animate-pulse",
+    thinking: "bg-indigo-500/[0.25] opacity-95 scale-120 animate-pulse",
+    deepsearch: "bg-blue-500/[0.28] opacity-100 scale-125 animate-pulse",
+    error: "bg-rose-500/[0.20] opacity-90 scale-110 animate-pulse",
   }[resolvedState];
 
   // Clean, monochromatic & subtle conic ring gradients
@@ -115,9 +115,9 @@ export function AnimatedBotLogo({
   const conicGradient = {
     idle: "conic-gradient(from 0deg, rgba(255,255,255,0.6), rgba(255,255,255,0.05) 40%, rgba(255,255,255,0.4) 75%, rgba(255,255,255,0.05))",
     typing: "conic-gradient(from 0deg, rgba(56,189,248,0.7), rgba(255,255,255,0.1) 40%, rgba(56,189,248,0.5) 75%, rgba(255,255,255,0.05))",
-    fast: "conic-gradient(from 0deg, rgba(255,255,255,0.9), rgba(56,189,248,0.6) 30%, rgba(255,255,255,0.1) 60%, rgba(255,255,255,0.9))",
-    thinking: "conic-gradient(from 0deg, rgba(129,140,248,0.85), rgba(56,189,248,0.6) 35%, rgba(255,255,255,0.1) 70%, rgba(129,140,248,0.85))",
-    deepsearch: "conic-gradient(from 0deg, rgba(96,165,250,0.9), rgba(129,140,248,0.7) 35%, rgba(255,255,255,0.15) 70%, rgba(96,165,250,0.9))",
+    fast: "conic-gradient(from 0deg, rgba(56,189,248,0.95), rgba(255,255,255,0.8) 30%, rgba(56,189,248,0.2) 60%, rgba(56,189,248,0.95))",
+    thinking: "conic-gradient(from 0deg, rgba(129,140,248,0.95), rgba(99,102,241,0.6) 35%, rgba(255,255,255,0.2) 70%, rgba(129,140,248,0.95))",
+    deepsearch: "conic-gradient(from 0deg, rgba(59,130,246,1), rgba(147,197,253,0.8) 35%, rgba(255,255,255,0.2) 70%, rgba(59,130,246,1))",
     error: "conic-gradient(from 0deg, rgba(244,63,94,0.8), rgba(255,255,255,0.1) 40%, rgba(251,113,133,0.5) 75%, rgba(255,255,255,0.05))",
   }[resolvedState];
 
@@ -125,9 +125,9 @@ export function AnimatedBotLogo({
   const satelliteColor = {
     idle: "bg-white/80 shadow-[0_0_6px_rgba(255,255,255,0.8)]",
     typing: "bg-sky-300 shadow-[0_0_8px_rgba(56,189,248,0.9)]",
-    fast: "bg-white shadow-[0_0_8px_rgba(255,255,255,0.9)]",
-    thinking: "bg-indigo-300 shadow-[0_0_8px_rgba(165,180,252,0.9)]",
-    deepsearch: "bg-blue-300 shadow-[0_0_8px_rgba(147,197,253,0.9)]",
+    fast: "bg-sky-300 shadow-[0_0_10px_rgba(56,189,248,1)]",
+    thinking: "bg-indigo-300 shadow-[0_0_10px_rgba(165,180,252,1)]",
+    deepsearch: "bg-blue-300 shadow-[0_0_12px_rgba(147,197,253,1)]",
     error: "bg-rose-400 shadow-[0_0_8px_rgba(244,63,94,0.9)]",
   }[resolvedState];
 
@@ -135,9 +135,9 @@ export function AnimatedBotLogo({
   const chassisBorder = {
     idle: "border-white/15 animate-bot-float",
     typing: "border-sky-400/30 animate-bot-float",
-    fast: "border-white/30",
-    thinking: "border-indigo-400/35",
-    deepsearch: "border-blue-400/40",
+    fast: "border-sky-400/40 shadow-[0_0_15px_rgba(56,189,248,0.2)]",
+    thinking: "border-indigo-400/45 shadow-[0_0_15px_rgba(129,140,248,0.25)]",
+    deepsearch: "border-blue-400/50 shadow-[0_0_20px_rgba(59,130,246,0.3)]",
     error: "border-rose-500/40 animate-bot-shake",
   }[resolvedState];
 
@@ -145,9 +145,9 @@ export function AnimatedBotLogo({
   const badgeColor = {
     idle: "bg-emerald-400 border border-black shadow-[0_0_6px_rgba(52,211,153,0.8)]",
     typing: "bg-sky-400 border border-black shadow-[0_0_6px_rgba(56,189,248,0.8)] animate-pulse",
-    fast: "bg-white border border-black shadow-[0_0_6px_rgba(255,255,255,0.9)] animate-pulse",
-    thinking: "bg-indigo-400 border border-black shadow-[0_0_6px_rgba(129,140,248,0.8)]",
-    deepsearch: "bg-blue-400 border border-black shadow-[0_0_8px_rgba(96,165,250,0.8)]",
+    fast: "bg-sky-400 border border-black shadow-[0_0_8px_rgba(56,189,248,0.9)] animate-pulse",
+    thinking: "bg-indigo-400 border border-black shadow-[0_0_8px_rgba(129,140,248,0.9)] animate-pulse",
+    deepsearch: "bg-blue-500 border border-black shadow-[0_0_10px_rgba(59,130,246,1)] animate-pulse",
     error: "bg-rose-500 border border-black shadow-[0_0_6px_rgba(244,63,94,0.8)] animate-pulse",
   }[resolvedState];
 

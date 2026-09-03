@@ -1,9 +1,9 @@
-﻿"use client";
+"use client";
 
 import { useEffect } from "react";
 import dynamic from "next/dynamic";
 import { useSession } from "next-auth/react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, usePathname, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Sidebar } from "@/components/dashboard/sidebar";
 import { TopBar } from "@/components/dashboard/top-bar";
@@ -46,7 +46,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const { status } = useSession();
   const params = useParams();
+  const pathname = usePathname();
   const pageId = params?.pageId as string | undefined;
+  const isAgentPage = pathname === "/dashboard/agent" || pathname?.startsWith("/dashboard/agent");
 
   const {
     activePage, setActivePage,
@@ -128,7 +130,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Center Main Workspace Area */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
-        <TopBar pageId={pageId} />
+        {!isAgentPage && <TopBar pageId={pageId} />}
         {utilityPage
           ? <UtilityPage type={utilityPage} onBack={() => { setUtilityPage(null); setActivePage({ title: "Getting Started with Notion" }); }} />
           : children}

@@ -432,7 +432,7 @@ export function TopBar({ pageId }: TopBarProps) {
           <ThemeToggle />
           <div className="h-7 w-[1px] bg-border mx-1" />
 
-          {/* Project HR Toggle Button */}
+          {/* Notion Agent Toggle Button */}
           <button
             onClick={toggleAi}
             className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium transition ml-1 ${
@@ -440,10 +440,10 @@ export function TopBar({ pageId }: TopBarProps) {
                 ? "bg-white/15 border border-white/20 text-white"
                 : "hover:bg-neutral-200 dark:hover:bg-neutral-800 text-neutral-700 dark:text-neutral-300"
             }`}
-            title="Toggle Project HR Side Panel"
+            title="Toggle Notion Agent Side Panel"
           >
             <AnimatedBotLogo size="xs" />
-            <span className="hidden sm:inline">Project HR</span>
+            <span className="hidden sm:inline">Notion Agent</span>
           </button>
         </div>
       </header>

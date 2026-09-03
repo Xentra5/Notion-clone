@@ -827,13 +827,13 @@ export function Sidebar({ activePage }: SidebarProps) {
           )}
         </div>
 
-        {/* Project HR Section */}
+        {/* AI Assistant Section */}
         <div className="space-y-1">
           <button
             onClick={() => toggleSection("agents")}
             className="w-full flex items-center justify-between px-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition text-left"
           >
-            <span>Project HR</span>
+            <span>AI Assistant</span>
             {expandedSections.agents ? (
               <ChevronDown className="h-3 w-3" />
             ) : (
@@ -848,7 +848,7 @@ export function Sidebar({ activePage }: SidebarProps) {
                 className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
               >
                 <Plus className="h-3.5 w-3.5 text-muted-foreground" />
-                <span className="text-[11px]">New Project HR chat</span>
+                <span className="text-[11px]">New Agent chat</span>
               </button>
               <button
                 onClick={() => router.push("/dashboard/agent")}
@@ -859,11 +859,12 @@ export function Sidebar({ activePage }: SidebarProps) {
                 }`}
               >
                 <AnimatedBotLogo size="xs" />
-                <span className="text-[11px] font-medium">Project HR</span>
+                <span className="text-[11px] font-medium">Workspace Agent</span>
               </button>
             </div>
           )}
         </div>
+
 
         {/* Private Section */}
         <div className="space-y-1">
@@ -1038,7 +1039,7 @@ export function Sidebar({ activePage }: SidebarProps) {
             <span>Notion Pro</span>
           </div>
           <p className="text-[10px] text-neutral-400 leading-normal">
-            Unlock unlimited Project HR Agent, calendar sync, and workspace tools.
+            Unlock unlimited Notion Agent, calendar sync, and workspace tools.
           </p>
           <button
             onClick={() => setShowPricing(true)}

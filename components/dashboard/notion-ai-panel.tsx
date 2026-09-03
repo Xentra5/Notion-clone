@@ -779,7 +779,7 @@ export function NotionAiPanel({
             className="flex items-center gap-1.5 font-semibold text-foreground px-2 py-1 rounded hover:bg-sidebar-accent transition text-xs"
           >
             <AnimatedBotLogo size="xs" />
-            <span>Project HR AI</span>
+            <span>Notion Agent</span>
             <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
           </button>
         </div>
@@ -819,7 +819,7 @@ export function NotionAiPanel({
         {messages.length === 0 && !writeAction ? (
           /* Initial Empty State */
           <div className="space-y-6 pt-4 animate-in fade-in duration-300">
-            {/* Project HR Circular Bot Logo */}
+            {/* Notion Agent Circular Bot Logo */}
             <div className="flex items-center justify-start">
               <AnimatedBotLogo
                 size="lg"
@@ -967,7 +967,7 @@ export function NotionAiPanel({
             {isGenerating && (
               <div className="flex items-center gap-2.5 text-xs text-foreground pl-1 animate-pulse">
                 <AnimatedBotLogo size="xs" isThinking={true} />
-                <span className="text-zinc-300 font-medium">Project HR AI is reasoning & analyzing...</span>
+                <span className="text-zinc-300 font-medium">Notion Agent is reasoning & analyzing...</span>
               </div>
             )}
           </div>

@@ -13,9 +13,9 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: "Project HR | Notion",
+  title: "Notion Agent | Notion",
   description:
-    "Project HR intelligent workspace management, team workflows, and live web research.",
+    "Notion Agent — intelligent workspace management, team workflows, and live web research.",
 
   icons: {
     icon: [
