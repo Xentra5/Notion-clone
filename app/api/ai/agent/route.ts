@@ -4,27 +4,25 @@ import { connectToDatabase } from "@/lib/mongodb";
 import AgentMemory from "@/lib/models/agent-memory";
 import AgentSession from "@/lib/models/agent-session";
 import AgentActionLog from "@/lib/models/agent-action-log";
+import { checkRateLimit } from "@/lib/ratelimit";
 
-const PYTHON_RAG_SERVICE_URL = (process.env.RAG_SERVICE_URL || "http://127.0.0.1:8000").replace("localhost", "127.0.0.1");
-const NEXTJS_BASE_URL = (process.env.NEXTAUTH_URL || "http://127.0.0.1:3000").replace("localhost", "127.0.0.1");
-const RAW_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
-const GEMINI_API_KEY = RAW_KEY.replace(/^["'"']|["'"']$/g, "").trim();
+// ─── Service Configuration ────────────────────────────────────────────────────
 
-const SESSION_COOKIE_NAMES = [
-  "next-auth.session-token",
-  "__Secure-next-auth.session-token",
-];
+const PYTHON_RAG_SERVICE_URL = (process.env.RAG_SERVICE_URL || "http://127.0.0.1:8000").replace(
+  "localhost",
+  "127.0.0.1"
+);
+const NEXTJS_BASE_URL = (process.env.NEXTAUTH_URL || "http://127.0.0.1:3000").replace(
+  "localhost",
+  "127.0.0.1"
+);
 
-function extractSessionToken(request: NextRequest): string {
-  const fullCookie = request.headers.get("cookie");
-  if (fullCookie) return fullCookie;
-
-  for (const name of SESSION_COOKIE_NAMES) {
-    const value = request.cookies.get(name)?.value;
-    if (value) return value;
-  }
-  return "";
-}
+/**
+ * Shared internal secret used to authenticate Next.js → Python RAG service calls.
+ * Set RAG_INTERNAL_SECRET in both .env and the Python service environment.
+ * The Python service MUST reject requests missing this header.
+ */
+const RAG_INTERNAL_SECRET = process.env.RAG_INTERNAL_SECRET || "";
 
 interface IncomingBody {
   message?: string;
@@ -34,11 +32,29 @@ interface IncomingBody {
   mode?: "fast" | "think" | "deepsearch";
 }
 
+/**
+ * Wraps user content in explicit delimiters so the LLM treats it as data,
+ * not as additional instructions — mitigates prompt injection.
+ */
+function sanitizeForPrompt(userInput: string): string {
+  return `[USER_INPUT_START]\n${userInput}\n[USER_INPUT_END]`;
+}
+
 export async function POST(request: NextRequest) {
   try {
+    // 1. Authentication
     const session = await getSession(request);
     if (!session?.user?.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    // 2. Rate limiting — AI agent is expensive; 15 requests/minute per IP
+    const rl = await checkRateLimit(request, "ai_agent", { limit: 15, windowMs: 60_000 });
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many requests. Please slow down." },
+        { status: 429 }
+      );
     }
 
     const body = (await request.json().catch(() => null)) as IncomingBody | null;
@@ -52,9 +68,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "message is required" }, { status: 400 });
     }
 
+    // 3. Cap message length to prevent prompt-flooding attacks
+    const MAX_MSG_LEN = 4000;
+    if (message.length > MAX_MSG_LEN) {
+      return NextResponse.json(
+        { error: `Message too long (max ${MAX_MSG_LEN} characters)` },
+        { status: 400 }
+      );
+    }
+
     await connectToDatabase();
 
-    // 1. Fetch persistent user memories to supply to LangChain agent
+    // 4. Fetch persistent user memories
     const userMemories = await AgentMemory.find({ userId: session.user.email })
       .sort({ createdAt: -1 })
       .limit(15)
@@ -62,23 +87,31 @@ export async function POST(request: NextRequest) {
 
     const memoryStrings = userMemories.map((m) => m.content);
 
-    const sessionToken = extractSessionToken(request);
-
-    // 2. Query Python LangChain Microservice
-    let data: any = null;
+    // 5. Query Python LangChain Microservice
+    //    SECURITY: The Gemini API key is NOT forwarded here — the Python service
+    //    reads it directly from its own environment variables. The RAG_INTERNAL_SECRET
+    //    authenticates this internal service-to-service call.
+    let data: { answer?: string; toolCalls?: unknown[] } | null = null;
     try {
       const agentRes = await fetch(`${PYTHON_RAG_SERVICE_URL}/agent`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          // Service-to-service authentication header (replaces session cookie forwarding)
+          "X-Rag-Internal-Secret": RAG_INTERNAL_SECRET,
+          // Scoped identity header — Python agent acts on behalf of this user
+          "X-Workspace-Id": session.user.email,
+        },
         body: JSON.stringify({
-          message: message.trim(),
-          sessionToken,
-          nextjsBaseUrl: NEXTJS_BASE_URL,
+          message: sanitizeForPrompt(message.trim()),
           workspaceId: session.user.email,
-          geminiApiKey: GEMINI_API_KEY,
+          nextjsBaseUrl: NEXTJS_BASE_URL,
           history: Array.isArray(history) ? history.slice(-12) : [],
           persona: personaId,
           memories: memoryStrings,
+          // NOTE: sessionToken is intentionally NOT forwarded. The Python agent
+          // authenticates back to Next.js using the X-Rag-Internal-Secret + X-Workspace-Id
+          // headers on a dedicated /api/internal/* route (no user session required there).
         }),
         signal: AbortSignal.timeout(60000),
       });
@@ -93,11 +126,13 @@ export async function POST(request: NextRequest) {
       console.warn("[/api/ai/agent] Python service unreachable:", fetchErr);
     }
 
-    const answer = data?.answer || "I received your request. Start the Python RAG service (`npm run dev`) to enable autonomous workspace actions.";
+    const answer =
+      data?.answer ||
+      "I received your request. Start the Python RAG service (`npm run dev`) to enable autonomous workspace actions.";
     const toolCalls = Array.isArray(data?.toolCalls) ? data.toolCalls : [];
 
-    // 3. Log actions into AgentActionLog for Change History & Audit Trail
-    for (const tc of toolCalls) {
+    // 6. Log tool calls into AgentActionLog
+    for (const tc of toolCalls as { tool?: string; output?: unknown; input?: unknown }[]) {
       try {
         const toolName = tc.tool;
         if (
@@ -108,7 +143,7 @@ export async function POST(request: NextRequest) {
             "create_page",
             "update_page",
             "remember_fact",
-          ].includes(toolName)
+          ].includes(toolName ?? "")
         ) {
           await AgentActionLog.create({
             userId: session.user.email,
@@ -123,7 +158,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 4. Save messages to persistent AgentSession
+    // 7. Save messages to persistent AgentSession
     let currentSessionId = sessionId;
     try {
       const userMsg = {
@@ -152,7 +187,6 @@ export async function POST(request: NextRequest) {
           }
         );
       } else {
-        // Create auto-titled session based on first user message
         const titleSnippet = message.trim().slice(0, 35) + (message.trim().length > 35 ? "…" : "");
         const newSession = await AgentSession.create({
           userId: session.user.email,

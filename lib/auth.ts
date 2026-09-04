@@ -15,14 +15,15 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_ID || process.env.GOOGLE_CLIENT_ID || '',
       clientSecret: process.env.GOOGLE_SECRET || process.env.GOOGLE_CLIENT_SECRET || '',
-      allowDangerousEmailAccountLinking: true,
+      // NOTE: allowDangerousEmailAccountLinking REMOVED — it allowed account takeover via email matching.
+      // The signIn() callback below handles existing-email conflicts explicitly and safely.
     }),
 
     // --- GitHub OAuth Provider ---
     GithubProvider({
       clientId: process.env.GITHUB_ID || process.env.GITHUB_CLIENT_ID || '',
       clientSecret: process.env.GITHUB_SECRET || process.env.GITHUB_CLIENT_SECRET || '',
-      allowDangerousEmailAccountLinking: true,
+      // NOTE: allowDangerousEmailAccountLinking REMOVED — same reason as Google above.
     }),
 
     // --- Credentials Provider (Email & Password) ---

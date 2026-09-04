@@ -3,6 +3,19 @@ import bcryptjs from "bcryptjs";
 import { getSession } from "@/lib/server-session";
 import { connectToDatabase } from "@/lib/mongodb";
 import User from "@/lib/models/user";
+import { checkRateLimit } from "@/lib/ratelimit";
+
+/**
+ * Allowlist of preference keys the user is permitted to set.
+ * SECURITY: Merging body.preferences directly without a filter allows a user
+ * to inject arbitrary keys into their MongoDB document (prototype pollution risk).
+ */
+const ALLOWED_PREFERENCE_KEYS = new Set([
+  "theme", "language", "fontSize", "fontFamily",
+  "defaultView", "sidebarCollapsed", "showPageIcons",
+  "notificationsEnabled", "emailNotifications", "soundEnabled",
+  "calendarStartDay", "dateFormat", "timeFormat",
+]);
 
 export async function GET(request: NextRequest) {
   const session = await getSession(request);
@@ -17,6 +30,11 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   const session = await getSession(request);
   if (!session?.user?.email) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  // Rate limit — 5 profile updates per minute
+  const rl = await checkRateLimit(request, "profile_patch", { limit: 5, windowMs: 60_000 });
+  if (!rl.success) return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+
   const body = await request.json();
   await connectToDatabase();
   const user = await User.findOne({ email: session.user.email });
@@ -40,10 +58,17 @@ export async function PATCH(request: NextRequest) {
       outlook: Boolean(body.connections.outlook),
     };
   }
-  if (body.preferences && typeof body.preferences === "object") {
+  if (body.preferences && typeof body.preferences === "object" && !Array.isArray(body.preferences)) {
+    // SECURITY: Only allow known preference keys — prevents arbitrary MongoDB field injection
+    const safePrefs: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(body.preferences as Record<string, unknown>)) {
+      if (ALLOWED_PREFERENCE_KEYS.has(key)) {
+        safePrefs[key] = value;
+      }
+    }
     user.preferences = {
       ...(user.preferences || {}),
-      ...body.preferences,
+      ...safePrefs,
     };
   }
   await user.save();

@@ -4,15 +4,31 @@ import { connectToDatabase } from "@/lib/mongodb";
 import Page from "@/lib/models/page";
 import { searchDuckDuckGo } from "@/lib/duckduckgo";
 import { serverCache, hashQuery } from "@/lib/cache";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 const PYTHON_RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || "http://localhost:8000";
-const RAW_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
-const GEMINI_API_KEY = RAW_KEY.replace(/^["']|["']$/g, "").trim();
+
+/**
+ * Shared internal secret — authenticates Next.js → Python RAG service calls.
+ * The Python service MUST reject requests without this header.
+ * Set RAG_INTERNAL_SECRET in both .env files.
+ */
+const RAG_INTERNAL_SECRET = process.env.RAG_INTERNAL_SECRET || "";
+
+/**
+ * We do NOT forward GEMINI_API_KEY to the Python service.
+ * The Python service reads its own GEMINI_API_KEY from its environment.
+ * This prevents the key from appearing in request bodies and logs.
+ */
 
 /** Returns true only when we have a key that looks like a real Gemini key */
 function isValidGeminiKey(key: string): boolean {
   return Boolean(key && key.length > 20 && !key.startsWith("your-") && !key.startsWith("replace-"));
 }
+
+// Read key for direct Gemini calls from THIS service's environment only
+const RAW_KEY = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || "";
+const GEMINI_API_KEY = RAW_KEY.replace(/^["'\u201c\u201d]|["'\u201c\u201d]$/g, "").trim();
 
 const NO_KEY_ANSWER =
   `\u26a0\ufe0f **Gemini API key not configured**\n\n` +
@@ -40,6 +56,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Rate limit: AI is expensive — 20 requests/minute per IP
+    const rl = await checkRateLimit(request, "ai_rag", { limit: 20, windowMs: 60_000 });
+    if (!rl.success) {
+      return NextResponse.json(
+        { error: "Too many AI requests. Please wait a moment." },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { question, pageId, pageTitle, pageContent, history } = body as {
       question?: unknown;
@@ -51,6 +76,15 @@ export async function POST(request: NextRequest) {
 
     if (typeof question !== "string" || !question.trim()) {
       return NextResponse.json({ error: "Question is required" }, { status: 400 });
+    }
+
+    // Cap question length to prevent prompt-flooding
+    const MAX_Q_LEN = 4000;
+    if (question.length > MAX_Q_LEN) {
+      return NextResponse.json(
+        { error: `Question too long (max ${MAX_Q_LEN} characters)` },
+        { status: 400 }
+      );
     }
 
     const q = question.trim();
@@ -164,13 +198,16 @@ export async function POST(request: NextRequest) {
       try {
         const ragRes = await fetch(`${PYTHON_RAG_SERVICE_URL}/query`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Rag-Internal-Secret": RAG_INTERNAL_SECRET,
+          },
           body: JSON.stringify({
             workspaceId,
             pageId: typeof pageId === "string" ? pageId : undefined,
             question: q,
             history: Array.isArray(history) ? history.slice(-12) : [],
-            geminiApiKey: GEMINI_API_KEY,
+            // SECURITY: geminiApiKey is NOT sent — the Python service reads its own env.
           }),
           signal: AbortSignal.timeout(10000),
         });
@@ -260,13 +297,16 @@ export async function POST(request: NextRequest) {
       try {
         const ragRes = await fetch(`${PYTHON_RAG_SERVICE_URL}/query`, {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "X-Rag-Internal-Secret": RAG_INTERNAL_SECRET,
+          },
           body: JSON.stringify({
             workspaceId,
             pageId: typeof pageId === "string" ? pageId : undefined,
             question: q,
             history: Array.isArray(history) ? history.slice(-12) : [],
-            geminiApiKey: GEMINI_API_KEY,
+            // SECURITY: geminiApiKey is NOT sent — the Python service reads its own env.
           }),
           signal: AbortSignal.timeout(12000),
         });

@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { serverCache, hashQuery } from "@/lib/cache";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 const RAG_SERVICE_URL = process.env.RAG_SERVICE_URL || "http://localhost:8000";
+/**
+ * Shared internal secret — authenticates Next.js → Python RAG service calls.
+ * SECURITY: The GEMINI_API_KEY is NOT forwarded to the Python service.
+ * The Python service reads it directly from its own environment variables.
+ */
+const RAG_INTERNAL_SECRET = process.env.RAG_INTERNAL_SECRET || "";
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY || "";
 
 export async function POST(request: NextRequest) {
@@ -11,12 +18,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  // Rate limit: 10 meeting summaries per minute per IP
+  const rl = await checkRateLimit(request, "meeting_summary", { limit: 10, windowMs: 60_000 });
+  if (!rl.success) {
+    return NextResponse.json({ error: "Too many requests. Please wait a moment." }, { status: 429 });
+  }
+
   const body = await request.json().catch(() => null);
   if (!body || typeof body.transcript !== "string") {
     return NextResponse.json({ error: "Missing transcript" }, { status: 400 });
   }
 
-  const { transcript, title = "Meeting" } = body as { transcript: string; title?: string };
+  const { title = "Meeting" } = body as { transcript: string; title?: string };
+  // Cap transcript length to prevent prompt-flooding / cost attacks
+  const MAX_TRANSCRIPT_LEN = 50_000;
+  const transcript = (body.transcript as string).slice(0, MAX_TRANSCRIPT_LEN);
   const meetingCacheKey = `ai:meeting:${hashQuery(`${session.user.email}:${title}:${transcript}`)}`;
 
   // 1. Check in-memory cache
@@ -25,12 +41,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(cachedSummary);
   }
 
-  // ── Try FastAPI RAG service first ─────────────────────────────────────────
+  // ── Try FastAPI RAG service first — it reads GEMINI_API_KEY from its own env ──
   try {
     const ragRes = await fetch(`${RAG_SERVICE_URL}/meeting-summary`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ transcript, title, geminiApiKey: GEMINI_API_KEY }),
+      headers: {
+        "Content-Type": "application/json",
+        "X-Rag-Internal-Secret": RAG_INTERNAL_SECRET,
+      },
+      // SECURITY: geminiApiKey is intentionally NOT sent in the body.
+      // The Python service reads GEMINI_API_KEY from its own environment.
+      body: JSON.stringify({ transcript, title }),
       signal: AbortSignal.timeout(30_000),
     });
     if (ragRes.ok) {

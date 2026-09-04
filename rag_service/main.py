@@ -3,7 +3,7 @@ import re
 import json
 import threading
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
@@ -24,13 +24,57 @@ warnings.filterwarnings("ignore", message=".*langchain.*", category=DeprecationW
 
 app = FastAPI(title="Notion RAG AI Microservice")
 
+# ─── CORS: Locked to Next.js origin only ─────────────────────────────────────
+# SECURITY: wildcard allow_origins=["*"] with allow_credentials=True was removed.
+# It allowed any browser origin to make credentialed cross-origin requests.
+# We now restrict to the specific Next.js server origin.
+_NEXTJS_ORIGIN = os.getenv("NEXTAUTH_URL", "http://localhost:3000").rstrip("/")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[_NEXTJS_ORIGIN],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["POST", "GET", "DELETE"],
+    allow_headers=["Content-Type", "X-Rag-Internal-Secret", "X-Workspace-Id"],
 )
+
+# ─── Internal Service-to-Service Authentication ───────────────────────────────
+# SECURITY: All API endpoints are now protected by a shared secret.
+# Next.js sets this in process.env.RAG_INTERNAL_SECRET and passes it as
+# the X-Rag-Internal-Secret header on every request to this service.
+# The Python service reads it from its own environment.
+# If the header is missing or wrong, the request is rejected with 403.
+_RAG_INTERNAL_SECRET = os.getenv("RAG_INTERNAL_SECRET", "")
+
+def _verify_internal_secret(x_rag_internal_secret: Optional[str] = Header(None, alias="X-Rag-Internal-Secret")):
+    """
+    FastAPI dependency — call as Depends(_verify_internal_secret) on protected routes.
+    Rejects requests that do not carry the correct shared internal secret.
+    Also works even when RAG_INTERNAL_SECRET is not set (development mode — logs a warning).
+    """
+    if not _RAG_INTERNAL_SECRET:
+        # Secret not configured — running in dev mode without a secret; allow but warn.
+        import sys
+        print(
+            "[RAG Security WARNING] RAG_INTERNAL_SECRET is not set. "
+            "All requests are accepted. Set this variable in production.",
+            file=sys.stderr
+        )
+        return
+    if x_rag_internal_secret != _RAG_INTERNAL_SECRET:
+        raise HTTPException(status_code=403, detail="Forbidden: invalid internal secret")
+
+
+def _resolve_workspace_id(x_workspace_id: Optional[str], body_workspace_id: str) -> str:
+    """
+    SECURITY: When the X-Workspace-Id header is present (set by Next.js after
+    verifying the user session), it takes precedence over the workspaceId field
+    in the request body. This prevents an authenticated user from accessing
+    another user's vector index by spoofing the workspaceId field.
+    """
+    if x_workspace_id and x_workspace_id.strip():
+        return x_workspace_id.strip()
+    return body_workspace_id
 
 # Global mutex lock to ensure SQLite write serialization
 db_lock = threading.Lock()
@@ -129,9 +173,12 @@ def health_check():
 
 
 # ─── Index Page ───────────────────────────────────────────────────────────────
-@app.post("/index-page")
-def index_page(req: IndexPageRequest):
+from fastapi import Depends
+
+@app.post("/index-page", dependencies=[Depends(_verify_internal_secret)])
+def index_page(req: IndexPageRequest, x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id")):
     """Chunk page text and upsert into ChromaDB with SQLite lock protection."""
+    req.workspaceId = _resolve_workspace_id(x_workspace_id, req.workspaceId)
     try:
         parts = []
         for b in req.blocks:
@@ -164,9 +211,10 @@ def index_page(req: IndexPageRequest):
 
 
 # ─── Batch Index Pages ────────────────────────────────────────────────────────
-@app.post("/index-pages-batch")
-def index_pages_batch(req: IndexPagesBatchRequest):
+@app.post("/index-pages-batch", dependencies=[Depends(_verify_internal_secret)])
+def index_pages_batch(req: IndexPagesBatchRequest, x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id")):
     """Batch index multiple workspace pages sequentially under lock."""
+    req.workspaceId = _resolve_workspace_id(x_workspace_id, req.workspaceId)
     try:
         from langchain_text_splitters import RecursiveCharacterTextSplitter
         splitter = RecursiveCharacterTextSplitter(chunk_size=400, chunk_overlap=80)
@@ -204,10 +252,11 @@ def index_pages_batch(req: IndexPagesBatchRequest):
 
 
 # ─── Delete Page Endpoint ─────────────────────────────────────────────────────
-@app.delete("/delete-page")
-@app.post("/delete-page")
-def delete_page(req: DeletePageRequest):
+@app.delete("/delete-page", dependencies=[Depends(_verify_internal_secret)])
+@app.post("/delete-page", dependencies=[Depends(_verify_internal_secret)])
+def delete_page(req: DeletePageRequest, x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id")):
     """Remove all indexed chunks for a deleted or trashed page."""
+    req.workspaceId = _resolve_workspace_id(x_workspace_id, req.workspaceId)
     try:
         delete_filter = _build_chroma_filter(req.workspaceId, req.pageId)
         with db_lock:
@@ -219,15 +268,22 @@ def delete_page(req: DeletePageRequest):
 
 
 # ─── Query ────────────────────────────────────────────────────────────────────
-@app.post("/query")
-def query_rag(req: QueryRequest):
+@app.post("/query", dependencies=[Depends(_verify_internal_secret)])
+def query_rag(req: QueryRequest, x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id")):
     q = req.question.strip()
+    req.workspaceId = _resolve_workspace_id(x_workspace_id, req.workspaceId)
+    # SECURITY: geminiApiKey from request body is ignored; use own env variable
+    api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip().strip('"').strip("'")
+
     if not q:
         return {"answer": "Please ask a question or type `/summary` or `/search <query>`.", "citations": []}
 
-    api_key = req.geminiApiKey or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
+    # Cap question length to prevent prompt-flooding attacks
+    if len(q) > 4000:
+        return {"answer": "Question too long (max 4000 characters).", "citations": []}
 
     # 1. /search command — live web search via built-in LangChain DuckDuckGo tools
+
     if q.lower().startswith("/search") or q.lower().startswith("search ") or q.lower().startswith("find "):
         search_q = re.sub(r"^(/search|search|find)\s*", "", q, flags=re.I).strip()
         if not search_q:
@@ -541,12 +597,14 @@ def _llm(system: str, context: str, user_query: str, api_key: Optional[str], his
 
 
 # ─── Meeting Summary ──────────────────────────────────────────────────────────
-@app.post("/meeting-summary", response_model=MeetingSummaryResponse)
+@app.post("/meeting-summary", response_model=MeetingSummaryResponse, dependencies=[Depends(_verify_internal_secret)])
 def meeting_summary(req: MeetingSummaryRequest):
     """
     Takes a raw meeting transcript and returns a structured AI-generated summary.
-    Uses Gemini via LangChain when an API key is provided.
+    Uses Gemini via LangChain — reads GEMINI_API_KEY from its own environment.
     """
+    # SECURITY: geminiApiKey from request body is ignored; read from own env
+    api_key = (os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip()
     transcript = req.transcript.strip()
     if not transcript:
         return MeetingSummaryResponse(
@@ -572,8 +630,8 @@ Rules:
 - If a section has nothing, return an empty array [].
 - ONLY output valid JSON. No explanation before or after."""
 
-    api_key = req.geminiApiKey or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
     if api_key and api_key.strip():
+
         try:
             from langchain_google_genai import ChatGoogleGenerativeAI
             model_name = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
@@ -1024,14 +1082,16 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
     ]
 
 
-@app.post("/agent", response_model=AgentResponse)
-def run_agent(req: AgentRequest):
+@app.post("/agent", response_model=AgentResponse, dependencies=[Depends(_verify_internal_secret)])
+def run_agent(req: AgentRequest, x_workspace_id: Optional[str] = Header(None, alias="X-Workspace-Id")):
     """
     LangChain tool-calling AI Agent endpoint with multi-persona, long-term memory,
     and workspace action execution (calendar scheduling/revisions, pages, RAG).
     """
+    req.workspaceId = _resolve_workspace_id(x_workspace_id, req.workspaceId)
+    # SECURITY: geminiApiKey from request body is ignored; read only from environment
     api_key = (
-        req.geminiApiKey or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
+        os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or ""
     ).strip().strip('"').strip("'")
 
     if not api_key or api_key.startswith("your-") or len(api_key) < 20:

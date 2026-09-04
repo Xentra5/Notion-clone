@@ -40,12 +40,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Memory content is required" }, { status: 400 });
     }
 
+    // SECURITY: Cap memory content length to prevent cost-exhaustion attacks.
+    // Up to 15 memories are injected into every AI agent prompt; unbounded content
+    // would allow a user to massively inflate their prompt token usage.
+    const MAX_MEMORY_LEN = 2000;
+    const safeContent = content.trim().slice(0, MAX_MEMORY_LEN);
+
     await connectToDatabase();
     const memory = await AgentMemory.create({
       userId: session.user.email,
-      content: content.trim(),
+      content: safeContent,
       category: category || "general",
-      importance: typeof importance === "number" ? importance : 1,
+      importance: typeof importance === "number" ? Math.min(Math.max(importance, 0), 10) : 1,
       source: source || "user",
     });
 
@@ -55,6 +61,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Failed to create memory" }, { status: 500 });
   }
 }
+
 
 // DELETE /api/ai/agent/memory?id=... — delete a memory
 export async function DELETE(request: NextRequest) {

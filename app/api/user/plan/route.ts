@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const { action, plan } = await request.json();
+    const { action } = await request.json();
     await connectToDatabase();
 
     const user = await User.findOne({ email: session.user.email.toLowerCase() });
@@ -57,16 +57,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    if (action === "upgrade") {
-      user.plan = plan || "pro";
-      await user.save();
-      return NextResponse.json({ success: true, plan: user.plan });
-    }
-
-    if (action === "resetFreeUsage") {
-      user.aiUsageCount = 0;
-      await user.save();
-      return NextResponse.json({ success: true, aiUsageCount: 0, plan: user.plan });
+    // SECURITY: "upgrade" and "resetFreeUsage" are intentionally blocked here.
+    // Plan upgrades must only happen via the Stripe or Razorpay payment webhook
+    // (the only trusted source of payment confirmation). Allowing users to call
+    // "upgrade" directly would let any free-tier user self-elevate to a paid plan.
+    if (action === "upgrade" || action === "resetFreeUsage") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
     if (action === "incrementAiUsage") {

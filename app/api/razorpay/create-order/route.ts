@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/lib/server-session";
 import { createRazorpayOrder } from "@/lib/razorpay";
+import { checkRateLimit } from "@/lib/ratelimit";
 
 export async function POST(request: NextRequest) {
   try {
@@ -9,10 +10,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    // Rate limit — prevent payment endpoint flooding
+    const rl = await checkRateLimit(request, "razorpay_order", { limit: 10, windowMs: 60_000 });
+    if (!rl.success) {
+      return NextResponse.json({ error: "Too many requests" }, { status: 429 });
+    }
+
     const { plan } = await request.json();
 
-    // Set prices (in paise: ₹499 = 49900 paise, ₹999 = 99900 paise)
-    const amount = plan === "ultimate" ? 99900 : 49900;
+    // SECURITY: Only accept known plan values — never trust arbitrary strings from the client
+    const VALID_PLANS = ["pro", "ultimate"] as const;
+    const safePlan = VALID_PLANS.includes(plan) ? plan : "pro";
+
+    // Prices in paise (₹499 = 49900, ₹999 = 99900)
+    const amount = safePlan === "ultimate" ? 99900 : 49900;
 
     const order = await createRazorpayOrder({
       amount,
@@ -20,7 +31,9 @@ export async function POST(request: NextRequest) {
       receipt: `rcpt_${Date.now()}`,
       notes: {
         userEmail: session.user.email,
-        plan: plan || "pro",
+        // Store the authoritative plan in Razorpay order notes.
+        // The verify endpoint reads it from here, NOT from the client body.
+        plan: safePlan,
       },
     });
 
