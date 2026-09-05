@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { updatePage, getPages, type Page, type PageBlock } from "@/lib/actions/pages";
+import { updatePage, type PageBlock } from "@/lib/actions/pages";
 import {
   Lock,
   ChevronDown,
@@ -12,7 +12,6 @@ import {
   MoreHorizontal,
   Check,
   Sidebar as SidebarIcon,
-  Sparkles,
   Globe,
   Users,
   Trash2,
@@ -22,6 +21,7 @@ import {
   Upload,
   History as HistoryIcon,
   MessageSquare,
+  Bell,
 } from "lucide-react";
 import { ThemeToggle } from "@/components/dashboard/theme-toggle";
 import { ImportModal } from "@/components/dashboard/modals/import-modal";
@@ -30,10 +30,10 @@ import { ShareModal } from "@/components/dashboard/modals/share-modal";
 import { NotificationsPopover } from "@/components/dashboard/notifications-popover";
 import { CommentsPanel } from "@/components/dashboard/editor/CommentsPanel";
 import { LivePresenceBar } from "@/components/dashboard/editor/LivePresenceBar";
-import { blocksToMarkdown, downloadMarkdownFile, exportToPdfPrint } from "@/lib/export-import";
-import { Bell } from "lucide-react";
-import { useWorkspaceStore } from "@/store/workspace-store";
 import { AnimatedBotLogo } from "@/components/dashboard/animated-bot-logo";
+import { useWorkspaceStore } from "@/store/workspace-store";
+import { blocksToMarkdown, downloadMarkdownFile, exportToPdfPrint } from "@/lib/export-import";
+
 
 function formatRelativeTime(dateInput?: string | Date | null): string {
   if (!dateInput) return "Edited just now";

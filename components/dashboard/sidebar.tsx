@@ -7,15 +7,12 @@ import { toast } from "sonner";
 import dynamic from "next/dynamic";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
-const PricingModal = dynamic(
-  () => import("./pricing-modal").then((mod) => mod.PricingModal),
-  { ssr: false }
-);
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RenameModal } from "@/components/ui/rename-modal";
 import { AnimatedBotLogo } from "@/components/dashboard/animated-bot-logo";
 import { getPages, createPage, updatePage, deletePage, type Page, type PageBlock } from "@/lib/actions/pages";
 import { localStore } from "@/lib/storage/local-store";
+
 import {
   Home,
   Search,
@@ -41,6 +38,11 @@ import {
   Star,
   Bot,
 } from "lucide-react";
+
+const PricingModal = dynamic(
+  () => import("./pricing-modal").then((mod) => mod.PricingModal),
+  { ssr: false }
+);
 
 const GETTING_STARTED_BLOCKS: PageBlock[] = [
   { id: "getting-started-intro", type: "paragraph", properties: { text: "Welcome! This page shows you the basics. You can edit it, keep it as a reference, or delete it whenever you are ready." } },  { id: "getting-started-write", type: "heading", properties: { text: "Write naturally" } },  { id: "getting-started-write-text", type: "paragraph", properties: { text: "Click anywhere and start typing. Press Enter for a new block. Press Shift + Enter for a line break." } },  { id: "getting-started-blocks", type: "heading", properties: { text: "Use blocks" } },  { id: "getting-started-blocks-text", type: "paragraph", properties: { text: "Type / to open the block menu. Try /heading, /bullet, /todo, /quote, or /code." } },  { id: "getting-started-todo", type: "to_do", properties: { text: "Try checking off this task", checked: false } },  { id: "getting-started-shortcuts", type: "heading", properties: { text: "Useful shortcuts" } },  { id: "getting-started-shortcuts-text", type: "paragraph", properties: { text: "Use Ctrl/Cmd + A to select the page, Backspace or Delete to remove selected blocks, and Ctrl/Cmd + K to search." } },  { id: "getting-started-delete", type: "quote", properties: { text: "You can delete this page later from the trash icon beside its name in the sidebar." } },

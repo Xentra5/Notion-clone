@@ -38,18 +38,18 @@ const nextConfig: NextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              // Scripts: self + Stripe + Razorpay + Google (Pyodide CDN for code runner)
-              "script-src 'self' 'unsafe-eval' https://js.stripe.com https://checkout.razorpay.com https://cdn.jsdelivr.net https://apis.google.com",
+              // Scripts: self + unsafe-inline (required for Next.js hydration) + unsafe-eval + Google
+              "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://cdn.jsdelivr.net https://apis.google.com",
               // Styles: self + Google Fonts
               "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
               // Fonts: self + Google Fonts CDN
               "font-src 'self' https://fonts.gstatic.com",
               // Images: self + data URIs + Unsplash + Google favicons
               "img-src 'self' data: blob: https://images.unsplash.com https://www.google.com https://lh3.googleusercontent.com https://avatars.githubusercontent.com",
-              // Connect: self + AI APIs + payment APIs
-              "connect-src 'self' https://generativelanguage.googleapis.com https://api.stripe.com https://api.razorpay.com https://api.unsplash.com",
-              // Frames: Stripe uses iframes for payment elements
-              "frame-src https://js.stripe.com https://hooks.stripe.com https://checkout.razorpay.com",
+              // Connect: self + AI APIs
+              "connect-src 'self' https://generativelanguage.googleapis.com https://api.unsplash.com",
+              // Frames
+              "frame-src 'self'",
               // Workers: self + blob for Pyodide
               "worker-src 'self' blob:",
               "object-src 'none'",
