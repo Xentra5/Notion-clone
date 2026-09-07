@@ -104,11 +104,11 @@ export const Footer = () => {
           {/* Resources links */}
           <div className="flex flex-col gap-3">
             <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-400">Resources</h4>
-            <a href="#" className="text-sm text-neutral-600 hover:text-black transition">Help center</a>
-            <a href="#" className="text-sm text-neutral-600 hover:text-black transition">Pricing</a>
-            <a href="#" className="text-sm text-neutral-600 hover:text-black transition">Blog</a>
-            <a href="#" className="text-sm text-neutral-600 hover:text-black transition">Community</a>
-            <a href="#" className="text-sm text-neutral-600 hover:text-black transition">Templates</a>
+            <Link href="/help" className="text-sm text-neutral-600 hover:text-black transition">Help center</Link>
+            <Link href="/pricing" className="text-sm text-neutral-600 hover:text-black transition">Pricing</Link>
+            <Link href="/resources" className="text-sm text-neutral-600 hover:text-black transition">Guides & Blog</Link>
+            <Link href="/resources" className="text-sm text-neutral-600 hover:text-black transition">Community</Link>
+            <Link href="/resources" className="text-sm text-neutral-600 hover:text-black transition">Templates</Link>
           </div>
 
           {/* Company links */}

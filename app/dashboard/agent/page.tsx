@@ -597,11 +597,14 @@ function AgentProgressIndicator({ mode = "fast", personaName = "Notion Agent" }:
 
   const [activeStep, setActiveStep] = useState(0);
   const [elapsed, setElapsed] = useState(0);
-  const startRef = useRef(Date.now());
+  const startRef = useRef<number | null>(null);
 
   useEffect(() => {
+    startRef.current = Date.now();
     const timer = setInterval(() => {
-      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+      if (startRef.current !== null) {
+        setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+      }
     }, 1000);
     return () => clearInterval(timer);
   }, []);
@@ -616,7 +619,6 @@ function AgentProgressIndicator({ mode = "fast", personaName = "Notion Agent" }:
       }
     });
     return () => timeouts.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const accentColor = isDeep ? "purple" : isThink ? "amber" : "cyan";

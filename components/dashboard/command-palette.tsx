@@ -10,8 +10,10 @@ import {
   Sun,
   Moon,
   ArrowRight,
+  HelpCircle,
 } from "lucide-react";
 import { getPages, createPage, type Page } from "@/lib/actions/pages";
+import { useWorkspaceStore } from "@/store/workspace-store";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -56,7 +58,7 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
   }, [pages, query]);
 
   // Combined selectable list (quick actions + pages)
-  const totalQuickActions = !query ? 3 : 0;
+  const totalQuickActions = !query ? 4 : 0;
   const totalItems = totalQuickActions + filteredPages.length;
 
   useEffect(() => {
@@ -111,8 +113,12 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
       } else if (!query && selectedIndex === 2) {
         setTheme(theme === "dark" ? "light" : "dark");
         onClose();
+      } else if (!query && selectedIndex === 3) {
+        useWorkspaceStore.getState().setUtilityPage("Help");
+        useWorkspaceStore.getState().setActivePage({ title: "Help" });
+        onClose();
       } else {
-        const pageIdx = !query ? selectedIndex - 3 : selectedIndex;
+        const pageIdx = !query ? selectedIndex - 4 : selectedIndex;
         if (filteredPages[pageIdx]) {
           handleSelectPage(filteredPages[pageIdx]._id);
         } else if (query.trim()) {
@@ -219,6 +225,34 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
                   </div>
                   <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
                 </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    useWorkspaceStore.getState().setUtilityPage("Help");
+                    useWorkspaceStore.getState().setActivePage({ title: "Help" });
+                    onClose();
+                  }}
+                  onMouseEnter={() => setSelectedIndex(3)}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition text-left cursor-pointer ${
+                    selectedIndex === 3
+                      ? "bg-accent text-accent-foreground ring-1 ring-primary/30 shadow-xs"
+                      : "text-foreground hover:bg-foreground/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-500">
+                      <HelpCircle className="h-4 w-4" />
+                    </div>
+                    <span>Help Center & Documentation</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <kbd className="rounded border border-border bg-muted/60 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                      ⌘ /
+                    </kbd>
+                    <ArrowRight className="h-3.5 w-3.5 text-muted-foreground" />
+                  </div>
+                </button>
               </div>
             </div>
           )}
@@ -230,7 +264,7 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
             </div>
             <div className="space-y-0.5">
               {filteredPages.map((page, idx) => {
-                const itemIdx = !query ? idx + 3 : idx;
+                const itemIdx = !query ? idx + 4 : idx;
                 const isSelected = selectedIndex === itemIdx;
                 return (
                   <button

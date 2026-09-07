@@ -10,6 +10,7 @@ import { TopBar } from "@/components/dashboard/top-bar";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { deletePage, getPage } from "@/lib/actions/pages";
 import { UtilityPage } from "@/components/dashboard/utility-page";
+import { FloatingHelpButton } from "@/components/dashboard/floating-help-button";
 import { useWorkspaceStore } from "@/store/workspace-store";
 
 // Lazy-load heavy modals on demand to eliminate initial workspace bundle bloat
@@ -69,17 +70,21 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (status === "unauthenticated") router.replace("/login");
   }, [status, router]);
 
-  // Global Cmd+K / Ctrl+K shortcut
+  // Global Cmd+K / Ctrl+K and Cmd+/ / Ctrl+/ shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         toggleCommandPalette();
+      } else if ((e.metaKey || e.ctrlKey) && e.key === "/") {
+        e.preventDefault();
+        setUtilityPage("Help");
+        setActivePage({ title: "Help" });
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [toggleCommandPalette]);
+  }, [toggleCommandPalette, setUtilityPage, setActivePage]);
 
   // Bridge legacy window custom events from deeply nested components to the store
   useEffect(() => {
@@ -145,6 +150,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         isSplitView={isAiSplitView}
         onToggleSplitView={toggleSplitView}
       />
+
+      {/* Floating Help Trigger */}
+      {utilityPage !== "Help" && <FloatingHelpButton />}
 
       {/* Overlay Modals */}
       <CommandPalette isOpen={isCommandPaletteOpen} onClose={closeCommandPalette} onOpenAi={() => useWorkspaceStore.getState().openQuickAi()} />

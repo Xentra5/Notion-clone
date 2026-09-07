@@ -67,6 +67,8 @@ const PageSchema = new Schema(
 // Performance Indexes
 PageSchema.index({ userId: 1, deletedAt: 1, updatedAt: -1 });
 PageSchema.index({ parentPageId: 1, userId: 1, deletedAt: 1 });
+PageSchema.index({ userId: 1, isStarred: 1, deletedAt: 1 });
+PageSchema.index({ userId: 1, category: 1, deletedAt: 1, updatedAt: -1 });
 // Materialized path index — powers O(1) subtree queries
 PageSchema.index({ ancestors: 1, userId: 1 });
 PageSchema.index({ title: "text", "blocks.properties.text": "text" });

@@ -101,10 +101,10 @@ export function SlashCommandMenu({
   if (filteredItems.length === 0) {
     return (
       <div
-        className="absolute left-0 top-full z-50 mt-1 w-80 max-h-96 overflow-y-auto bg-white dark:bg-[#1c1c1c] border border-black/[0.08] dark:border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1.5"
+        className="absolute left-0 top-full z-50 mt-1.5 w-80 max-h-96 overflow-y-auto bg-white/95 dark:bg-[#161616]/95 backdrop-blur-xl border border-black/[0.08] dark:border-white/[0.1] rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.14)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.7)] p-2"
         onMouseDown={(e) => e.preventDefault()}
       >
-        <p className="px-3 py-2 text-xs text-foreground/40">No results</p>
+        <p className="px-3 py-3 text-xs text-foreground/40 text-center font-medium">No matching blocks</p>
       </div>
     );
   }
@@ -115,14 +115,17 @@ export function SlashCommandMenu({
 
   return (
     <div
-      className="absolute left-0 top-full z-50 mt-1 w-80 max-h-96 overflow-y-auto bg-white dark:bg-[#1c1c1c] border border-black/[0.08] dark:border-white/[0.08] rounded-xl shadow-[0_8px_32px_rgba(0,0,0,0.12)] dark:shadow-[0_8px_32px_rgba(0,0,0,0.5)] p-1.5"
+      className="absolute left-0 top-full z-50 mt-1.5 w-80 max-h-96 overflow-y-auto bg-white/95 dark:bg-[#161616]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.1] rounded-2xl shadow-[0_16px_48px_rgba(0,0,0,0.14)] dark:shadow-[0_20px_60px_rgba(0,0,0,0.7)] p-2 transition-all animate-in fade-in-0 zoom-in-95 duration-100"
       onMouseDown={(e) => e.preventDefault()}
     >
       {aiItems.length > 0 && (
-        <>
-          <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-purple-500 uppercase tracking-widest flex items-center gap-1">
-            <span>✨ Notion AI</span>
-          </p>
+        <div className="mb-2">
+          <div className="px-2 pt-1 pb-1 text-[10px] font-bold text-purple-600 dark:text-purple-400 uppercase tracking-widest flex items-center justify-between">
+            <span className="flex items-center gap-1.5">
+              <Sparkles className="h-3 w-3 animate-pulse" /> Notion AI
+            </span>
+            <span className="text-[9px] font-mono px-1.5 py-0.5 rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-300">Tab ⇥</span>
+          </div>
           {aiItems.map((s) => {
             const Icon = s.icon;
             const gi = filteredItems.indexOf(s);
@@ -132,29 +135,29 @@ export function SlashCommandMenu({
                 key={s.label}
                 type="button"
                 onMouseDown={() => onSelect(s)}
-                className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${
+                className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left transition-all duration-150 ${
                   isSelected
-                    ? "bg-purple-500/10 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300 font-semibold"
-                    : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"
+                    ? "bg-purple-500/15 dark:bg-purple-500/25 text-purple-700 dark:text-purple-200 font-medium scale-[1.01] shadow-sm ring-1 ring-purple-500/30"
+                    : "hover:bg-purple-500/10 dark:hover:bg-white/[0.04]"
                 }`}
               >
-                <div className="p-1.5 rounded-md bg-purple-100 dark:bg-purple-950/60 border border-purple-300/40 dark:border-purple-800/40 shrink-0 shadow-sm">
+                <div className="p-1.5 rounded-lg bg-purple-100 dark:bg-purple-950/70 border border-purple-300/50 dark:border-purple-800/50 shrink-0 shadow-sm">
                   <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
                 </div>
-                <div>
-                  <div className="text-[13px] font-medium text-foreground">{s.label}</div>
-                  <div className="text-[11px] text-foreground/40">{s.description}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-medium text-foreground truncate">{s.label}</div>
+                  <div className="text-[11px] text-foreground/50 truncate">{s.description}</div>
                 </div>
               </button>
             );
           })}
-        </>
+        </div>
       )}
 
       {basicItems.length > 0 && (
-        <>
-          <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">
-            Basic blocks
+        <div className="mb-2">
+          <p className="px-2 pt-1 pb-1 text-[10px] font-semibold text-foreground/45 uppercase tracking-wider">
+            Basic Blocks
           </p>
           {basicItems.map((s) => {
             const Icon = s.icon;
@@ -165,29 +168,29 @@ export function SlashCommandMenu({
                 key={s.label}
                 type="button"
                 onMouseDown={() => onSelect(s)}
-                className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${
+                className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left transition-all duration-150 ${
                   isSelected
-                    ? "bg-[#f0f0ef] dark:bg-white/[0.06] font-semibold"
-                    : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"
+                    ? "bg-black/[0.06] dark:bg-white/[0.08] font-medium scale-[1.01] shadow-sm ring-1 ring-black/10 dark:ring-white/10"
+                    : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
                 }`}
               >
-                <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
+                <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-[#222] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
                   <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
                 </div>
-                <div>
-                  <div className="text-[13px] font-medium text-foreground">{s.label}</div>
-                  <div className="text-[11px] text-foreground/40">{s.description}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-medium text-foreground truncate">{s.label}</div>
+                  <div className="text-[11px] text-foreground/50 truncate">{s.description}</div>
                 </div>
               </button>
             );
           })}
-        </>
+        </div>
       )}
 
       {mediaItems.length > 0 && (
-        <>
-          <p className="px-2 pt-2 pb-0.5 text-[10px] font-semibold text-foreground/40 uppercase tracking-widest">
-            Media
+        <div>
+          <p className="px-2 pt-1 pb-1 text-[10px] font-semibold text-foreground/45 uppercase tracking-wider">
+            Media & Interactive
           </p>
           {mediaItems.map((s) => {
             const Icon = s.icon;
@@ -198,23 +201,23 @@ export function SlashCommandMenu({
                 key={s.label}
                 type="button"
                 onMouseDown={() => onSelect(s)}
-                className={`w-full flex items-center gap-3 px-2 py-1.5 rounded-lg text-left transition ${
+                className={`w-full flex items-center gap-3 px-2.5 py-2 rounded-xl text-left transition-all duration-150 ${
                   isSelected
-                    ? "bg-[#f0f0ef] dark:bg-white/[0.06] font-semibold"
-                    : "hover:bg-[#f0f0ef] dark:hover:bg-white/[0.06]"
+                    ? "bg-black/[0.06] dark:bg-white/[0.08] font-medium scale-[1.01] shadow-sm ring-1 ring-black/10 dark:ring-white/10"
+                    : "hover:bg-black/[0.04] dark:hover:bg-white/[0.04]"
                 }`}
               >
-                <div className="p-1.5 rounded-md bg-white dark:bg-[#2a2a2a] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
+                <div className="p-1.5 rounded-lg bg-neutral-100 dark:bg-[#222] border border-black/[0.07] dark:border-white/[0.07] shrink-0 shadow-sm">
                   <Icon className={`h-3.5 w-3.5 ${s.iconColor}`} />
                 </div>
-                <div>
-                  <div className="text-[13px] font-medium text-foreground">{s.label}</div>
-                  <div className="text-[11px] text-foreground/40">{s.description}</div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[13px] font-medium text-foreground truncate">{s.label}</div>
+                  <div className="text-[11px] text-foreground/50 truncate">{s.description}</div>
                 </div>
               </button>
             );
           })}
-        </>
+        </div>
       )}
     </div>
   );

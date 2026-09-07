@@ -140,15 +140,17 @@ export const BlockItem = memo(function BlockItem({
 
   return (
     <div
-      className="group/b relative flex items-start -ml-2 pl-2 sm:-ml-4 sm:pl-4 -mr-2 pr-6 sm:-mr-12 sm:pr-12 rounded-md hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors overflow-visible"
+      className={`group/b relative flex items-start -ml-2 pl-2 sm:-ml-4 sm:pl-4 -mr-2 pr-6 sm:-mr-12 sm:pr-12 rounded-md hover:bg-[#f7f7f5] dark:hover:bg-white/[0.03] transition-colors overflow-visible ${
+        !isFocused ? "[content-visibility:auto] [contain-intrinsic-size:0_36px]" : ""
+      }`}
       data-block-id={item.id}
     >
       {/* Drag handle, Add & Delete */}
       {item.type !== "code" && (
-        <div className="absolute right-1 top-[4px] flex items-center gap-0.5 opacity-0 group-hover/b:opacity-100 transition-opacity z-10">
+        <div className="absolute right-1 top-[4px] flex items-center gap-0.5 opacity-0 group-hover/b:opacity-100 transition-all duration-150 z-10">
           <button
             type="button"
-            className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition"
+            className="p-1 rounded-md text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] hover:scale-110 active:scale-95 transition-all duration-150"
             title="Add block below"
             onClick={() => onAddAfter?.(item.id)}
           >
@@ -156,15 +158,15 @@ export const BlockItem = memo(function BlockItem({
           </button>
           <button
             type="button"
-            className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] transition"
-            title="Drag"
+            className="p-1 rounded-md text-[#888] dark:text-[#666] hover:text-foreground hover:bg-[#eee] dark:hover:bg-[#2a2a2a] hover:scale-110 active:scale-95 transition-all duration-150 cursor-grab active:cursor-grabbing"
+            title="Drag block"
           >
             <GripVertical className="h-3.5 w-3.5" />
           </button>
           {onDelete && (
             <button
               type="button"
-              className="p-0.5 rounded text-[#888] dark:text-[#666] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 transition"
+              className="p-1 rounded-md text-[#888] dark:text-[#666] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 hover:scale-110 active:scale-95 transition-all duration-150"
               title="Delete block"
               onClick={() => onDelete(item.id)}
             >
