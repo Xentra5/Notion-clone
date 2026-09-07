@@ -10,7 +10,7 @@ import { useWorkspaceStore } from "@/store/workspace-store";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { RenameModal } from "@/components/ui/rename-modal";
 import { AnimatedBotLogo } from "@/components/dashboard/animated-bot-logo";
-import { getPages, createPage, updatePage, deletePage, type Page, type PageBlock } from "@/lib/actions/pages";
+import { getPages, createPage, updatePage, deletePage, invalidatePagesCache, type Page, type PageBlock } from "@/lib/actions/pages";
 import { localStore } from "@/lib/storage/local-store";
 
 import {
@@ -365,6 +365,16 @@ export function Sidebar({ activePage }: SidebarProps) {
       if (STRUCTURAL_EVENTS.has(evt.type)) void loadPages();
     });
     return () => unsubscribeLocal();
+  }, [loadPages]);
+
+  useEffect(() => {
+    // Reload sidebar whenever AI Agent or RAG creates or modifies workspace pages
+    const handlePageUpdated = () => {
+      invalidatePagesCache();
+      void loadPages();
+    };
+    window.addEventListener("page-updated", handlePageUpdated);
+    return () => window.removeEventListener("page-updated", handlePageUpdated);
   }, [loadPages]);
 
   const userName = session?.user?.name || "o";

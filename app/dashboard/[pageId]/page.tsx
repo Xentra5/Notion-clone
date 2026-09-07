@@ -15,15 +15,19 @@ interface PageRouteProps {
 /** Convert a DB PageBlock into the editor's ChecklistItem shape. */
 function toChecklistItem(block: PageBlock): ChecklistItem {
   let type: ChecklistItem["type"] = "paragraph";
-  if (block.type === "heading") type = "heading";
-  else if (block.type === "quote") type = "quote";
+  if (block.type === "heading1" || block.type === "heading_1") type = "heading1";
+  else if (block.type === "heading2" || block.type === "heading_2") type = "heading2";
+  else if (block.type === "heading3" || block.type === "heading_3") type = "heading3";
+  else if (block.type === "heading4" || block.type === "heading_4" || block.type === "heading") type = "heading";
   else if (block.type === "bullet" || block.type === "bulleted_list_item") type = "bullet";
+  else if (block.type === "numbered" || block.type === "numbered_list_item") type = "numbered";
   else if (block.type === "to_do" || block.type === "todo") type = "todo";
+  else if (block.type === "quote") type = "quote";
+  else if (block.type === "callout") type = "callout";
+  else if (block.type === "divider") type = "divider";
+  else if (block.type === "toggle") type = "toggle";
   else if (
     block.type === "code" ||
-    block.type === "callout" ||
-    block.type === "divider" ||
-    block.type === "toggle" ||
     block.type === "page" ||
     block.type === "image" ||
     block.type === "video" ||
@@ -39,11 +43,62 @@ function toChecklistItem(block: PageBlock): ChecklistItem {
     type = "paragraph";
   }
 
+  let text = block.properties?.text ?? block.properties?.title ?? "";
+  let checked = block.properties?.checked ?? false;
+  let calloutIcon = (block.properties as { calloutIcon?: string })?.calloutIcon || "💡";
+
+  // Auto-detect and parse raw markdown text if saved as a generic paragraph
+  if ((type === "paragraph" || !type) && text) {
+    const trimmed = text.trim();
+    if (/^####\s+/.test(trimmed)) {
+      type = "heading4";
+      text = trimmed.replace(/^####\s+/, "");
+    } else if (/^###\s+/.test(trimmed)) {
+      type = "heading3";
+      text = trimmed.replace(/^###\s+/, "");
+    } else if (/^##\s+/.test(trimmed)) {
+      type = "heading2";
+      text = trimmed.replace(/^##\s+/, "");
+    } else if (/^#\s+/.test(trimmed)) {
+      type = "heading1";
+      text = trimmed.replace(/^#\s+/, "");
+    } else if (/^[-*+•]\s*\[\s*\]\s+/.test(trimmed)) {
+      type = "todo";
+      checked = false;
+      text = trimmed.replace(/^[-*+•]\s*\[\s*\]\s+/, "");
+    } else if (/^[-*+•]\s*\[[xX]\]\s+/.test(trimmed)) {
+      type = "todo";
+      checked = true;
+      text = trimmed.replace(/^[-*+•]\s*\[[xX]\]\s+/, "");
+    } else if (/^[-*+•]\s+/.test(trimmed)) {
+      type = "bullet";
+      text = trimmed.replace(/^[-*+•]\s+/, "");
+    } else if (/^\d+[\.\)]\s+/.test(trimmed)) {
+      type = "numbered";
+      text = trimmed.replace(/^\d+[\.\)]\s+/, "");
+    } else if (/^>\s*\[![A-Z]+\]\s*/i.test(trimmed) || /^>\s*💡\s*/.test(trimmed) || /^💡\s*/.test(trimmed)) {
+      type = "callout";
+      if (/NOTE|IMPORTANT/i.test(trimmed)) calloutIcon = "📌";
+      else if (/WARNING/i.test(trimmed)) calloutIcon = "⚠️";
+      else if (/TIP/i.test(trimmed)) calloutIcon = "💡";
+      text = trimmed.replace(/^(>\s*\[![A-Z]+\]\s*|>\s*💡\s*|💡\s*)/i, "");
+    } else if (/^>\s+/.test(trimmed)) {
+      type = "quote";
+      text = trimmed.replace(/^>\s+/, "");
+    } else if (trimmed === "---" || trimmed === "***" || trimmed === "___") {
+      type = "divider";
+      text = "";
+    }
+  }
+
   return {
     id: block.id,
     type,
-    text: block.properties?.text ?? "",
-    checked: block.properties?.checked ?? false,
+    text,
+    checked,
+    calloutIcon,
+    toggleChildren: (block.properties as { toggleChildren?: string })?.toggleChildren ?? "",
+    tableData: (block.properties as { tableData?: string[][] })?.tableData,
     codeLanguage: block.properties?.language ?? "javascript",
     subPageId: block.properties?.subPageId ?? "",
     kanbanColumns: (block.properties?.kanbanColumns as never) ?? [],

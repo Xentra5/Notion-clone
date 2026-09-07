@@ -42,6 +42,7 @@ import { toast } from "sonner";
 import { AnimatedBotLogo, BotCharacterState } from "@/components/dashboard/animated-bot-logo";
 import { AgentMemoryModal } from "@/components/dashboard/modals/agent-memory-modal";
 import { AgentHistoryDrawer } from "@/components/dashboard/modals/agent-history-drawer";
+import { useWorkspaceStore } from "@/store/workspace-store";
 
 const PricingModal = dynamic(
   () => import("@/components/dashboard/pricing-modal").then((m) => m.PricingModal),
@@ -523,16 +524,20 @@ function AssistantMessage({
                 <ArrowUpRight className="h-3 w-3 opacity-70" />
               </button>
             )}
-            {hasPageAction && (
-              <button
-                onClick={() => router.push("/dashboard")}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-xs font-medium transition"
-              >
-                <FileText className="h-3.5 w-3.5" />
-                <span>Open Workspace</span>
-                <ArrowUpRight className="h-3 w-3 opacity-70" />
-              </button>
-            )}
+            {hasPageAction && (() => {
+              const pageTool = msg.toolCalls?.find((tc) => tc.tool === "create_page" || tc.tool === "update_page");
+              const createdPageId = pageTool?.output?.match(/ID:\s*([a-f0-9]+)/i)?.[1];
+              return (
+                <button
+                  onClick={() => router.push(createdPageId ? `/dashboard/${createdPageId}` : "/dashboard")}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 text-xs font-medium transition"
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>{createdPageId ? "Open Created Page" : "Open Workspace"}</span>
+                  <ArrowUpRight className="h-3 w-3 opacity-70" />
+                </button>
+              );
+            })()}
             {hasMemoryAction && (
               <button
                 onClick={() => onOpenMemory?.()}
@@ -579,30 +584,141 @@ function UserMessage({ msg }: { msg: AgentMessage }) {
   );
 }
 
-function HRThinking({ mode = "fast" }: { mode?: "fast" | "think" | "deepsearch" }) {
+function AgentProgressIndicator({ mode = "fast", personaName = "Notion Agent" }: { mode?: "fast" | "think" | "deepsearch"; personaName?: string }) {
   const isDeep = mode === "deepsearch";
+  const isThink = mode === "think";
+
+  const PROGRESS_STEPS = [
+    { label: "Understanding your request", icon: "🧠", durationMs: 2500 },
+    { label: isDeep ? "Deep-scanning workspace & web" : "Searching for information", icon: "🔍", durationMs: 4000 },
+    { label: "Generating rich content with blocks", icon: "📝", durationMs: 5000 },
+    { label: "Finalizing and formatting page", icon: "✨", durationMs: 6000 },
+  ];
+
+  const [activeStep, setActiveStep] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
+  const startRef = useRef(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - startRef.current) / 1000));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  useEffect(() => {
+    const timeouts: ReturnType<typeof setTimeout>[] = [];
+    let cumulative = 0;
+    PROGRESS_STEPS.forEach((step, idx) => {
+      if (idx > 0) {
+        cumulative += PROGRESS_STEPS[idx - 1].durationMs;
+        timeouts.push(setTimeout(() => setActiveStep(idx), cumulative));
+      }
+    });
+    return () => timeouts.forEach(clearTimeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const accentColor = isDeep ? "purple" : isThink ? "amber" : "cyan";
+  const dotColor = isDeep ? "bg-purple-400" : isThink ? "bg-amber-400" : "bg-cyan-400";
+  const glowColor = isDeep ? "rgba(168,85,247,0.15)" : isThink ? "rgba(245,158,11,0.15)" : "rgba(6,182,212,0.15)";
+  const borderGlow = isDeep ? "border-purple-500/20" : isThink ? "border-amber-500/20" : "border-cyan-500/20";
+
   return (
     <div className="flex gap-3.5 py-3 max-w-4xl mx-auto w-full">
       <div className="shrink-0 mt-0.5">
         <AnimatedBotLogo
           size="sm"
-          state={isDeep ? "deepsearch" : "thinking"}
+          state={isDeep ? "deepsearch" : isThink ? "thinking" : "fast"}
           showStatusBadge={true}
         />
       </div>
-      <div className="flex items-center gap-2.5 py-1">
+
+      <div className="flex-1 min-w-0">
+        {/* Progress Card */}
         <div
-          className={`h-2.5 w-2.5 rounded-full animate-ping ${
-            isDeep ? "bg-purple-400" : "bg-cyan-400"
-          }`}
-        />
-        <span className="text-sm text-zinc-200 font-sans tracking-wide font-medium">
-          {isDeep
-            ? "Notion Agent is deep-scanning workspace & live web tools..."
-            : mode === "think"
-            ? "Notion Agent is reasoning step-by-step..."
-            : "Notion Agent is executing tools & synthesizing..."}
-        </span>
+          className={`rounded-xl border ${borderGlow} bg-black/40 backdrop-blur-xl overflow-hidden`}
+          style={{ boxShadow: `0 0 30px ${glowColor}, inset 0 1px 0 rgba(255,255,255,0.06)` }}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-2.5 border-b border-white/[0.06]">
+            <div className="flex items-center gap-2">
+              <div className={`h-2 w-2 rounded-full ${dotColor} animate-pulse`} />
+              <span className="text-xs font-semibold text-white tracking-wide">{personaName}</span>
+              <span className={`text-[9px] font-mono px-1.5 py-0.5 rounded border text-${accentColor}-400 border-${accentColor}-500/30 bg-${accentColor}-500/10 uppercase tracking-wider font-bold`}>
+                {isDeep ? "DEEP SEARCH" : isThink ? "REASONING" : "EXECUTING"}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 text-zinc-500">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span className="text-[10px] font-mono tabular-nums">{elapsed}s</span>
+            </div>
+          </div>
+
+          {/* Steps Timeline */}
+          <div className="px-4 py-3 space-y-0">
+            {PROGRESS_STEPS.map((step, idx) => {
+              const isActive = idx === activeStep;
+              const isCompleted = idx < activeStep;
+              const isPending = idx > activeStep;
+
+              return (
+                <div key={idx} className="flex items-start gap-3 relative">
+                  {/* Vertical connector line */}
+                  {idx < PROGRESS_STEPS.length - 1 && (
+                    <div
+                      className={`absolute left-[9px] top-[22px] w-px h-[calc(100%-2px)] transition-colors duration-500 ${
+                        isCompleted ? "bg-emerald-500/50" : "bg-white/[0.06]"
+                      }`}
+                    />
+                  )}
+
+                  {/* Step indicator dot */}
+                  <div className="relative z-10 mt-0.5 shrink-0">
+                    {isCompleted ? (
+                      <div className="h-[18px] w-[18px] rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                        <CheckCircle2 className="h-3 w-3 text-emerald-400" />
+                      </div>
+                    ) : isActive ? (
+                      <div className={`h-[18px] w-[18px] rounded-full bg-${accentColor}-500/20 border border-${accentColor}-500/40 flex items-center justify-center`}>
+                        <div className={`h-2 w-2 rounded-full ${dotColor} animate-ping`} />
+                      </div>
+                    ) : (
+                      <div className="h-[18px] w-[18px] rounded-full bg-white/[0.04] border border-white/[0.08] flex items-center justify-center">
+                        <div className="h-1.5 w-1.5 rounded-full bg-zinc-700" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Step text */}
+                  <div className={`pb-3 transition-all duration-300 ${isPending ? "opacity-30" : "opacity-100"}`}>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm leading-none">{step.icon}</span>
+                      <span className={`text-[13px] font-medium transition-colors duration-300 ${
+                        isActive ? "text-white" : isCompleted ? "text-zinc-400" : "text-zinc-600"
+                      }`}>
+                        {step.label}
+                        {isActive && (
+                          <span className="inline-flex ml-1.5">
+                            <span className="animate-pulse text-zinc-500">...</span>
+                          </span>
+                        )}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Progress bar */}
+          <div className="h-0.5 w-full bg-white/[0.04]">
+            <div
+              className={`h-full bg-gradient-to-r from-${accentColor}-500 to-${accentColor}-400 transition-all duration-1000 ease-out`}
+              style={{ width: `${Math.min(100, ((activeStep + 1) / PROGRESS_STEPS.length) * 100)}%` }}
+            />
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -625,12 +741,18 @@ export default function AgentPage() {
 
   // Chat Session Persistence State
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const currentSessionIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
+
   const [sessions, setSessions] = useState<Array<{ _id: string; title: string; personaId: string; updatedAt: string }>>([]);
   const [showSessionMenu, setShowSessionMenu] = useState(false);
 
   // Memory Modal & Action History Drawer States
   const [showMemoryModal, setShowMemoryModal] = useState(false);
   const [showHistoryDrawer, setShowHistoryDrawer] = useState(false);
+  const [historyDrawerTab, setHistoryDrawerTab] = useState<"chats" | "actions">("chats");
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -707,19 +829,6 @@ export default function AgentPage() {
     inputRef.current?.focus();
   }, []);
 
-  // Fetch chat sessions
-  const fetchSessions = useCallback(async () => {
-    try {
-      const res = await fetch("/api/ai/agent/sessions");
-      if (res.ok) {
-        const data = await res.json();
-        setSessions(data.sessions || []);
-      }
-    } catch {
-      // ignore
-    }
-  }, []);
-
   // Load a chat session
   const loadSession = useCallback(async (sessionId: string) => {
     try {
@@ -729,6 +838,7 @@ export default function AgentPage() {
         const data = await res.json();
         if (data.session) {
           setCurrentSessionId(data.session._id);
+          currentSessionIdRef.current = data.session._id;
           if (data.session.personaId) {
             setSelectedPersona(data.session.personaId);
           }
@@ -751,6 +861,23 @@ export default function AgentPage() {
       setShowSessionMenu(false);
     }
   }, []);
+
+  // Fetch chat sessions (optionally auto-load the most recent session)
+  const fetchSessions = useCallback(async (autoLoadLatest = false) => {
+    try {
+      const res = await fetch("/api/ai/agent/sessions");
+      if (res.ok) {
+        const data = await res.json();
+        const list = data.sessions || [];
+        setSessions(list);
+        if (autoLoadLatest && list.length > 0 && !currentSessionIdRef.current) {
+          void loadSession(list[0]._id);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, [loadSession]);
 
   // Start new chat
   const createNewSession = useCallback(() => {
@@ -796,7 +923,7 @@ export default function AgentPage() {
 
   useEffect(() => {
     refreshUsage();
-    fetchSessions();
+    fetchSessions(true);
   }, [refreshUsage, fetchSessions]);
 
   useEffect(() => {
@@ -919,6 +1046,7 @@ export default function AgentPage() {
               tc.tool === "update_calendar_event"
           )
         ) {
+          useWorkspaceStore.getState().refreshPages();
           window.dispatchEvent(new Event("page-updated"));
         }
       } catch {
@@ -1032,6 +1160,10 @@ export default function AgentPage() {
       <AgentHistoryDrawer
         isOpen={showHistoryDrawer}
         onClose={() => setShowHistoryDrawer(false)}
+        initialTab={historyDrawerTab}
+        onSelectSession={loadSession}
+        currentSessionId={currentSessionId}
+        onNewChat={createNewSession}
       />
 
       {/* ─── Premium Command Strip ─────────────────────────────────────────── */}
@@ -1176,7 +1308,28 @@ export default function AgentPage() {
           <div className="w-px h-4 bg-white/[0.08] mx-0.5" />
 
           {/* ── Right Actions ──────────────────────────────────────────────── */}
-          <div className="flex items-center gap-0.5">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                setHistoryDrawerTab("chats");
+                setShowHistoryDrawer(true);
+              }}
+              title="View previous conversations"
+              className="group flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-150"
+            >
+              <MessagesSquare className="h-3.5 w-3.5 text-sky-400 group-hover:text-sky-300 transition" />
+              <span>Previous Chats ({sessions.length})</span>
+            </button>
+
+            <button
+              onClick={createNewSession}
+              title="Start a new chat conversation"
+              className="group flex items-center gap-1.5 h-7 px-2 rounded-lg text-[11px] font-medium text-zinc-400 hover:text-white hover:bg-white/6 border border-white/5 transition-all duration-150"
+            >
+              <Plus className="h-3.5 w-3.5 text-zinc-400 group-hover:text-white transition" />
+              <span className="hidden sm:inline">New Chat</span>
+            </button>
+
             <button
               onClick={() => setShowMemoryModal(true)}
               title="Manage agent memory"
@@ -1187,12 +1340,15 @@ export default function AgentPage() {
             </button>
 
             <button
-              onClick={() => setShowHistoryDrawer(true)}
+              onClick={() => {
+                setHistoryDrawerTab("actions");
+                setShowHistoryDrawer(true);
+              }}
               title="View action history"
               className="group flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium text-zinc-400 hover:text-white hover:bg-white/6 transition-all duration-150"
             >
               <History className="h-3.5 w-3.5 text-zinc-500 group-hover:text-zinc-300 transition" />
-              <span className="hidden sm:inline">History</span>
+              <span className="hidden sm:inline">Actions</span>
             </button>
           </div>
 
@@ -1300,7 +1456,7 @@ export default function AgentPage() {
                 />
               )
             )}
-            {isLoading && <HRThinking mode={activeMode} />}
+            {isLoading && <AgentProgressIndicator mode={activeMode} personaName={currentPersona.name} />}
             <div ref={scrollRef} />
           </div>
         )}

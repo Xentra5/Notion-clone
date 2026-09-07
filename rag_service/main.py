@@ -640,6 +640,8 @@ Rules:
                 google_api_key=api_key.strip(),
             )
             prompt = f"{SYSTEM}\n\nMeeting Title: {req.title}\n\nFull Transcript:\n{transcript}"
+            res = llm.invoke(prompt)
+            raw = str(res.content) if res and res.content else ""
             # Robust JSON extraction handling fences or raw text
             json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
             if json_match:
@@ -674,9 +676,9 @@ Rules:
 
 class AgentRequest(BaseModel):
     message: str
-    sessionToken: str          # forwarded session cookie value from Next.js
-    nextjsBaseUrl: str         # e.g. http://localhost:3000
-    workspaceId: str           # user email used as workspace id
+    sessionToken: Optional[str] = ""          # forwarded session cookie value from Next.js (optional)
+    nextjsBaseUrl: str                        # e.g. http://localhost:3000
+    workspaceId: str                          # user email used as workspace id
     geminiApiKey: Optional[str] = None
     history: List[dict] = Field(default_factory=list)
     persona: Optional[str] = "project_hr"
@@ -697,22 +699,210 @@ class AgentResponse(BaseModel):
     content: Optional[str] = None
 
 
-def _make_nextjs_headers(session_token: str) -> dict:
+def _make_nextjs_headers(session_token: Optional[str] = "", workspace_id: str = "") -> dict:
     """Build headers with the session cookie so Next.js API routes authenticate the agent."""
-    if ";" in session_token or "=" in session_token:
-        cookie_val = session_token
-    else:
-        cookie_val = (
-            f"next-auth.session-token={session_token}; "
-            f"__Secure-next-auth.session-token={session_token}"
-        )
-    return {
+    headers = {
         "Content-Type": "application/json",
-        "Cookie": cookie_val,
     }
+    if session_token:
+        if ";" in session_token or "=" in session_token:
+            cookie_val = session_token
+        else:
+            cookie_val = (
+                f"next-auth.session-token={session_token}; "
+                f"__Secure-next-auth.session-token={session_token}"
+            )
+        headers["Cookie"] = cookie_val
+    if _RAG_INTERNAL_SECRET:
+        headers["X-Rag-Internal-Secret"] = _RAG_INTERNAL_SECRET
+    if workspace_id:
+        headers["X-Workspace-Id"] = workspace_id
+    return headers
 
 
-def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool_calls_log: list):
+def _markdown_to_blocks(content: str) -> list:
+    """Convert markdown text into rich Notion blocks (heading1, heading2, heading3, heading4, bullets, numbered, todos, quotes, callouts, code, dividers, tables, paragraphs)."""
+    blocks = []
+    if not content or not content.strip():
+        return blocks
+
+    lines = content.strip().split("\n")
+    in_code_block = False
+    code_lines = []
+    code_lang = "javascript"
+
+    in_table = False
+    table_lines = []
+
+    def flush_table():
+        nonlocal in_table, table_lines
+        if not table_lines:
+            in_table = False
+            return
+        parsed_rows = []
+        for tl in table_lines:
+            stripped_tl = tl.strip()
+            # Skip separator rows like |---|---|
+            if re.match(r"^\|(\s*:?-+:?\s*\|)+$", stripped_tl):
+                continue
+            cells = [c.strip() for c in stripped_tl.strip("|").split("|")]
+            if any(cells):
+                parsed_rows.append(cells)
+        if parsed_rows:
+            max_cols = max(len(r) for r in parsed_rows)
+            normalized = [r + [""] * (max_cols - len(r)) for r in parsed_rows]
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "table",
+                "properties": {
+                    "text": "",
+                    "tableData": normalized,
+                },
+            })
+        in_table = False
+        table_lines = []
+
+    for raw_line in lines:
+        line = raw_line.rstrip()
+        stripped = line.strip()
+
+        if stripped.startswith("```"):
+            if in_table:
+                flush_table()
+            if in_code_block:
+                blocks.append({
+                    "id": f"agent-block-{len(blocks)}",
+                    "type": "code",
+                    "properties": {
+                        "text": "\n".join(code_lines),
+                        "language": code_lang or "javascript",
+                    },
+                })
+                in_code_block = False
+                code_lines = []
+            else:
+                in_code_block = True
+                code_lang = stripped[3:].strip() or "javascript"
+            continue
+
+        if in_code_block:
+            code_lines.append(line)
+            continue
+
+        # Table row detection
+        if stripped.startswith("|") and stripped.endswith("|") and stripped.count("|") >= 2:
+            in_table = True
+            table_lines.append(stripped)
+            continue
+        elif in_table:
+            flush_table()
+
+        if not stripped:
+            continue
+
+        if stripped.startswith("#### "):
+            text_val = stripped[5:].strip()
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "heading4",
+                "properties": {"text": text_val, "title": text_val},
+            })
+        elif stripped.startswith("### "):
+            text_val = stripped[4:].strip()
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "heading3",
+                "properties": {"text": text_val, "title": text_val},
+            })
+        elif stripped.startswith("## "):
+            text_val = stripped[3:].strip()
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "heading2",
+                "properties": {"text": text_val, "title": text_val},
+            })
+        elif stripped.startswith("# "):
+            text_val = stripped[2:].strip()
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "heading1",
+                "properties": {"text": text_val, "title": text_val},
+            })
+        elif stripped.startswith("- [ ] ") or stripped.startswith("* [ ] "):
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "todo",
+                "properties": {"text": stripped[6:].strip(), "checked": False},
+            })
+        elif stripped.startswith("- [x] ") or stripped.startswith("* [x] ") or stripped.startswith("- [X] "):
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "todo",
+                "properties": {"text": stripped[6:].strip(), "checked": True},
+            })
+        elif stripped.startswith("- ") or stripped.startswith("* ") or stripped.startswith("+ ") or stripped.startswith("• "):
+            text_val = re.sub(r"^[-*+•]\s+", "", stripped).strip()
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "bullet",
+                "properties": {"text": text_val},
+            })
+        elif re.match(r"^\d+[\.\)]\s", stripped):
+            # Numbered / ordered list item (e.g. "1. First item" or "1) First item")
+            text_val = re.sub(r"^\d+[\.\)]\s*", "", stripped).strip()
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "numbered",
+                "properties": {"text": text_val},
+            })
+        elif stripped.startswith("> [!NOTE]") or stripped.startswith("> [!TIP]") or stripped.startswith("> [!IMPORTANT]") or stripped.startswith("> [!WARNING]") or stripped.startswith("> [!CAUTION]") or stripped.startswith("> 💡") or stripped.startswith("💡 "):
+            callout_text = re.sub(r"^(>\s*\[![A-Z]+\]\s*|>\s*💡\s*|💡\s*)", "", stripped).strip()
+            icon = "💡"
+            if "NOTE" in stripped or "IMPORTANT" in stripped:
+                icon = "📌"
+            elif "WARNING" in stripped or "CAUTION" in stripped:
+                icon = "⚠️"
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "callout",
+                "properties": {"text": callout_text, "calloutIcon": icon},
+            })
+        elif stripped.startswith("> "):
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "quote",
+                "properties": {"text": stripped[2:].strip()},
+            })
+        elif stripped in ("---", "***", "___"):
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "divider",
+                "properties": {"text": ""},
+            })
+        else:
+            blocks.append({
+                "id": f"agent-block-{len(blocks)}",
+                "type": "paragraph",
+                "properties": {"text": stripped},
+            })
+
+    if in_table:
+        flush_table()
+
+    if in_code_block and code_lines:
+        blocks.append({
+            "id": f"agent-block-{len(blocks)}",
+            "type": "code",
+            "properties": {
+                "text": "\n".join(code_lines),
+                "language": code_lang or "javascript",
+            },
+        })
+
+    return blocks
+
+
+def _build_agent_tools(base_url: str, session_token: Optional[str], workspaceId: str, tool_calls_log: list):
     """
     Returns a list of LangChain @tool functions that make authenticated HTTP calls
     back to the Next.js API routes.
@@ -720,7 +910,7 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
     import requests as req_lib
     from langchain.tools import tool
 
-    headers = _make_nextjs_headers(session_token)
+    headers = _make_nextjs_headers(session_token, workspaceId)
 
     @tool
     def create_calendar_event(title: str, date: str, start_time: str = "", end_time: str = "",
@@ -871,23 +1061,25 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
     @tool
     def create_page(title: str, content: str = "", category: str = "Private") -> str:
         """
-        Create a new page (note or document) in the user's workspace.
+        Create a new rich, detailed page (note or document) in the user's workspace.
+        IMPORTANT: The content MUST be comprehensive and well-structured using rich markdown.
         Args:
             title: Page title (required)
-            content: Page content as plain text or markdown (optional)
+            content: REQUIRED. Must be detailed, multi-section markdown content. Include:
+                - Multiple `## Heading` and `### Subheading` sections (at least 3-4 sections)
+                - Bullet lists (`- item`) for features, benefits, comparisons
+                - Numbered lists (`1. step`) for processes or rankings
+                - Bold text (`**key term**`) for emphasis
+                - Block quotes (`> important note`) for key takeaways
+                - Code blocks (```language\ncode\n```) when relevant
+                - Horizontal dividers (`---`) between major sections
+                - At least 300-500 words of substantive content
+                NEVER pass empty or minimal content. Each section must have real, detailed paragraphs.
             category: One of 'Private', 'Shared', 'Meetings' (default: 'Private')
         Returns:
             Confirmation with the new page ID.
         """
-        blocks = []
-        if content.strip():
-            for line in content.strip().split("\n"):
-                if line.strip():
-                    blocks.append({
-                        "id": f"agent-block-{len(blocks)}",
-                        "type": "paragraph",
-                        "properties": {"text": line.strip()},
-                    })
+        blocks = _markdown_to_blocks(content)
         payload = {
             "title": title,
             "category": category if category in ("Private", "Shared", "Meetings") else "Private",
@@ -898,7 +1090,7 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
             if r.status_code in (200, 201):
                 page = r.json().get("page", {})
                 page_id = page.get("_id", "")
-                result = f"✅ Page created: '{page.get('title', title)}' (ID: {page_id})"
+                result = f"✅ Page created: '{page.get('title', title)}' (ID: {page_id}) with {len(blocks)} blocks."
                 tool_calls_log.append({"tool": "create_page", "input": title, "output": result})
                 return result
             else:
@@ -921,7 +1113,6 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
             Confirmation of page update.
         """
         try:
-            # First fetch existing page blocks
             get_res = req_lib.get(f"{base_url}/api/pages/{page_id}", headers=headers, timeout=10)
             existing_blocks = []
             current_title = title
@@ -933,13 +1124,10 @@ def _build_agent_tools(base_url: str, session_token: str, workspaceId: str, tool
 
             new_blocks = list(existing_blocks)
             if content_to_append.strip():
-                for line in content_to_append.strip().split("\n"):
-                    if line.strip():
-                        new_blocks.append({
-                            "id": f"agent-block-{len(new_blocks)}",
-                            "type": "paragraph",
-                            "properties": {"text": line.strip()},
-                        })
+                append_blocks = _markdown_to_blocks(content_to_append)
+                for b in append_blocks:
+                    b["id"] = f"agent-block-{len(new_blocks)}"
+                    new_blocks.append(b)
 
             patch_payload = {
                 "title": current_title,
@@ -1164,7 +1352,7 @@ AVAILABLE WORKSPACE & WEB TOOLS:
 - update_calendar_event: Revise, reschedule, or change existing events.
 - delete_calendar_event: Cancel or delete calendar events.
 - list_calendar_events: View upcoming calendar events with their IDs.
-- create_page: Create a new Notion page/document.
+- create_page: Create a new rich, detailed Notion page/document with comprehensive content.
 - update_page: Revise or append content to an existing page.
 - list_pages: List pages in the workspace.
 - search_workspace: Semantic search across workspace documents via ChromaDB vector store.
@@ -1172,20 +1360,43 @@ AVAILABLE WORKSPACE & WEB TOOLS:
 - web_search: Real-time search via DuckDuckGo.
 
 CRITICAL EXECUTION RULES:
-1. ALWAYS EXECUTE TOOLS IMMEDIATELY (DO NOT ASK FOR PERMISSION OR EXTRA DETAILS):
-   - You are an autonomous executor. When the user asks to schedule (e.g. "Team sync tomorrow at 3pm", "meeting on Friday"), YOU MUST IMMEDIATELY CALL `create_calendar_event` on turn 1. DO NOT ask who to invite or ask for duration.
-   - Use sensible defaults: Title: derive from request (e.g. 'Team Sync'), Duration: 30 minutes (e.g. 15:00 to 15:30), Color: 'blue'.
-   - When the user asks to reschedule, move, or revise an event, first call `list_calendar_events` to locate the event ID, then call `update_calendar_event`.
-   - When the user asks to create or draft a page/doc, YOU MUST CALL `create_page` immediately with structured markdown content.
-   - When the user asks to add or edit notes on an existing page, call `update_page`.
-   - When the user asks you to remember something or shares a strong habit, call `remember_fact`.
-2. DATE COMPUTATION:
+1. AUTONOMOUS MULTI-STEP EXECUTION:
+   - When the user asks you to search and create a page (e.g. "search for X and create a page", "research Open Source vs Proprietary LLMs and create a page"):
+     * STEP 1: Immediately call `web_search` to gather comprehensive details.
+     * STEP 2: Immediately call `create_page` with RICH, DETAILED, WELL-STRUCTURED content.
+     * DO NOT stop after searching! You MUST complete the full request!
+   - For calendar actions, call the tool immediately without asking for confirmations.
+   - For user preferences or habits, call `remember_fact`.
+
+2. CONTENT QUALITY RULES (MANDATORY for create_page and update_page):
+   You are an elite technical document architect and writer. Pages MUST feel like meticulously authored Notion documents, never shallow AI slop or generic outlines.
+   - DEPTH & LENGTH: Provide at least 500-800 words of thorough, substantive, and highly informative content. Never create brief 1-2 sentence placeholders.
+   - HIERARCHY & STRUCTURE: Organize logically with 3-6 major sections using:
+     * `# Section Title` (Heading 1 - for top-level thematic sections)
+     * `## Sub-Topic` (Heading 2 - for medium section headings)
+     * `### Detailed Point` (Heading 3 - for sub-topics)
+   - FULL BLOCK ECOSYSTEM (MANDATORY): Utilize all basic blocks from Notion's block palette:
+     * Regular paragraphs with substantive explanations (3-5 informative sentences each)
+     * `- Bullet points` for comparisons, pros/cons, key attributes, features
+     * `1. Numbered lists` for workflows, sequential steps, or priority rankings
+     * `> Block quotes` or `> 💡 Callout` for key takeaways, insights, or best practices
+     * ```code blocks``` (with language specified, e.g. python, bash, json) for commands, snippets, or configs
+     * `---` Dividers between major conceptual sections for clean visual pacing
+     * `- [ ] Checklists` for actionable steps or implementation checklists
+   - NO RAW MARKDOWN SYMBOLS IN CONTENT: Ensure each section is distinct and formatted cleanly so each block parses into its native Notion block component.
+
+3. DATE COMPUTATION:
    - Today is {today} ({today_date_only}).
-   - Compute relative dates ("tomorrow", "this Thursday", "next Monday") accurately based on today.
-   - For 12-hour times like "3pm", convert to 24-hour format "15:00", "3:30pm" -> "15:30".
-3. TONE & RESPONSE:
-   - Deliver clear, direct, insightful answers.
-   - After executing the tool, confirm the action taken (e.g. "✅ I've scheduled the Team Sync for tomorrow at 3:00 PM - 3:30 PM.") and let them know you can revise it anytime.
+   - Compute relative dates ("tomorrow", "this Thursday", "next Monday") accurately.
+   - For 12-hour times like "3pm", convert to 24-hour format "15:00".
+
+4. TONE & EXECUTIVE-LEVEL CHAT RESPONSE:
+   - NEVER give a brief or dismissive answer like "I've created the page."
+   - Always provide a rich, structured executive summary directly in your chat response:
+     * State the exact page created and its location (Private / Shared)
+     * Provide key takeaways and a bulleted digest of the most important insights
+     * Highlight what each section of the new page covers
+     * Include next steps or suggest follow-up actions (e.g. adding database views, scheduling reviews)
 """
 
         # Prepare messages
@@ -1201,12 +1412,16 @@ CRITICAL EXECUTION RULES:
 
         # Invoke model with LangChain tools bound
         llm_with_tools = llm.bind_tools(tools)
-        ai_msg = llm_with_tools.invoke(messages)
+        
+        # Multi-step tool execution loop (up to 4 steps)
+        max_steps = 4
+        curr_msg = llm_with_tools.invoke(messages)
+        steps = 0
 
-        # If model invoked tools, execute them and generate final answer
-        if getattr(ai_msg, "tool_calls", None):
-            messages.append(ai_msg)
-            for tc in ai_msg.tool_calls:
+        while getattr(curr_msg, "tool_calls", None) and steps < max_steps:
+            messages.append(curr_msg)
+            steps += 1
+            for tc in curr_msg.tool_calls:
                 t_name = tc.get("name", "")
                 t_args = tc.get("args", {})
                 t_id = tc.get("id", f"call_{len(tool_calls_log)}")
@@ -1217,11 +1432,13 @@ CRITICAL EXECUTION RULES:
                         output = f"Error executing {t_name}: {invoke_err}"
                     messages.append(ToolMessage(content=str(output), tool_call_id=t_id))
 
-            # Second turn generates natural language summary with the executed tool outputs
-            final_ai_msg = llm.invoke(messages)
-            answer = str(final_ai_msg.content or "I processed your request.")
-        else:
-            answer = str(ai_msg.content or "I processed your request.")
+            # Allow the agent to call another tool (e.g. create_page after web_search)
+            if steps < max_steps:
+                curr_msg = llm_with_tools.invoke(messages)
+            else:
+                curr_msg = llm.invoke(messages)
+
+        answer = str(curr_msg.content or "I processed your request.")
 
         return AgentResponse(
             answer=answer,

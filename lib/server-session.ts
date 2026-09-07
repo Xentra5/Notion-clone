@@ -27,6 +27,23 @@ export interface ServerSession {
  * Returns a session `{ user: { email, id, name } }` or null when unauthenticated.
  */
 export async function getSession(request?: NextRequest | Request | null): Promise<ServerSession | null> {
+  // Strategy 0: Internal Microservice authentication (if secret is configured)
+  const internalSecret = process.env.RAG_INTERNAL_SECRET;
+  if (internalSecret && request && "headers" in request) {
+    const reqHeaders = request.headers;
+    const providedSecret = reqHeaders.get("x-rag-internal-secret");
+    const workspaceId = reqHeaders.get("x-workspace-id");
+    if (providedSecret && providedSecret === internalSecret && workspaceId) {
+      return {
+        user: {
+          id: workspaceId,
+          email: workspaceId,
+          name: "AI Agent",
+        },
+      };
+    }
+  }
+
   let token: { email?: string; id?: string; sub?: string; name?: string } | null = null;
 
   // Strategy 1: getToken on request with auto-detected secureCookie

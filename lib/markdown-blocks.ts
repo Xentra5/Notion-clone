@@ -167,6 +167,35 @@ export function parseMarkdownToBlocks(
       continue;
     }
 
+    // ── Table (| col 1 | col 2 |) ────────────────────────────────────────────
+    if (trimmed.startsWith("|") && trimmed.endsWith("|") && trimmed.includes("|")) {
+      flushParagraph();
+      const tableLines: string[] = [trimmed];
+      while (i + 1 < lines.length && lines[i + 1].trim().startsWith("|") && lines[i + 1].trim().endsWith("|")) {
+        i++;
+        tableLines.push(lines[i].trim());
+      }
+      const parsedRows: string[][] = [];
+      for (const tl of tableLines) {
+        if (/^\|(\s*:?-+:?\s*\|)+$/.test(tl)) continue; // skip divider line
+        const cells = tl.slice(1, -1).split("|").map((c) => c.trim());
+        if (cells.some((c) => c.length > 0)) {
+          parsedRows.push(cells);
+        }
+      }
+      if (parsedRows.length > 0) {
+        const maxCols = Math.max(...parsedRows.map((r) => r.length));
+        const normalized = parsedRows.map((r) => [...r, ...Array(Math.max(0, maxCols - r.length)).fill("")]);
+        blocks.push({
+          id: generateBlockId("table"),
+          type: "table",
+          text: "",
+          tableData: normalized,
+        });
+        continue;
+      }
+    }
+
     // ── Todo checkbox (- [ ] or - [x]) ───────────────────────────────────────
     const todoMatch = /^(-|\*|\+)?\s*\[([ xX])\]\s+(.*)$/.exec(trimmed);
     if (todoMatch) {

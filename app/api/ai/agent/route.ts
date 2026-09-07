@@ -87,6 +87,13 @@ export async function POST(request: NextRequest) {
 
     const memoryStrings = userMemories.map((m) => m.content);
 
+    const rawCookie = request.headers.get("cookie") || "";
+    const sessionToken =
+      rawCookie ||
+      request.cookies.get("next-auth.session-token")?.value ||
+      request.cookies.get("__Secure-next-auth.session-token")?.value ||
+      "";
+
     // 5. Query Python LangChain Microservice
     //    SECURITY: The Gemini API key is NOT forwarded here — the Python service
     //    reads it directly from its own environment variables. The RAG_INTERNAL_SECRET
@@ -104,14 +111,12 @@ export async function POST(request: NextRequest) {
         },
         body: JSON.stringify({
           message: sanitizeForPrompt(message.trim()),
+          sessionToken,
           workspaceId: session.user.email,
           nextjsBaseUrl: NEXTJS_BASE_URL,
           history: Array.isArray(history) ? history.slice(-12) : [],
           persona: personaId,
           memories: memoryStrings,
-          // NOTE: sessionToken is intentionally NOT forwarded. The Python agent
-          // authenticates back to Next.js using the X-Rag-Internal-Secret + X-Workspace-Id
-          // headers on a dedicated /api/internal/* route (no user session required there).
         }),
         signal: AbortSignal.timeout(60000),
       });
@@ -145,12 +150,15 @@ export async function POST(request: NextRequest) {
             "remember_fact",
           ].includes(toolName ?? "")
         ) {
+          const match = String(tc.output || "").match(/ID:\s*([a-f0-9]+)/i);
+          const entityId = match ? match[1] : undefined;
           await AgentActionLog.create({
             userId: session.user.email,
             actionType: toolName,
+            entityId,
             entityTitle: tc.output ? String(tc.output).slice(0, 100) : toolName,
             details: tc.output || tc.input,
-            metadata: { input: tc.input },
+            metadata: { input: tc.input, entityId },
           });
         }
       } catch (logErr) {
