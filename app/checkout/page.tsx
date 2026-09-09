@@ -427,7 +427,7 @@ function CheckoutContent() {
                       value={cardNumber}
                       onChange={(e) => setCardNumber(formatCardNumber(e.target.value))}
                       placeholder="4532 0000 0000 0000"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-xs font-mono text-white placeholder:text-zinc-600 outline-none focus:border-zinc-400 transition"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-xs tabular-nums text-white placeholder:text-zinc-600 outline-none focus:border-zinc-400 transition"
                     />
                     <CreditCard className="absolute right-3.5 top-3 h-4 w-4 text-zinc-500" />
                   </div>
@@ -443,7 +443,7 @@ function CheckoutContent() {
                       value={cardExpiry}
                       onChange={(e) => setCardExpiry(formatExpiry(e.target.value))}
                       placeholder="MM / YY"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-xs font-mono text-white placeholder:text-zinc-600 outline-none focus:border-zinc-400 transition"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-xs tabular-nums text-white placeholder:text-zinc-600 outline-none focus:border-zinc-400 transition"
                     />
                   </div>
                   <div className="space-y-1">
@@ -455,7 +455,7 @@ function CheckoutContent() {
                       value={cardCvc}
                       onChange={(e) => setCardCvc(e.target.value.replace(/\D/g, ""))}
                       placeholder="123"
-                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-xs font-mono text-white placeholder:text-zinc-600 outline-none focus:border-zinc-400 transition"
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-xs tabular-nums text-white placeholder:text-zinc-600 outline-none focus:border-zinc-400 transition"
                     />
                   </div>
                 </div>
@@ -468,7 +468,7 @@ function CheckoutContent() {
                     value={postalCode}
                     onChange={(e) => setPostalCode(e.target.value)}
                     placeholder={region === "in" ? "400001" : "10001"}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-xs font-mono text-white placeholder:text-zinc-600 outline-none focus:border-zinc-400 transition"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#18181b] border border-[#27272a] text-xs tabular-nums text-white placeholder:text-zinc-600 outline-none focus:border-zinc-400 transition"
                   />
                 </div>
               </div>

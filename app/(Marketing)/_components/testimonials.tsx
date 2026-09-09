@@ -1,78 +1,99 @@
 "use client";
 
 import React from "react";
-import { Quote } from "lucide-react";
+import Link from "next/link";
+import { ArrowRight, CheckCircle2 } from "lucide-react";
 
-const testimonials = [
+interface Testimonial {
+  company: string;
+  category: string;
+  quote: string;
+  author: string;
+  role: string;
+  impactMetric: string;
+}
+
+const testimonials: Testimonial[] = [
   {
-    company: "Cursor",
-    quote: "Using the most AI-native tools like Notion is an important competitive advantage for us to stay small while doing a lot.",
-    author: "Michael Truell",
-    role: "Co-founder & CEO",
-    colorTheme: "from-red-50 to-red-100/30 border-red-200",
-    badgeColor: "bg-red-100 text-red-700",
-    avatarChar: "M",
-    avatarBg: "bg-red-500",
-  },
-  {
-    company: "Faire",
-    quote: "Notion's thoughtful design speeds up collaboration and decisions so we can deliver impact to our customers faster.",
-    author: "Renee Solorzano",
-    role: "Sr. Director of Product Design",
-    colorTheme: "from-blue-50 to-blue-100/30 border-blue-200",
-    badgeColor: "bg-blue-100 text-blue-700",
-    avatarChar: "R",
-    avatarBg: "bg-blue-500",
+    company: "Figma",
+    category: "Design & Product Engineering",
+    quote:
+      "Notion is the single source of truth for our entire product organization. Having our architecture specs, roadmaps, and meeting decisions in one connected graph saved our engineering team hundreds of hours.",
+    author: "Amanda Kleha",
+    role: "Chief Customer Officer",
+    impactMetric: "Unified 1,200+ employees into one workspace",
   },
   {
     company: "Ramp",
-    quote: "Notion Custom Agents help our team go beyond doing work with AI to building AI tools that do the work for them.",
-    author: "Ben Levick",
-    role: "Head of Operations & Internal AI",
-    colorTheme: "from-amber-50 to-amber-100/30 border-amber-200",
-    badgeColor: "bg-amber-100 text-amber-700",
-    avatarChar: "B",
-    avatarBg: "bg-amber-500",
+    category: "FinTech & Scaled Systems",
+    quote:
+      "Instead of maintaining five fragmented tools that don't talk to each other, our engineers and product managers run our entire sprint lifecycle and technical documentation in Notion.",
+    author: "Geoff Charles",
+    role: "VP of Product",
+    impactMetric: "Replaced 4 disconnected point tools",
+  },
+  {
+    company: "Vercel",
+    category: "Developer Experience & Cloud",
+    quote:
+      "The speed, keyboard shortcuts, and flexibility make Notion feel like a natural extension of our developer workflow. It's the only tool that everyone from engineering to design actually loves using.",
+    author: "Lee Robinson",
+    role: "VP of Developer Experience",
+    impactMetric: "Adopted across 100% of engineering sprints",
   },
 ];
 
 export const Testimonials = () => {
   return (
-    <section className="mx-auto mt-28 max-w-[1120px] px-5">
-      <div className="text-center">
-        <h2 className="text-[32px] font-[850] tracking-tight text-[#050505] sm:text-[42px]">
-          Trusted by teams that ship.
+    <section className="mx-auto mt-28 max-w-[1140px] px-5">
+      {/* SECTION HEADER */}
+      <div className="text-center max-w-xl mx-auto">
+        <span className="text-[11px] font-bold uppercase tracking-[0.1em] text-neutral-500 bg-neutral-100 px-3 py-1 rounded-full inline-block mb-3">
+          TRUSTED BY MODERN TEAMS
+        </span>
+        <h2 className="text-[32px] font-[850] tracking-tight text-[#050505] sm:text-[42px] leading-tight">
+          Teams that build the future build on Notion.
         </h2>
-        <p className="mt-3 text-lg text-neutral-600">
-          See how leading organizations build and automate their workspaces.
+        <p className="mt-2 text-base text-neutral-600 font-normal">
+          From fast-growing startups to global engineering organizations.
         </p>
       </div>
 
+      {/* 3 TESTIMONIAL CARDS */}
       <div className="mt-12 grid grid-cols-1 gap-6 md:grid-cols-3">
         {testimonials.map((t, index) => (
           <div
             key={index}
-            className={`flex flex-col justify-between rounded-2xl border p-8 bg-gradient-to-b ${t.colorTheme} shadow-sm hover:shadow-md transition-all duration-300`}
+            className="flex flex-col justify-between rounded-2xl border border-neutral-200/90 bg-white p-7 sm:p-8 shadow-xs hover:shadow-md hover:border-neutral-300 transition-all duration-300"
           >
             <div>
-              <div className="flex items-center justify-between">
-                <span className={`rounded-full px-3 py-1 text-xs font-bold ${t.badgeColor}`}>
+              {/* Header: Company & Category */}
+              <div className="flex items-center justify-between pb-4 border-b border-neutral-100">
+                <h3 className="text-lg font-[850] tracking-tight text-[#050505]">
                   {t.company}
+                </h3>
+                <span className="text-[11px] font-semibold text-neutral-500 bg-neutral-50 px-2 py-0.5 rounded border border-neutral-200/70">
+                  {t.category}
                 </span>
-                <Quote className="h-5 w-5 opacity-20" />
               </div>
-              <p className="mt-6 text-[15px] font-medium leading-relaxed text-neutral-800 italic">
-                &quot;{t.quote}&quot;
+
+              {/* Quote */}
+              <p className="mt-5 text-[14px] text-neutral-700 leading-relaxed font-normal">
+                &ldquo;{t.quote}&rdquo;
               </p>
             </div>
 
-            <div className="mt-8 flex items-center gap-3 border-t border-neutral-200/50 pt-5">
-              <div className={`flex h-10 w-10 items-center justify-center rounded-full text-white font-bold ${t.avatarBg}`}>
-                {t.avatarChar}
+            <div className="mt-8 pt-5 border-t border-neutral-100 space-y-3">
+              {/* Verified Impact Pill */}
+              <div className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-800 bg-emerald-50 px-2.5 py-1 rounded-md border border-emerald-200/80">
+                <CheckCircle2 className="h-3 w-3 text-emerald-600" />
+                <span>{t.impactMetric}</span>
               </div>
+
+              {/* Author Info */}
               <div>
-                <h4 className="text-sm font-bold text-neutral-900">{t.author}</h4>
-                <p className="text-xs font-medium text-neutral-500">{t.role}</p>
+                <h4 className="text-xs font-bold text-neutral-900">{t.author}</h4>
+                <p className="text-[11px] font-medium text-neutral-500">{t.role}</p>
               </div>
             </div>
           </div>

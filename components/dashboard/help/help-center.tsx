@@ -593,7 +593,7 @@ export function HelpCenter({ onBack }: { onBack: () => void }) {
                         <HelpCircle className="mx-auto h-8 w-8 text-muted-foreground" />
                         <p className="mt-3 text-sm font-medium text-foreground">No articles match your search</p>
                         <p className="mt-1 text-xs text-muted-foreground">
-                          Try searching for keywords like "blocks", "python", "rag", or "kanban"
+                          Try searching for keywords like &quot;blocks&quot;, &quot;python&quot;, &quot;rag&quot;, or &quot;kanban&quot;
                         </p>
                         <button
                           onClick={() => {
