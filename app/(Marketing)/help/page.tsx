@@ -288,17 +288,18 @@ export default function MarketingHelpPage() {
               <div key={i}>
                 <button
                   onClick={() => setOpenFaqIndex(openFaqIndex === i ? null : i)}
-                  className="flex w-full items-center justify-between px-6 py-4.5 text-left text-sm font-semibold text-neutral-900 hover:bg-neutral-50 transition"
+                  className="flex w-full items-center justify-between px-6 py-4.5 text-left text-sm font-semibold text-neutral-900 hover:bg-neutral-50/80 transition-colors duration-150 cursor-pointer"
+                  aria-expanded={openFaqIndex === i}
                 >
                   <span>{faq.q}</span>
                   <ChevronDown
-                    className={`h-4 w-4 text-neutral-400 transition-transform duration-200 ${
+                    className={`h-4 w-4 text-neutral-400 transition-transform duration-200 ease-out ${
                       openFaqIndex === i ? "rotate-180 text-black" : ""
                     }`}
                   />
                 </button>
                 {openFaqIndex === i && (
-                  <div className="px-6 pb-5 pt-1 text-xs leading-relaxed text-neutral-600 bg-neutral-50/50">
+                  <div className="px-6 pb-5 pt-1 text-xs sm:text-sm leading-relaxed text-neutral-600 bg-neutral-50/40 animate-in fade-in duration-200">
                     {faq.a}
                   </div>
                 )}

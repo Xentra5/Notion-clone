@@ -108,7 +108,7 @@ export default function LoginForm() {
         {message ? (
           <div
             role="status"
-            className="mb-6 flex w-full items-start gap-2.5 rounded-lg border border-red-200 bg-red-50/80 p-3 text-xs text-red-700 shadow-sm"
+            className="mb-6 flex w-full items-start gap-2.5 rounded-lg border border-red-200 bg-red-50/80 p-3 text-xs text-red-700 shadow-sm animate-in fade-in zoom-in-95 duration-200"
           >
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-500" />
             <span className="leading-snug">{message}</span>
@@ -154,7 +154,7 @@ export default function LoginForm() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600 cursor-pointer"
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -165,7 +165,7 @@ export default function LoginForm() {
           <button
             type="submit"
             disabled={isSubmitting}
-            className="h-10 w-full rounded-md bg-[#0078df] font-medium text-white shadow-sm transition hover:bg-[#0067c2] active:scale-[0.99] disabled:cursor-wait disabled:opacity-70"
+            className="h-10 w-full rounded-md bg-[#0078df] font-medium text-white shadow-sm transition-all duration-150 hover:bg-[#0067c2] active:scale-[0.98] cursor-pointer disabled:cursor-wait disabled:opacity-70"
           >
             {isSubmitting ? "Signing in..." : "Continue"}
           </button>

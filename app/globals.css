@@ -336,3 +336,58 @@
 .animate-bot-electric-flicker {
   animation: bot-electric-flicker 0.4s ease-in-out infinite;
 }
+
+/* ====================================================
+   NOTION MOTION & INTERACTION SYSTEM (animatio.md)
+   Subtle + Snappy + Human-Designed + Accessible
+   ==================================================== */
+
+:root {
+  --ease-notion: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-ui: 220ms;
+  --duration-reveal: 350ms;
+}
+
+/* Snappy tactile press feedback for buttons and triggers */
+.notion-press {
+  transition: transform var(--duration-fast) var(--ease-notion);
+}
+.notion-press:active {
+  transform: scale(0.98);
+}
+
+/* Calm interactive card hover: subtle border & elevation */
+.notion-card-interactive {
+  transition: border-color var(--duration-ui) var(--ease-notion),
+              box-shadow var(--duration-ui) var(--ease-notion),
+              background-color var(--duration-ui) var(--ease-notion);
+}
+
+/* Subtle, purposeful entrance animation */
+@keyframes notion-fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.notion-fade-up {
+  animation: notion-fade-up var(--duration-reveal) var(--ease-notion) forwards;
+}
+
+/* Universal Accessibility: Respect reduced motion preference */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

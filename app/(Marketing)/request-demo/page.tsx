@@ -8,6 +8,7 @@ import { CheckCircle2, Building2, Users, Shield } from "lucide-react";
 
 export default function RequestDemoPage() {
   const [submitted, setSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
     lastName: "",
@@ -19,7 +20,11 @@ export default function RequestDemoPage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setIsSubmitting(true);
+    setTimeout(() => {
+      setIsSubmitting(false);
+      setSubmitted(true);
+    }, 600);
   };
 
   return (
@@ -91,7 +96,7 @@ export default function RequestDemoPage() {
           {/* Right Column - Form */}
           <div className="rounded-3xl border border-neutral-200 bg-white p-8 shadow-xl">
             {submitted ? (
-              <div className="py-12 text-center">
+              <div className="py-12 text-center animate-in fade-in zoom-in-95 duration-200">
                 <CheckCircle2 className="mx-auto h-16 w-16 text-emerald-500" />
                 <h3 className="mt-4 text-2xl font-extrabold text-neutral-900">Demo Request Received!</h3>
                 <p className="mt-2 text-sm text-neutral-600 max-w-sm mx-auto">
@@ -99,7 +104,7 @@ export default function RequestDemoPage() {
                 </p>
                 <Button
                   onClick={() => setSubmitted(false)}
-                  className="mt-6 rounded-lg bg-neutral-900 px-6 font-bold text-white hover:bg-black"
+                  className="mt-6 rounded-lg bg-neutral-900 px-6 font-bold text-white hover:bg-black notion-press"
                 >
                   Submit Another Request
                 </Button>
@@ -117,7 +122,7 @@ export default function RequestDemoPage() {
                       value={formData.firstName}
                       onChange={(e) => setFormData({ ...formData, firstName: e.target.value })}
                       placeholder="Jane"
-                      className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none focus:border-[#0078df] focus:ring-1 focus:ring-[#0078df]"
+                      className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none transition-colors duration-150 focus:border-[#0078df] focus:ring-1 focus:ring-[#0078df]"
                     />
                   </div>
                   <div>
@@ -128,7 +133,7 @@ export default function RequestDemoPage() {
                       value={formData.lastName}
                       onChange={(e) => setFormData({ ...formData, lastName: e.target.value })}
                       placeholder="Doe"
-                      className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none focus:border-[#0078df] focus:ring-1 focus:ring-[#0078df]"
+                      className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none transition-colors duration-150 focus:border-[#0078df] focus:ring-1 focus:ring-[#0078df]"
                     />
                   </div>
                 </div>
@@ -141,7 +146,7 @@ export default function RequestDemoPage() {
                     value={formData.email}
                     onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                     placeholder="jane@company.com"
-                    className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none focus:border-[#0078df] focus:ring-1 focus:ring-[#0078df]"
+                    className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none transition-colors duration-150 focus:border-[#0078df] focus:ring-1 focus:ring-[#0078df]"
                   />
                 </div>
 
@@ -151,7 +156,7 @@ export default function RequestDemoPage() {
                     <select
                       value={formData.companySize}
                       onChange={(e) => setFormData({ ...formData, companySize: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none focus:border-[#0078df]"
+                      className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none transition-colors duration-150 focus:border-[#0078df]"
                     >
                       <option value="1-20">1 - 20 employees</option>
                       <option value="20-50">20 - 50 employees</option>
@@ -165,7 +170,7 @@ export default function RequestDemoPage() {
                     <select
                       value={formData.role}
                       onChange={(e) => setFormData({ ...formData, role: e.target.value })}
-                      className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none focus:border-[#0078df]"
+                      className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none transition-colors duration-150 focus:border-[#0078df]"
                     >
                       <option value="Engineering Lead">Engineering Lead</option>
                       <option value="Product Manager">Product Manager</option>
@@ -183,15 +188,23 @@ export default function RequestDemoPage() {
                     value={formData.notes}
                     onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                     placeholder="Tell us about your team's current setup, goals, or questions..."
-                    className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none focus:border-[#0078df] focus:ring-1 focus:ring-[#0078df]"
+                    className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm text-black outline-none transition-colors duration-150 focus:border-[#0078df] focus:ring-1 focus:ring-[#0078df]"
                   />
                 </div>
 
                 <Button
                   type="submit"
-                  className="mt-2 h-11 w-full rounded-lg bg-[#0078df] text-sm font-bold text-white hover:bg-[#006dcc]"
+                  disabled={isSubmitting}
+                  className="mt-2 h-11 w-full rounded-lg bg-[#0078df] text-sm font-bold text-white hover:bg-[#006dcc] notion-press disabled:opacity-75 cursor-pointer"
                 >
-                  Submit Demo Request
+                  {isSubmitting ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                      Submitting Request...
+                    </span>
+                  ) : (
+                    "Submit Demo Request"
+                  )}
                 </Button>
               </form>
             )}

@@ -229,9 +229,9 @@ export default function PricingPage() {
               </div>
             </div>
 
-            <div className="flex flex-col items-stretch sm:items-center gap-3 shrink-0">
+              <div className="flex flex-col items-stretch sm:items-center gap-3 shrink-0">
               <Link href="/signup">
-                <Button className="h-12 px-8 rounded-xl bg-purple-500 text-white font-extrabold text-base hover:bg-purple-600 shadow-lg">
+                <Button className="h-12 px-8 rounded-xl bg-purple-500 text-white font-extrabold text-base hover:bg-purple-600 shadow-lg notion-press">
                   Add Notion AI <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Link>
@@ -241,7 +241,75 @@ export default function PricingPage() {
         </div>
       </section>
 
+      {/* Pricing FAQs Section with Smooth Accordion */}
+      <section className="mx-auto max-w-[840px] px-5 py-12 border-t border-neutral-200">
+        <div className="text-center mb-8">
+          <span className="text-xs font-bold uppercase tracking-wider text-[#0078df]">
+            Billing & Plans
+          </span>
+          <h2 className="mt-2 text-2xl font-bold text-neutral-900 sm:text-3xl">
+            Frequently Asked Pricing Questions
+          </h2>
+        </div>
+
+        <PricingFaqAccordion />
+      </section>
+
       <Footer />
     </main>
+  );
+}
+
+function PricingFaqAccordion() {
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  const faqs = [
+    {
+      q: "Can I change plans or cancel my subscription at any time?",
+      a: "Yes. You can upgrade, downgrade, or cancel your subscription at any point from your workspace Settings & Members panel. If you cancel, your paid features remain active until the end of your current billing cycle.",
+    },
+    {
+      q: "How does seat billing work when adding or removing teammates?",
+      a: "If you add team members during your billing period, we prorate the cost based on the remaining days in your billing cycle. If you remove members, credits are automatically applied to your next renewal invoice.",
+    },
+    {
+      q: "Is there a free trial available for the Plus and Business plans?",
+      a: "Yes! You can start a 14-day free trial on either Plus or Business without being charged. All team features, unlimited blocks, and priority support are unlocked during the trial.",
+    },
+    {
+      q: "Can I use Notion AI on the Free plan?",
+      a: "Yes. Every plan includes a free preview of Notion AI. To unlock unlimited AI prompts, autonomous agent tasks, and connected app search, you can add Notion AI to any plan for $8 per member per month.",
+    },
+  ];
+
+  return (
+    <div className="divide-y divide-neutral-200 rounded-2xl border border-neutral-200 bg-white overflow-hidden shadow-xs">
+      {faqs.map((faq, i) => {
+        const isOpen = openIndex === i;
+        return (
+          <div key={i}>
+            <button
+              onClick={() => setOpenIndex(isOpen ? null : i)}
+              className="flex w-full items-center justify-between px-6 py-4.5 text-left text-sm font-semibold text-neutral-900 hover:bg-neutral-50/80 transition duration-150 cursor-pointer"
+              aria-expanded={isOpen}
+            >
+              <span>{faq.q}</span>
+              <span
+                className={`ml-4 shrink-0 transition-transform duration-200 ease-out ${
+                  isOpen ? "rotate-180 text-black" : "text-neutral-400"
+                }`}
+              >
+                ▼
+              </span>
+            </button>
+            {isOpen && (
+              <div className="px-6 pb-5 pt-1 text-xs sm:text-sm leading-relaxed text-neutral-600 bg-neutral-50/40 animate-in fade-in duration-200">
+                {faq.a}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }

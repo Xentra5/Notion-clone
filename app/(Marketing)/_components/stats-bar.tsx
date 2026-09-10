@@ -41,6 +41,15 @@ function AnimatedCounter({
       return;
     }
 
+    const prefersReducedMotion =
+      typeof window !== "undefined" &&
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+    if (prefersReducedMotion) {
+      setCurrent(target);
+      return;
+    }
+
     let startTimestamp: number | null = null;
     let animationFrameId: number;
 
@@ -91,14 +100,11 @@ export const StatsBar = () => {
     if (!element) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting) {
-            setIsVisible(true);
-          } else {
-            setIsVisible(false);
-          }
-        });
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setIsVisible(true);
+          observer.disconnect();
+        }
       },
       {
         threshold: 0.15,

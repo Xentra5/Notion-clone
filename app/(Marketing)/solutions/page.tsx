@@ -67,7 +67,7 @@ export default function SolutionsPage() {
 
         <div className="mt-8 flex justify-center gap-4">
           <Link href="/request-demo">
-            <Button className="h-11 rounded-lg bg-[#0078df] px-6 text-[16px] font-bold text-white hover:bg-[#006dcc]">
+            <Button className="h-11 rounded-lg bg-[#0078df] px-6 text-[16px] font-bold text-white hover:bg-[#006dcc] notion-press">
               Talk to Sales <ArrowRight className="ml-1 h-4 w-4" />
             </Button>
           </Link>
@@ -77,18 +77,29 @@ export default function SolutionsPage() {
       <section className="mx-auto max-w-[1120px] px-5 py-12">
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
           {solutions.map((s, i) => (
-            <div key={i} className="group rounded-2xl border border-neutral-200 bg-neutral-50/50 p-7 shadow-xs hover:border-blue-300 hover:bg-white hover:shadow-md transition-all">
-              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white border border-neutral-200 group-hover:scale-105 transition-transform">
-                {s.icon}
+            <Link
+              key={i}
+              href="/dashboard"
+              className="group rounded-2xl border border-neutral-200 bg-neutral-50/50 p-7 shadow-xs hover:border-neutral-400 hover:bg-white hover:shadow-md transition-all duration-200 ease-out flex flex-col justify-between"
+            >
+              <div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-white border border-neutral-200 group-hover:scale-105 transition-transform duration-200 ease-out shadow-2xs">
+                  {s.icon}
+                </div>
+                <span className="mt-4 inline-block text-xs font-bold uppercase tracking-wider text-neutral-500">
+                  {s.role}
+                </span>
+                <h3 className="mt-1 text-xl font-bold text-neutral-900 group-hover:text-[#0078df] transition-colors duration-150">
+                  {s.title}
+                </h3>
+                <p className="mt-3 text-sm text-neutral-600 leading-relaxed">{s.desc}</p>
               </div>
-              <span className="mt-4 inline-block text-xs font-bold uppercase tracking-wider text-neutral-500">
-                {s.role}
-              </span>
-              <h3 className="mt-1 text-xl font-bold text-neutral-900 group-hover:text-[#0078df] transition-colors">
-                {s.title}
-              </h3>
-              <p className="mt-3 text-sm text-neutral-600 leading-relaxed">{s.desc}</p>
-            </div>
+
+              <div className="mt-6 flex items-center gap-1 text-xs font-semibold text-[#0078df] pt-2">
+                <span>Explore {s.role} workflows</span>
+                <ArrowRight className="h-3.5 w-3.5 group-hover:translate-x-1 transition-transform duration-200" />
+              </div>
+            </Link>
           ))}
         </div>
       </section>
