@@ -1006,28 +1006,28 @@ export function Sidebar({ activePage }: SidebarProps) {
         {/* Bottom Utility Items */}
         <div className="pt-3 border-t border-sidebar-border space-y-0.5">
           <button
-            onClick={() => { setUtilityPage("Library"); setActivePage({ title: "Library" }); }}
+            onClick={() => { setUtilityPage(null); router.push("/dashboard/library"); }}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <BookOpen className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Library</span>
           </button>
           <button
-            onClick={() => { setUtilityPage("My Tasks"); setActivePage({ title: "My Tasks" }); }}
+            onClick={() => { setUtilityPage(null); router.push("/dashboard/tasks"); }}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <CheckSquare className="h-3.5 w-3.5 text-muted-foreground" />
             <span>My Tasks</span>
           </button>
           <button
-            onClick={() => { setUtilityPage("Marketplace"); setActivePage({ title: "Marketplace" }); }}
+            onClick={() => { setUtilityPage(null); router.push("/dashboard/templates"); }}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <ShoppingBag className="h-3.5 w-3.5 text-muted-foreground" />
             <span>Marketplace</span>
           </button>
           <button
-            onClick={() => { setUtilityPage("Help"); setActivePage({ title: "Help" }); }}
+            onClick={() => { setUtilityPage(null); router.push("/dashboard/help"); }}
             className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
           >
             <HelpCircle className="h-3.5 w-3.5 text-muted-foreground" />

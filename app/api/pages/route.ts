@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       userId: session.user.email,
       $or: [{ deletedAt: { $exists: false } }, { deletedAt: null }],
     })
-      .select("_id userId title icon coverImage category parentPageId isAiMeetingNote isStarred permission createdAt updatedAt deletedAt")
+      .select("_id userId title icon coverImage category parentPageId isAiMeetingNote isStarred permission workspaceMeta createdAt updatedAt deletedAt")
       .sort({ updatedAt: -1 })
       .lean();
 
@@ -50,12 +50,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid request body" }, { status: 400 });
     }
 
-    const { title, category, parentPageId, isAiMeetingNote, blocks } = body as {
+    const { title, category, parentPageId, isAiMeetingNote, blocks, icon, coverImage, isStarred, permission, workspaceMeta } = body as {
       title?: unknown;
       category?: unknown;
       parentPageId?: unknown;
       isAiMeetingNote?: unknown;
       blocks?: unknown;
+      icon?: unknown;
+      coverImage?: unknown;
+      isStarred?: unknown;
+      permission?: unknown;
+      workspaceMeta?: unknown;
     };
     const pageTitle = typeof title === "string" && title.trim() ? title.trim() : "Untitled";
     const pageCategory = category === "Private" || category === "Shared" || category === "Meetings" ? category : "Private";
@@ -63,6 +68,9 @@ export async function POST(request: NextRequest) {
 
     if (blocks !== undefined && !Array.isArray(blocks)) {
       return NextResponse.json({ error: "Blocks must be an array" }, { status: 400 });
+    }
+    if (workspaceMeta !== undefined && (!workspaceMeta || typeof workspaceMeta !== "object" || Array.isArray(workspaceMeta))) {
+      return NextResponse.json({ error: "workspaceMeta must be an object" }, { status: 400 });
     }
 
     const pageBlocks = (blocks ?? []).map((block, index) => {
@@ -92,11 +100,15 @@ export async function POST(request: NextRequest) {
     const page = await Page.create({
       userId: session.user.email,
       title: pageTitle,
-      icon: "📄",
+      icon: typeof icon === "string" && icon.trim() ? icon : "📄",
+      coverImage: typeof coverImage === "string" ? coverImage : "",
       category: pageCategory,
       parentPageId: parentId,
       ancestors,
       isAiMeetingNote: !!isAiMeetingNote,
+      isStarred: Boolean(isStarred),
+      permission: permission === "Workspace" || permission === "Public" ? permission : "Private",
+      ...(workspaceMeta ? { workspaceMeta } : {}),
       blocks: pageBlocks,
     });
 

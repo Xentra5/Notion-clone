@@ -28,6 +28,23 @@ export interface PageBlock {
   parent?: string;
 }
 
+export type WorkspaceItemKind = "page" | "guide" | "sop" | "template" | "task";
+export type TaskPriority = "low" | "medium" | "high";
+export type TaskStatus = "open" | "done";
+
+/** Metadata for pages shown in Library, Templates, and My Tasks. */
+export interface WorkspaceMeta {
+  kind?: WorkspaceItemKind;
+  description?: string;
+  tags?: string[];
+  owner?: string;
+  verifiedAt?: string;
+  verificationExpiresAt?: string;
+  templateSourceId?: string;
+  templateUses?: number;
+  task?: { due?: string; priority?: TaskPriority; status?: TaskStatus };
+}
+
 export interface Page {
   _id: string;
   userId: string;
@@ -39,6 +56,7 @@ export interface Page {
   isAiMeetingNote: boolean;
   isStarred?: boolean;
   permission?: "Private" | "Workspace" | "Public";
+  workspaceMeta?: WorkspaceMeta;
   blocks: PageBlock[];
   createdAt: string;
   updatedAt: string;
@@ -192,6 +210,7 @@ export async function createPage(data?: {
   isAiMeetingNote?: boolean;
   isStarred?: boolean;
   permission?: "Private" | "Workspace" | "Public";
+  workspaceMeta?: WorkspaceMeta;
   blocks?: PageBlock[];
 }): Promise<Page> {
   const res = await fetch("/api/pages", {
@@ -218,7 +237,7 @@ export async function createPage(data?: {
 // PATCH /api/pages/[id] — optimistic local update + write-through network sync
 export async function updatePage(
   id: string,
-  data: Partial<Pick<Page, "title" | "blocks" | "category" | "icon" | "coverImage" | "isStarred" | "permission">> & {
+  data: Partial<Pick<Page, "title" | "blocks" | "category" | "icon" | "coverImage" | "isStarred" | "permission" | "workspaceMeta">> & {
     parentPageId?: string;
   }
 ): Promise<Page> {

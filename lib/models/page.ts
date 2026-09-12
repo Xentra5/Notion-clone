@@ -57,6 +57,22 @@ const PageSchema = new Schema(
       enum: ["Private", "Workspace", "Public"],
       default: "Private",
     },
+    // The document body stays in blocks; this powers collection-style views.
+    workspaceMeta: {
+      kind: { type: String, enum: ["page", "guide", "sop", "template", "task"], default: "page" },
+      description: { type: String, default: "" },
+      tags: { type: [String], default: [] },
+      owner: { type: String, default: "" },
+      verifiedAt: { type: String, default: "" },
+      verificationExpiresAt: { type: String, default: "" },
+      templateSourceId: { type: String, default: "" },
+      templateUses: { type: Number, default: 0 },
+      task: {
+        due: { type: String, default: "" },
+        priority: { type: String, enum: ["low", "medium", "high"], default: "medium" },
+        status: { type: String, enum: ["open", "done"], default: "open" },
+      },
+    },
     blocks: [BlockSchema],
     deletedAt: { type: Date, default: null },
   },
@@ -72,6 +88,7 @@ PageSchema.index({ userId: 1, category: 1, deletedAt: 1, updatedAt: -1 });
 // Materialized path index — powers O(1) subtree queries
 PageSchema.index({ ancestors: 1, userId: 1 });
 PageSchema.index({ title: "text", "blocks.properties.text": "text" });
+PageSchema.index({ userId: 1, "workspaceMeta.kind": 1, updatedAt: -1 });
 
 const Page = mongoose.models.Page || mongoose.model("Page", PageSchema);
 

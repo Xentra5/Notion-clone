@@ -66,7 +66,7 @@ export const PERSONAS: Persona[] = [
     role: "People & Operations",
     badge: "AGENT",
     icon: "✦",
-    description: "Team syncs, calendar actions, workspace pages & meeting notes",
+    description: "Find answers, shape ideas into pages, and keep your work moving.",
     accent: "text-indigo-400 border-indigo-500/30 bg-indigo-500/10",
   },
   {
@@ -75,7 +75,7 @@ export const PERSONAS: Persona[] = [
     role: "Scheduling & Execution",
     badge: "EA",
     icon: "⚡",
-    description: "Fast calendar revisions, task organization & summaries",
+    description: "Protect your time with clear schedules, follow-ups, and summaries.",
     accent: "text-amber-400 border-amber-500/30 bg-amber-500/10",
   },
   {
@@ -84,7 +84,7 @@ export const PERSONAS: Persona[] = [
     role: "Product & Architecture",
     badge: "TECH",
     icon: "🛠️",
-    description: "Roadmaps, specs, sprint plans & engineering tasks",
+    description: "Turn product questions into decisions, plans, and practical next steps.",
     accent: "text-sky-400 border-sky-500/30 bg-sky-500/10",
   },
   {
@@ -93,7 +93,7 @@ export const PERSONAS: Persona[] = [
     role: "Document Architecture",
     badge: "DOC",
     icon: "📄",
-    description: "Structured Notion pages, thought structuring & formatting",
+    description: "Turn rough notes into clear, useful documents your team can use.",
     accent: "text-purple-400 border-purple-500/30 bg-purple-500/10",
   },
 ];
@@ -165,6 +165,14 @@ const QUICK_CHIPS = [
   { label: "🌐 Web search", text: "Search the web for the latest updates on AI agents" },
 ];
 
+// Intent-first language is clearer than exposing implementation/tool names on the welcome screen.
+const WELCOME_QUICK_CHIP_COPY = [
+  { label: "Plan a meeting", text: "Plan a focused meeting for tomorrow afternoon. Include an agenda, attendees, and a follow-up note." },
+  { label: "Find an answer", text: "Search my workspace for the latest project decisions and give me a short summary." },
+  { label: "Create a page", text: "Create a clear project plan with goals, milestones, owners, and next steps." },
+  { label: "Research a topic", text: "Research the latest updates on AI agents and cite the most useful sources." },
+];
+
 interface AgentSkill {
   id: string;
   prefix: string;
@@ -183,8 +191,8 @@ const AGENT_SKILLS: AgentSkill[] = [
     label: "@workspace",
     category: "Knowledge RAG",
     icon: Search,
-    title: "Search workspace notes",
-    description: "Semantic query across your private notes, docs, and knowledge base",
+    title: "Find answers in your workspace",
+    description: "Search your notes, documents, and decisions — then get the useful parts.",
     samplePrompt: "@workspace What were our key decisions on React architecture?",
   },
   {
@@ -193,8 +201,8 @@ const AGENT_SKILLS: AgentSkill[] = [
     label: "/calendar",
     category: "Calendar",
     icon: Calendar,
-    title: "Schedule meeting or event",
-    description: "Create calendar invites with date, time, and agenda note",
+    title: "Plan a meeting or event",
+    description: "Create a calendar event with the right time, people, agenda, and note.",
     samplePrompt: "/calendar Schedule a team sync tomorrow at 10am with meeting notes",
   },
   {
@@ -203,8 +211,8 @@ const AGENT_SKILLS: AgentSkill[] = [
     label: "/events",
     category: "Agenda",
     icon: CalendarDays,
-    title: "View upcoming events",
-    description: "Query calendar to list upcoming meetings and today's schedule",
+    title: "Review your schedule",
+    description: "See today’s meetings, upcoming events, and the time you still have.",
     samplePrompt: "/events List my scheduled meetings for today",
   },
   {
@@ -213,8 +221,8 @@ const AGENT_SKILLS: AgentSkill[] = [
     label: "/page",
     category: "Page Builder",
     icon: FilePlus,
-    title: "Draft workspace page",
-    description: "Generate structured project specs, task tables, or roadmaps",
+    title: "Create a polished page",
+    description: "Turn an idea into a project brief, roadmap, task list, or team doc.",
     samplePrompt: "/page Create a new page for Q4 product roadmap with key deliverables",
   },
   {
@@ -223,8 +231,8 @@ const AGENT_SKILLS: AgentSkill[] = [
     label: "/pages",
     category: "Documents",
     icon: FileText,
-    title: "List workspace documents",
-    description: "Explore and query all existing pages across your workspace",
+    title: "Explore workspace documents",
+    description: "Find the pages your team already has before creating something new.",
     samplePrompt: "/pages Show all workspace pages created this week",
   },
   {
@@ -233,8 +241,8 @@ const AGENT_SKILLS: AgentSkill[] = [
     label: "/search",
     category: "Live Web",
     icon: Globe,
-    title: "Live web research",
-    description: "Real-time web research across DuckDuckGo with citations",
+    title: "Research the web",
+    description: "Find current information and return a concise answer with sources.",
     samplePrompt: "/search Search the web for Next.js 15 features, breaking changes and best practices",
   },
 ];
@@ -736,6 +744,20 @@ export default function AgentPage() {
   const [activeMode, setActiveMode] = useState<"fast" | "think" | "deepsearch">("fast");
   const [liveUsage, setLiveUsage] = useState<{ plan: string; aiUsageCount: number } | null>(null);
   const [hasError, setHasError] = useState(false);
+  // Keep the Agent's working surface legible when Chrome is zoomed far out.
+  // This is deliberately scoped below to the welcome content and composer —
+  // never the dashboard shell, sidebar, or app root.
+  const [agentContentScale, setAgentContentScale] = useState(1);
+
+  useEffect(() => {
+    const updateAgentContentScale = () => {
+      const dpr = window.devicePixelRatio || 1;
+      setAgentContentScale(dpr < 0.8 ? Math.min(2, Math.round((1 / dpr) * 100) / 100) : 1);
+    };
+    updateAgentContentScale();
+    window.addEventListener("resize", updateAgentContentScale);
+    return () => window.removeEventListener("resize", updateAgentContentScale);
+  }, []);
 
   // Personality & Multi-Agent Persona State
   const [selectedPersona, setSelectedPersona] = useState<string>("project_hr");
@@ -1317,7 +1339,7 @@ export default function AgentPage() {
                 setShowHistoryDrawer(true);
               }}
               title="View previous conversations"
-              className="group flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border border-white/10 transition-all duration-150"
+              className={`group flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium border transition-all duration-150 ${showHistoryDrawer && historyDrawerTab === "chats" ? "bg-white/12 border-white/20 text-white" : "text-zinc-300 hover:text-white bg-white/5 hover:bg-white/10 border-white/10"}`}
             >
               <MessagesSquare className="h-3.5 w-3.5 text-sky-400 group-hover:text-sky-300 transition" />
               <span>Previous Chats ({sessions.length})</span>
@@ -1335,7 +1357,7 @@ export default function AgentPage() {
             <button
               onClick={() => setShowMemoryModal(true)}
               title="Manage agent memory"
-              className="group flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium text-zinc-400 hover:text-white hover:bg-white/6 transition-all duration-150"
+              className={`group flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium transition-all duration-150 ${showMemoryModal ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/6"}`}
             >
               <Brain className="h-3.5 w-3.5 text-purple-400/70 group-hover:text-purple-300 transition" />
               <span className="hidden sm:inline">Memory</span>
@@ -1347,7 +1369,7 @@ export default function AgentPage() {
                 setShowHistoryDrawer(true);
               }}
               title="View action history"
-              className="group flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium text-zinc-400 hover:text-white hover:bg-white/6 transition-all duration-150"
+              className={`group flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-medium transition-all duration-150 ${showHistoryDrawer && historyDrawerTab === "actions" ? "bg-white/10 text-white" : "text-zinc-400 hover:text-white hover:bg-white/6"}`}
             >
               <History className="h-3.5 w-3.5 text-zinc-500 group-hover:text-zinc-300 transition" />
               <span className="hidden sm:inline">Actions</span>
@@ -1361,9 +1383,12 @@ export default function AgentPage() {
 
 
       {/* Messages Thread or Welcome Hero */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-8 scrollbar-thin scrollbar-thumb-white/10 relative z-10">
+      <div className={`${showWelcome ? "shrink-0" : "flex-1"} overflow-y-auto px-4 sm:px-6 py-8 scrollbar-thin scrollbar-thumb-white/10 relative z-10`}>
         {showWelcome ? (
-          <div className="flex flex-col items-center justify-center min-h-[480px] max-w-3xl mx-auto text-center py-8">
+          <div
+            style={agentContentScale > 1 ? { zoom: agentContentScale } : undefined}
+            className="flex flex-col items-center justify-center min-h-[470px] max-w-3xl mx-auto text-center py-5"
+          >
 
             {/* Bot Logo — untouched */}
             <div className="mb-7 relative flex flex-col items-center justify-center">
@@ -1372,23 +1397,27 @@ export default function AgentPage() {
 
             {/* ── Premium Gradient Headline ── */}
             <h1 className="text-[2rem] sm:text-[2.5rem] font-bold tracking-[-0.03em] leading-[1.15] bg-gradient-to-b from-white via-white/90 to-zinc-400 bg-clip-text text-transparent">
-              What can {currentPersona.name} do for you?
+              What would you like to move forward today?
             </h1>
             <p className="text-zinc-500 text-[13px] sm:text-sm mt-3 max-w-sm leading-relaxed font-normal tracking-wide">
-              {currentPersona.description}
+              Search your workspace, shape ideas into pages, plan meetings, or research a topic with sources.
             </p>
 
             {/* ── Keyboard-shortcut style Chips ── */}
             <div className="flex flex-wrap items-center justify-center gap-1.5 mt-6">
-              {QUICK_CHIPS.map((chip) => (
+              {QUICK_CHIPS.map((chip, index) => {
+                const copy = WELCOME_QUICK_CHIP_COPY[index];
+                return (
                 <button
                   key={chip.label}
-                  onClick={() => { setInput(chip.text); inputRef.current?.focus(); }}
+                  onClick={() => { setInput(copy.text); inputRef.current?.focus(); }}
                   className="group flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[11px] font-medium text-zinc-500 hover:text-zinc-200 bg-transparent hover:bg-white/5 border border-white/[0.08] hover:border-white/15 transition-all duration-150 active:scale-95"
                 >
-                  <span>{chip.label}</span>
+                  <span>{copy.label}</span>
+                  <ArrowUpRight className="h-3 w-3 opacity-0 transition group-hover:opacity-70" />
                 </button>
-              ))}
+                );
+              })}
             </div>
 
             {/* ── Premium Skill Cards ── */}
@@ -1417,7 +1446,7 @@ export default function AgentPage() {
                 return (
                   <button
                     key={skill.id}
-                    onClick={() => sendMessage(skill.samplePrompt)}
+                    onClick={() => { setInput(skill.samplePrompt); inputRef.current?.focus(); }}
                     className={`group flex flex-col gap-3 p-4 rounded-xl border border-white/[0.07] bg-white/[0.025] hover:bg-white/[0.045] ${accent} transition-all duration-200 text-left active:scale-[0.985] relative overflow-hidden`}
                   >
                     {/* Subtle glow on hover */}
@@ -1438,11 +1467,29 @@ export default function AgentPage() {
                       <p className="text-[11px] text-zinc-600 mt-1 leading-relaxed line-clamp-2">
                         {skill.description}
                       </p>
+                      <p className="mt-2 text-[10px] font-medium text-zinc-700 transition-colors group-hover:text-zinc-500">Use this prompt →</p>
                     </div>
                   </button>
                 );
               })}
             </div>
+
+            {sessions.length > 0 && (
+              <div className="mt-6 w-full border-t border-white/[0.06] pt-4 text-left">
+                <div className="mb-2 flex items-center justify-between px-1">
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-zinc-600">Continue recent work</p>
+                  <button onClick={() => { setHistoryDrawerTab("chats"); setShowHistoryDrawer(true); }} className="text-[11px] font-medium text-zinc-500 hover:text-zinc-200">View all</button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {sessions.slice(0, 3).map((session) => (
+                    <button key={session._id} onClick={() => loadSession(session._id)} className="group flex min-w-0 items-center gap-2.5 rounded-lg border border-white/[0.06] bg-white/[0.02] px-3 py-2.5 text-left transition hover:border-white/[0.13] hover:bg-white/[0.05]">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white/[0.06] text-sky-400"><MessagesSquare className="h-3.5 w-3.5" /></div>
+                      <div className="min-w-0"><p className="truncate text-[11px] font-medium text-zinc-400 group-hover:text-zinc-100">{session.title}</p><p className="mt-0.5 text-[10px] text-zinc-700">Resume conversation</p></div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         ) : (
           <div className="space-y-4 pb-6">
@@ -1466,7 +1513,10 @@ export default function AgentPage() {
 
 
       {/* Notion Agent Floating Command Input Bar */}
-      <div className="shrink-0 max-w-3xl mx-auto w-full px-4 pb-4 pt-1">
+      <div
+        style={showWelcome && agentContentScale > 1 ? { zoom: agentContentScale } : undefined}
+        className={`shrink-0 max-w-3xl mx-auto w-full px-4 pb-4 ${showWelcome ? "pt-2" : "pt-1"}`}
+      >
         {isLimitReached ? (
           <div className="rounded-2xl border border-white/10 bg-zinc-950 p-5 flex flex-col sm:flex-row items-center justify-between gap-4">
             <div className="flex items-center gap-3.5">
@@ -1572,6 +1622,13 @@ export default function AgentPage() {
             {/* ── Input capsule ── */}
             <div className="rounded-2xl border border-white/[0.09] bg-[#0b0b0f]/96 backdrop-blur-2xl shadow-[0_2px_40px_rgba(0,0,0,0.6)] focus-within:border-white/20 focus-within:shadow-[0_0_0_1px_rgba(255,255,255,0.04),0_2px_40px_rgba(0,0,0,0.6)] transition-all duration-200">
 
+              {showWelcome && (
+                <div className="flex items-center justify-between gap-3 border-b border-white/[0.06] px-3 py-2">
+                  <span className="inline-flex items-center gap-1.5 text-[10px] font-medium text-zinc-500"><CheckCircle2 className="h-3 w-3 text-emerald-400" />Ready to work with your workspace</span>
+                  <span className="hidden text-[10px] text-zinc-700 sm:inline">Select a skill to give the Agent the right context</span>
+                </div>
+              )}
+
               {/* ── Tool chips row ── */}
               <div className="flex items-center gap-1 px-3 pt-2.5 pb-2 border-b border-white/[0.06] overflow-x-auto no-scrollbar">
                 {AGENT_SKILLS.map((skill) => {
@@ -1622,7 +1679,7 @@ export default function AgentPage() {
                 value={input}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder={`Ask Notion Agent to search workspace, schedule meetings, or create pages…`}
+                placeholder="Ask anything — I can search, plan, write, and organise your workspace…"
                 rows={1}
                 disabled={isLoading}
                 className="w-full resize-none bg-transparent text-[15px] text-white/90 placeholder:text-zinc-600 outline-none leading-relaxed max-h-[180px] disabled:opacity-40 font-normal px-3 pt-2.5 pb-1"

@@ -50,6 +50,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
   const pageId = params?.pageId as string | undefined;
   const isAgentPage = pathname === "/dashboard/agent" || pathname?.startsWith("/dashboard/agent");
+  const isUtilityRoute = ["/dashboard/library", "/dashboard/tasks", "/dashboard/templates", "/dashboard/help"].includes(pathname || "");
 
   const {
     activePage, setActivePage,
@@ -136,7 +137,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Center Main Workspace Area */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         {!isAgentPage && <TopBar pageId={pageId} />}
-        {utilityPage
+        {utilityPage && !isUtilityRoute
           ? <UtilityPage type={utilityPage} onBack={() => { setUtilityPage(null); setActivePage({ title: "Getting Started with Notion" }); }} />
           : children}
       </div>

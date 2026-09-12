@@ -64,7 +64,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const body = await request.json();
-    const { title, blocks, category, icon, coverImage, parentPageId, isStarred, permission } = body;
+    const { title, blocks, category, icon, coverImage, parentPageId, isStarred, permission, workspaceMeta } = body;
 
     // Build update payload from only the provided fields
     const $set: Record<string, unknown> = {};
@@ -107,6 +107,12 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     if (coverImage !== undefined) $set.coverImage = coverImage;
     if (isStarred !== undefined) $set.isStarred = Boolean(isStarred);
     if (permission !== undefined) $set.permission = permission;
+    if (workspaceMeta !== undefined) {
+      if (!workspaceMeta || typeof workspaceMeta !== "object" || Array.isArray(workspaceMeta)) {
+        return NextResponse.json({ error: "workspaceMeta must be an object" }, { status: 400 });
+      }
+      $set.workspaceMeta = workspaceMeta;
+    }
     if (parentPageId !== undefined) {
       if (parentPageId === id) {
         return NextResponse.json({ error: "A page cannot be its own parent" }, { status: 400 });

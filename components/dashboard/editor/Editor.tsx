@@ -856,15 +856,9 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       }}
     >
       {/* Save indicator */}
-      {saveStatus === "saving" && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 text-[11px] text-foreground/40 animate-pulse">Saving…</div>
-      )}
-      {saveStatus === "saved" && (
-        <div className="fixed top-3 left-1/2 -translate-x-1/2 z-50 text-[11px] text-emerald-500">✓ Saved</div>
-      )}
       {saveStatus === "error" && (
-        <button type="button" onClick={retryAutosave} className="fixed top-3 left-1/2 -translate-x-1/2 z-50 text-[11px] text-red-500 hover:underline">
-          Save failed — retry
+        <button type="button" onClick={retryAutosave} className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 rounded-full border border-red-500/20 bg-background px-3 py-1.5 text-xs font-medium text-red-500 shadow-lg hover:bg-red-500/10">
+          Save failed — retry now
         </button>
       )}
 
@@ -874,7 +868,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       {/* Full-width Page Cover Banner */}
       <PageCoverBanner url={coverUrl} onUpdateCover={handleCoverChange} />
 
-      <div id="editor-page-container" className="max-w-[720px] mx-auto px-4 sm:px-8 md:px-12 lg:px-20 pt-8 sm:pt-12 pb-60 select-text">
+      <div id="editor-page-container" className="mx-auto max-w-[880px] px-5 pb-60 pt-8 select-text sm:px-10 sm:pt-12 lg:px-16">
         {/* Editor Header: Cover, Icon, Title */}
         <EditorHeader
           pageEmoji={pageEmoji}
@@ -906,6 +900,8 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
               if (items[0]) focusBlock(items[0].id);
             }
           }}
+          saveStatus={saveStatus}
+          blockCount={items.filter((item) => item.text.trim() || item.type !== "paragraph").length}
         />
 
         {/* Blocks */}
@@ -953,7 +949,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
           {/* Empty state hint */}
           {items.length === 1 && !items[0].text && focusedId !== items[0].id && (
             <p
-              className="text-[15px] text-foreground/20 leading-[1.75] cursor-text select-none"
+              className="cursor-text select-none rounded-lg border border-dashed border-border/80 bg-muted/20 px-3 py-2 text-sm text-muted-foreground transition hover:border-primary/40 hover:bg-muted/40"
               onClick={() => focusBlock(items[0].id)}
             >
               Press <kbd className="font-mono text-[11px] border border-foreground/10 rounded px-1 py-0.5">/</kbd> for commands…
