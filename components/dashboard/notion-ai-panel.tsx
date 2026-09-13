@@ -21,6 +21,7 @@ import {
 import { useSession } from "next-auth/react";
 import { PricingModal } from "./pricing-modal";
 import { AnimatedBotLogo } from "./animated-bot-logo";
+import { cleanAiText } from "@/lib/clean-ai-text";
 
 interface NotionAiPanelProps {
   isOpen: boolean;
@@ -302,9 +303,10 @@ function ChatMessageText({
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
   const [insertedIdx, setInsertedIdx] = useState<number | null>(null);
 
-  if (!text) return null;
+  const cleanText = cleanAiText(text);
+  if (!cleanText) return null;
 
-  const rawBlocks = text.split("```");
+  const rawBlocks = cleanText.split("```");
   const parts: { type: "text" | "code"; content: string; lang?: string }[] = [];
 
   for (let i = 0; i < rawBlocks.length; i++) {
@@ -697,7 +699,8 @@ export function NotionAiPanel({
           ).join("\n")
         : "";
 
-      const answerText = (data.answer || "I processed your request.") + toolSummary;
+      const rawAnswer = data.answer;
+      const answerText = (rawAnswer ? cleanAiText(rawAnswer) : "I processed your request.") + toolSummary;
       const assistantMsg: ChatMessage = {
         id: createMessageId("assistant"),
         role: "assistant",

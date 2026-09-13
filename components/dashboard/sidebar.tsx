@@ -300,6 +300,11 @@ export function Sidebar({ activePage }: SidebarProps) {
   const newMenuRef = useRef<HTMLDivElement>(null);
   const [showPricing, setShowPricing] = useState(false);
   const [pages, setPages] = useState<Page[]>([]);
+  const [sharedPages, setSharedPages] = useState<Array<{
+    _id: string; title: string; icon: string;
+    sharedBy: string; sharedByEmail: string; myRole: string;
+  }>>([]);
+  const [isLoadingShared, setIsLoadingShared] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [renamingPageId, setRenamingPageId] = useState<string | null>(null);
@@ -347,11 +352,26 @@ export function Sidebar({ activePage }: SidebarProps) {
     }
   }, [router, status]);
 
+  const loadSharedPages = useCallback(async () => {
+    if (status !== "authenticated") return;
+    setIsLoadingShared(true);
+    try {
+      const res = await fetch("/api/pages/shared");
+      if (res.ok) {
+        const data = await res.json();
+        setSharedPages(data.pages ?? []);
+      }
+    } catch { /* silent */ } finally {
+      setIsLoadingShared(false);
+    }
+  }, [status]);
+
   useEffect(() => {
     if (status === "authenticated") {
       void loadPages();
+      void loadSharedPages();
     }
-  }, [status, loadPages]);
+  }, [status, loadPages, loadSharedPages]);
 
   // Refresh pages whenever the store signals a structural change
   useEffect(() => {
@@ -936,7 +956,10 @@ export function Sidebar({ activePage }: SidebarProps) {
             onClick={() => toggleSection("shared")}
             className="w-full flex items-center justify-between px-1 text-[11px] font-semibold text-muted-foreground hover:text-foreground transition text-left"
           >
-            <span>Shared</span>
+            <span className="flex items-center gap-1.5">
+              <Users className="h-3 w-3" />
+              <span>Shared</span>
+            </span>
             {expandedSections.shared ? (
               <ChevronDown className="h-3 w-3" />
             ) : (
@@ -946,18 +969,36 @@ export function Sidebar({ activePage }: SidebarProps) {
 
           {expandedSections.shared && (
             <div className="space-y-0.5">
+              {isLoadingShared && sharedPages.length === 0 && (
+                <div className="px-2 py-1.5 text-[11px] text-muted-foreground animate-pulse">Loading…</div>
+              )}
+              {sharedPages.map((page) => (
+                <div
+                  key={page._id}
+                  onClick={() => { router.push(`/dashboard/${page._id}`); setActivePage({ title: page.title }); }}
+                  className={`w-full flex items-center justify-between group px-2 py-1.5 rounded-lg transition text-left font-medium cursor-pointer ${
+                    pathname === `/dashboard/${page._id}`
+                      ? "bg-neutral-200 dark:bg-[#2c2c2c] text-foreground font-semibold shadow-sm"
+                      : "hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Users className="h-3.5 w-3.5 shrink-0 text-blue-500" />
+                    <span className="truncate text-[11px] flex-1">{page.title}</span>
+                  </div>
+                  <span
+                    title={`Shared by ${page.sharedBy || page.sharedByEmail}`}
+                    className="opacity-0 group-hover:opacity-100 text-[9px] text-muted-foreground truncate max-w-[70px] transition"
+                  >
+                    by {page.sharedBy || page.sharedByEmail}
+                  </span>
+                </div>
+              ))}
+              {!isLoadingShared && sharedPages.length === 0 && (
+                <p className="px-2 py-1 text-[11px] text-muted-foreground italic">No shared pages yet</p>
+              )}
               <button
-                onClick={() => {
-                  refreshPages();
-                  toast.info("Shared pages synced with collaborators");
-                }}
-                className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left"
-              >
-                <Users className="h-3.5 w-3.5 text-blue-500" />
-                <span className="text-[11px] truncate">Q3 Product Roadmap</span>
-              </button>
-              <button
-                onClick={() => toast.info("Use the top bar 'Share' button to invite members to any page")}
+                onClick={() => window.dispatchEvent(new CustomEvent("open-share-modal"))}
                 className="w-full flex items-center gap-2 px-2 py-1 rounded-md hover:bg-sidebar-accent text-sidebar-foreground hover:text-sidebar-accent-foreground transition text-left text-muted-foreground"
               >
                 <Plus className="h-3.5 w-3.5" />
@@ -966,6 +1007,7 @@ export function Sidebar({ activePage }: SidebarProps) {
             </div>
           )}
         </div>
+
 
         {/* Notion apps Section */}
         <div className="space-y-1">

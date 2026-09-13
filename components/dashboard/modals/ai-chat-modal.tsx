@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Sparkles, X, Send, Bot, User as UserIcon, Lock } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { PricingModal } from "../pricing-modal";
+import { cleanAiText } from "@/lib/clean-ai-text";
 
 interface AiChatModalProps {
   isOpen: boolean;
@@ -126,7 +127,7 @@ export function AiChatModal({ isOpen, onClose }: AiChatModalProps) {
                       : "bg-[#282828] border border-[#373737] text-neutral-200"
                   }`}
                 >
-                  {msg.text}
+                  {msg.role === "assistant" ? cleanAiText(msg.text) : msg.text}
                 </div>
               </div>
             ))}

@@ -43,6 +43,7 @@ import { AnimatedBotLogo, BotCharacterState } from "@/components/dashboard/anima
 import { AgentMemoryModal } from "@/components/dashboard/modals/agent-memory-modal";
 import { AgentHistoryDrawer } from "@/components/dashboard/modals/agent-history-drawer";
 import { useWorkspaceStore } from "@/store/workspace-store";
+import { cleanAiText } from "@/lib/clean-ai-text";
 
 const PricingModal = dynamic(
   () => import("@/components/dashboard/pricing-modal").then((m) => m.PricingModal),
@@ -345,7 +346,8 @@ function FormattedAssistantText({ text }: { text: string }) {
     setTimeout(() => setCopiedIndex(null), 2000);
   };
 
-  const rawBlocks = text.split(/(```[\s\S]*?```)/g);
+  const cleanedText = cleanAiText(text);
+  const rawBlocks = cleanedText.split(/(```[\s\S]*?```)/g);
 
   return (
     <div className="space-y-3 text-[15px] sm:text-[16px] leading-[1.75] text-zinc-100 font-normal">
@@ -477,7 +479,7 @@ function AssistantMessage({
     msg.text.toLowerCase().includes("error.");
 
   const copyFull = () => {
-    navigator.clipboard.writeText(msg.text);
+    navigator.clipboard.writeText(cleanAiText(msg.text));
     setCopied(true);
     toast.success("Response copied to clipboard");
     setTimeout(() => setCopied(false), 2000);
@@ -869,7 +871,7 @@ export default function AgentPage() {
           const loadedMsgs = (data.session.messages || []).map((m: any) => ({
             id: m.id || msgId(),
             role: m.role,
-            text: m.text,
+            text: m.role === "assistant" ? cleanAiText(m.text) : m.text,
             toolCalls: m.toolCalls,
             mode: m.mode || "fast",
             timestamp: new Date(m.timestamp || Date.now()),
@@ -1043,7 +1045,8 @@ export default function AgentPage() {
         });
 
         const data = await res.json().catch(() => ({}));
-        const answer = data.answer || "Request processed.";
+        const rawAnswer = data.answer;
+        const answer = (rawAnswer ? cleanAiText(rawAnswer) : "") || "Request processed.";
 
         if (data.sessionId && data.sessionId !== currentSessionId) {
           setCurrentSessionId(data.sessionId);

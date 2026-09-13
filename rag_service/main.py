@@ -594,6 +594,47 @@ Never comment on spelling, typos, or grammar in your response.""",
     }
 
 
+def _extract_text_content(content) -> str:
+    """Extract clean human-readable text from LangChain AIMessage content, which can be str, list of dicts, or list of parts."""
+    if not content:
+        return ""
+    if isinstance(content, str):
+        s = content.strip()
+        if (s.startswith("[{") or s.startswith("{")) and ("'type': 'text'" in s or '"type": "text"' in s):
+            import re
+            matches = re.findall(r"['\"]text['\"]\s*:\s*(?:\"((?:[^\"\\]|\\.)*)\"|'((?:[^'\\]|\\.)*)')", s)
+            extracted = [m[0] or m[1] for m in matches if (m[0] or m[1])]
+            if extracted:
+                cleaned = []
+                for item in extracted:
+                    try:
+                        cleaned.append(item.encode().decode("unicode-escape"))
+                    except Exception:
+                        cleaned.append(item)
+                return "\n\n".join(cleaned)
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict):
+                if item.get("type") == "text" or "text" in item:
+                    val = item.get("text", "")
+                    if isinstance(val, str):
+                        parts.append(val)
+                    elif val:
+                        parts.append(str(val))
+            elif hasattr(item, "text"):
+                parts.append(str(getattr(item, "text")))
+            elif hasattr(item, "content"):
+                parts.append(_extract_text_content(getattr(item, "content")))
+        return "\n\n".join(parts) if parts else ""
+    if hasattr(content, "text"):
+        return str(getattr(content, "text"))
+    return str(content)
+
+
 # ─── LLM Helper ───────────────────────────────────────────────────────────────
 def _llm(system: str, context: str, user_query: str, api_key: Optional[str], history: Optional[List[dict]] = None) -> str:
     clean_key = (api_key or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY") or "").strip().strip('"').strip("'")
@@ -622,7 +663,7 @@ def _llm(system: str, context: str, user_query: str, api_key: Optional[str], his
                 )
                 res = llm.invoke(prompt)
                 if res and res.content:
-                    return str(res.content)
+                    return _extract_text_content(res.content)
             except Exception as e:
                 print(f"[Gemini model {m} error] {e}")
 
@@ -661,7 +702,9 @@ async def _llm_stream(system: str, context: str, user_query: str, api_key: Optio
                 )
                 async for chunk in llm.astream(prompt):
                     if chunk and chunk.content:
-                        yield str(chunk.content)
+                        clean_chunk = _extract_text_content(chunk.content)
+                        if clean_chunk:
+                            yield clean_chunk
                 return
             except Exception as e:
                 print(f"[Gemini streaming model {m} error] {e}")
@@ -770,7 +813,7 @@ Rules:
             )
             prompt = f"{SYSTEM}\n\nMeeting Title: {req.title}\n\nFull Transcript:\n{transcript}"
             res = llm.invoke(prompt)
-            raw = str(res.content) if res and res.content else ""
+            raw = _extract_text_content(res.content) if res and res.content else ""
             # Robust JSON extraction handling fences or raw text
             json_match = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", raw, re.DOTALL)
             if json_match:
@@ -1567,7 +1610,7 @@ CRITICAL EXECUTION RULES:
             else:
                 curr_msg = llm.invoke(messages)
 
-        answer = str(curr_msg.content or "I processed your request.")
+        answer = _extract_text_content(curr_msg.content) or "I processed your request."
 
         return AgentResponse(
             answer=answer,

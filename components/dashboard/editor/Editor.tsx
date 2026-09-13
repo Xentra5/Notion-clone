@@ -60,6 +60,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [currentTitle, setCurrentTitle] = useState(activeTitle);
   const [coverUrl, setCoverUrl] = useState<string | undefined>(initialCoverImage);
+  const [showCoverPicker, setShowCoverPicker] = useState(false);
   const [items, setItems] = useState<ChecklistItem[]>(() =>
     initialBlocks && initialBlocks.length > 0 ? initialBlocks : [makeBlock("paragraph")]
   );
@@ -866,7 +867,12 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       <RemoteCursorOverlay cursors={remoteCursors} />
 
       {/* Full-width Page Cover Banner */}
-      <PageCoverBanner url={coverUrl} onUpdateCover={handleCoverChange} />
+      <PageCoverBanner
+        url={coverUrl}
+        onUpdateCover={handleCoverChange}
+        openPicker={showCoverPicker}
+        onPickerClosed={() => setShowCoverPicker(false)}
+      />
 
       <div id="editor-page-container" className="mx-auto max-w-[880px] px-5 pb-60 pt-8 select-text sm:px-10 sm:pt-12 lg:px-16">
         {/* Editor Header: Cover, Icon, Title */}
@@ -882,11 +888,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
           }}
           onEmojiSelect={handleEmojiChange}
           onEmojiClose={() => setShowEmojiPicker(false)}
-          onAddCover={() =>
-            handleCoverChange(
-              "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1600&auto=format&fit=crop"
-            )
-          }
+          onAddCover={() => setShowCoverPicker(true)}
           onAddSubPage={() => {
             const newBlock = makeBlock("page", "Untitled");
             setItems((prev) => [...prev, newBlock]);

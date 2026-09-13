@@ -2,9 +2,24 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck, MessageSquare, UserPlus, FileEdit, Sparkles, X } from "lucide-react";
-import { NotificationItem } from "@/lib/actions/notifications";
+import { Bell, CheckCheck, MessageSquare, UserPlus, FileEdit, Sparkles, X, HandshakeIcon } from "lucide-react";
 import { toast } from "sonner";
+
+// Local interface — matches the shape returned by /api/notifications (DB-backed)
+interface NotificationItem {
+  id: string;
+  recipientId?: string;
+  actorName: string;
+  actorEmail?: string;
+  actorAvatar?: string;
+  type: "page_shared" | "comment_added" | "page_edited" | "mention" | "invite_accepted";
+  title: string;
+  message: string;
+  pageId: string;
+  pageTitle?: string;
+  isRead: boolean;
+  createdAt: string;
+}
 
 interface NotificationsPopoverProps {
   isOpen: boolean;
@@ -90,6 +105,8 @@ export function NotificationsPopover({
         return <FileEdit className="h-3.5 w-3.5 text-amber-500" />;
       case "mention":
         return <Sparkles className="h-3.5 w-3.5 text-purple-500" />;
+      case "invite_accepted":
+        return <HandshakeIcon className="h-3.5 w-3.5 text-teal-500" />;
       default:
         return <Bell className="h-3.5 w-3.5 text-foreground/50" />;
     }

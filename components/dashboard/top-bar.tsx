@@ -100,6 +100,13 @@ export function TopBar({ pageId }: TopBarProps) {
     queueMicrotask(() => setRenameTitleValue(activePage.title));
   }, [activePage.title]);
 
+  // Listen for the sidebar "Invite collaborator" button to open this Share modal
+  useEffect(() => {
+    const handler = () => setShowShareModal(true);
+    window.addEventListener("open-share-modal", handler);
+    return () => window.removeEventListener("open-share-modal", handler);
+  }, []);
+
   async function handleFinishTitleRename() {
     setIsRenamingTitle(false);
     if (!pageId) return;

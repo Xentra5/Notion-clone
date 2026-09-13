@@ -5,6 +5,7 @@ import AgentMemory from "@/lib/models/agent-memory";
 import AgentSession from "@/lib/models/agent-session";
 import AgentActionLog from "@/lib/models/agent-action-log";
 import { checkRateLimit } from "@/lib/ratelimit";
+import { cleanAiText } from "@/lib/clean-ai-text";
 
 // ─── Service Configuration ────────────────────────────────────────────────────
 
@@ -131,8 +132,9 @@ export async function POST(request: NextRequest) {
       console.warn("[/api/ai/agent] Python service unreachable:", fetchErr);
     }
 
+    const rawAnswer = data?.answer;
     const answer =
-      data?.answer ||
+      (rawAnswer ? cleanAiText(rawAnswer) : "") ||
       "I received your request. Start the Python RAG service (`npm run dev`) to enable autonomous workspace actions.";
     const toolCalls = Array.isArray(data?.toolCalls) ? data.toolCalls : [];
 
