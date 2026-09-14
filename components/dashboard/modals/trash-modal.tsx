@@ -5,6 +5,7 @@ import { ArchiveRestore, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { getTrashPages, permanentlyDeletePage, restorePage, type Page } from "@/lib/actions/pages";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
+import { workspaceStore } from "@/store/workspace-store";
 
 export function TrashModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [pages, setPages] = useState<Page[]>([]);
@@ -33,6 +34,7 @@ export function TrashModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       await restorePage(id);
       await load();
       toast.success("Page restored from Trash");
+      workspaceStore.getState().refreshPages();
       window.dispatchEvent(new Event("page-updated"));
     } catch {
       toast.error("Failed to restore page");
@@ -47,6 +49,7 @@ export function TrashModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
       await permanentlyDeletePage(id);
       await load();
       toast.success("Page permanently deleted");
+      workspaceStore.getState().refreshPages();
       window.dispatchEvent(new Event("page-updated"));
     } catch {
       toast.error("Failed to permanently delete page");
