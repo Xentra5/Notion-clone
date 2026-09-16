@@ -18,6 +18,7 @@ import {
   type SlashMenuItem,
 } from "./SlashCommandMenu";
 import { EditorHeader } from "./EditorHeader";
+import { PageIcon } from "../page-icon";
 import { useAutosave } from "@/hooks/use-autosave";
 import { useCollaboration } from "@/hooks/use-collaboration";
 import { useWorkspaceStore } from "@/store/workspace-store";
@@ -992,7 +993,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                       onClick={() => router.push(`/dashboard/${child._id}`)}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <span className="text-base shrink-0">{child.icon || "📄"}</span>
+                        <PageIcon icon={child.icon} className="w-5 h-5 text-base shrink-0" />
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold text-[13px] text-foreground truncate group-hover:text-primary transition-colors">
                             {child.title || "Untitled"}

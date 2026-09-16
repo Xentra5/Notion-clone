@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect, useLayoutEffect, useCallback, memo 
 import type { ChecklistItem, KanbanColumn } from "@/hooks/use-pages";
 import { getPlaceholder } from "./SlashCommandMenu";
 import { EmojiDropdown } from "./EmojiPicker";
+import { PageIcon } from "../page-icon";
 import { CodeBlock } from "./CodeBlock";
 import { DatabaseBlock } from "./DatabaseBlock";
 import { WebBookmarkBlock } from "./WebBookmarkBlock";
@@ -297,10 +298,10 @@ export const BlockItem = memo(function BlockItem({
             <button
               type="button"
               onClick={() => setShowCalloutPicker(!showCalloutPicker)}
-              className="shrink-0 text-[18px] select-none mt-[2px] hover:scale-110 transition-transform cursor-pointer p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5"
+              className="shrink-0 text-[18px] select-none mt-[2px] hover:scale-110 transition-transform cursor-pointer p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/5 flex items-center justify-center"
               title="Change callout icon"
             >
-              {item.calloutIcon || "💡"}
+              <PageIcon icon={item.calloutIcon || "💡"} className="w-5 h-5 text-[18px]" />
             </button>
             {showCalloutPicker && (
               <div className="absolute left-4 top-12 z-50">

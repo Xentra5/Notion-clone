@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import { getTrashPages, permanentlyDeletePage, restorePage, type Page } from "@/lib/actions/pages";
 import { ConfirmModal } from "@/components/ui/confirm-modal";
 import { workspaceStore } from "@/store/workspace-store";
+import { PageIcon } from "../page-icon";
 
 export function TrashModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const [pages, setPages] = useState<Page[]>([]);
@@ -78,7 +79,10 @@ export function TrashModal({ isOpen, onClose }: { isOpen: boolean; onClose: () =
               pages.map((page) => (
                 <div key={page._id} className="flex items-center justify-between gap-3 rounded-xl p-3 hover:bg-accent transition">
                   <div className="min-w-0">
-                    <p className="truncate text-sm font-medium">{page.icon} {page.title}</p>
+                    <p className="truncate text-sm font-medium flex items-center gap-1.5">
+                      <PageIcon icon={page.icon} className="w-4 h-4 text-sm shrink-0" />
+                      <span>{page.title}</span>
+                    </p>
                     <p className="text-[11px] text-muted-foreground">Deleted page</p>
                   </div>
                   <div className="flex shrink-0 gap-1">

@@ -3,6 +3,7 @@
 import React from "react";
 import { Check, CircleAlert, Cloud, ImagePlus, Plus, SquarePen } from "lucide-react";
 import { EmojiDropdown } from "./EmojiPicker";
+import { PageIcon } from "../page-icon";
 
 export interface EditorHeaderProps {
   pageEmoji: string;
@@ -42,7 +43,14 @@ export function EditorHeader({
     </div>
 
     <div className="relative mb-3">
-      <button type="button" onClick={onEmojiClick} className="inline-block rounded-xl p-1.5 text-5xl transition hover:scale-105 hover:bg-foreground/5 active:scale-95" title="Change icon">{pageEmoji}</button>
+      <button
+        type="button"
+        onClick={onEmojiClick}
+        className="inline-flex items-center justify-center rounded-2xl p-1.5 transition hover:scale-105 hover:bg-foreground/5 active:scale-95 cursor-pointer"
+        title="Change icon"
+      >
+        <PageIcon icon={pageEmoji} className="w-16 h-16 text-5xl" />
+      </button>
       {showEmojiPicker && <EmojiDropdown onSelect={onEmojiSelect} onClose={onEmojiClose} />}
     </div>
 

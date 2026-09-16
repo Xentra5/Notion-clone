@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { getPages, createPage, type Page } from "@/lib/actions/pages";
 import { useWorkspaceStore } from "@/store/workspace-store";
+import { PageIcon } from "./page-icon";
 
 interface CommandPaletteProps {
   isOpen: boolean;
@@ -279,7 +280,7 @@ export function CommandPalette({ isOpen, onClose, onOpenAi }: CommandPaletteProp
                     }`}
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="text-base select-none shrink-0">{page.icon || "📄"}</span>
+                      <PageIcon icon={page.icon} className="w-4 h-4 text-base shrink-0" />
                       <span className="truncate font-semibold">{page.title}</span>
                     </div>
                     <span className={`text-[10px] text-muted-foreground transition shrink-0 ml-2 ${

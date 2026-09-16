@@ -11,6 +11,7 @@ import {
 
 import { getPages, type Page } from "@/lib/actions/pages";
 import { useRouter } from "next/navigation";
+import { PageIcon } from "../page-icon";
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -143,7 +144,7 @@ export function SearchModal({ isOpen, onClose, onSelectPage }: SearchModalProps)
                     }}
                     className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-left hover:bg-[#292929] transition group"
                   >
-                    <span className="shrink-0 text-base">{page.icon || "📄"}</span>
+                    <PageIcon icon={page.icon} className="w-5 h-5 text-base shrink-0" />
                     <div className="flex items-center gap-1.5 min-w-0 flex-1 truncate">
                       <span className="font-medium text-[#d4d4d4] group-hover:text-white truncate">
                         {page.title}

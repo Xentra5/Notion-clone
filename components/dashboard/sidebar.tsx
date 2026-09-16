@@ -12,6 +12,7 @@ import { RenameModal } from "@/components/ui/rename-modal";
 import { AnimatedBotLogo } from "@/components/dashboard/animated-bot-logo";
 import { getPages, createPage, updatePage, deletePage, invalidatePagesCache, type Page, type PageBlock } from "@/lib/actions/pages";
 import { localStore } from "@/lib/storage/local-store";
+import { PageIcon } from "./page-icon";
 
 import {
   Home,
@@ -150,7 +151,7 @@ function PageTreeNode({
           ) : (
             <span className="w-3.5 shrink-0" />
           )}
-          <span className="shrink-0 text-sm">{page.icon || "📄"}</span>
+          <PageIcon icon={page.icon} className="w-4 h-4 text-sm shrink-0" />
           {renamingPageId === page._id ? (
             <input
               autoFocus
@@ -244,7 +245,7 @@ function PageTreeNode({
               onClick={() => { onMoveInto(page._id, p._id); setMoveMenuPos(null); }}
               className="w-full flex items-center gap-2 px-2 py-1.5 rounded-lg hover:bg-accent text-[11px] text-foreground transition"
             >
-              <span className="shrink-0">{p.icon || "📄"}</span>
+              <PageIcon icon={p.icon} className="w-4 h-4 text-xs shrink-0" />
               <span className="truncate flex-1">{p.title}</span>
               {p.parentPageId && (
                 <span className="ml-auto text-[9px] text-muted-foreground shrink-0 italic">nested</span>
@@ -679,7 +680,7 @@ export function Sidebar({ activePage }: SidebarProps) {
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <span className="shrink-0 text-sm">{page.icon || "📄"}</span>
+                        <PageIcon icon={page.icon} className="w-4 h-4 text-sm shrink-0" />
                         <span className="truncate text-[11px] flex-1">{page.title}</span>
                       </div>
                       <button
@@ -809,7 +810,7 @@ export function Sidebar({ activePage }: SidebarProps) {
                   }`}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <span className="shrink-0 text-sm">{page.icon}</span>
+                    <PageIcon icon={page.icon} className="w-4 h-4 text-sm shrink-0" />
                     {renamingPageId === page._id ? (
                       <input
                         autoFocus
