@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import Image from "next/image";
 import {
   Code,
   Terminal,
@@ -65,7 +66,27 @@ export interface LogoDefinition {
   render: (props: { className?: string }) => React.ReactNode;
 }
 
-export const MODERN_LOGOS: LogoDefinition[] = [
+const LOCAL_LOGO_ASSETS: Record<string, string> = {
+  "logo:react": "/react-svgrepo-com.svg",
+  "logo:nextjs": "/next-js-svgrepo-com.svg",
+  "logo:typescript": "/typescript-svgrepo-com.svg",
+  "logo:javascript": "/js-svgrepo-com.svg",
+  "logo:docker": "/docker-svgrepo-com (2).svg",
+  "logo:tailwind": "/tailwind-svgrepo-com.svg",
+  "logo:vercel": "/vercel-fill-svgrepo-com.svg",
+  "logo:mongodb": "/mongodb-svgrepo-com.svg",
+  "logo:nodejs": "/nodejs-svgrepo-com.svg",
+  "logo:notion": "/notion-svgrepo-com.svg",
+};
+
+function renderLocalLogo(id: string, className: string) {
+  const src = LOCAL_LOGO_ASSETS[id];
+  if (!src) return null;
+
+  return <Image src={src} alt="" width={64} height={64} className={className} draggable={false} />;
+}
+
+const BUILT_IN_LOGOS: LogoDefinition[] = [
   {
     id: "logo:react",
     name: "React",
@@ -140,14 +161,14 @@ export const MODERN_LOGOS: LogoDefinition[] = [
     category: "Logos & Tech",
     tags: ["python", "py", "backend", "ai", "machine learning", "data"],
     render: ({ className = "w-full h-full" }) => (
-      <svg viewBox="0 0 110 110" className={className}>
+      <svg viewBox="0 0 128 128" className={className}>
         <path
-          d="M54.4 2C30.3 2 31.8 12.4 31.8 12.4l.03 10.8h23.2v3.3H22.4S6.8 24.7 6.8 49.3c0 24.6 13.6 23.7 13.6 23.7h8.1v-11.4s-.4-13.6 13.4-13.6h23v-19s.4-13.6-13.4-13.6zm-11.6 7.4a3.8 3.8 0 1 1 0 7.6 3.8 3.8 0 0 1 0-7.6z"
           fill="#3776AB"
+          d="M63.6 2.1c-13.6 0-22.7 1.5-26.8 3.3-6.2 2.8-10.9 8.2-10.9 19.3v14.2h37.7v5.3H26c-11.1 0-18.7 6.7-21.8 13.9-3.6 8.3-3.6 20.3 0 29.5 3 7.7 8.5 13.9 19.6 13.9h12.7V85.7c0-8.9 7.7-16.7 16.7-16.7h37.6c7.5 0 13.7-6.2 13.7-13.7V24.7c0-7.3-6.4-13.1-13.7-14.7-6.7-1.5-20.7-7.9-27.1-7.9zm-13.8 11.4c3.7 0 6.7 3 6.7 6.7s-3 6.7-6.7 6.7-6.7-3-6.7-6.7 3-6.7 6.7-6.7z"
         />
         <path
-          d="M55.6 108c24.1 0 22.6-10.4 22.6-10.4l-.03-10.8H55v-3.3h32.6s15.6 1.8 15.6-22.8c0-24.6-13.6-23.7-13.6-23.7h-8.1v11.4s.4 13.6-13.4 13.6H45.1v19s-.4 13.6 13.4 13.6zm11.6-7.4a3.8 3.8 0 1 1 0-7.6 3.8 3.8 0 0 1 0 7.6z"
           fill="#FFD43B"
+          d="M64.4 125.9c13.6 0 22.7-1.5 26.8-3.3 6.2-2.8 10.9-8.2 10.9-19.3V89.1H64.4v-5.3h37.7c11.1 0 18.7-6.7 21.8-13.9 3.6-8.3 3.6-20.3 0-29.5-3-7.7-8.5-13.9-19.6-13.9H91.6v15.8c0 8.9-7.7 16.7-16.7 16.7H37.3c-7.5 0-13.7 6.2-13.7 13.7v30.6c0 7.3 6.4 13.1 13.7 14.7 6.7 1.5 20.7 7.9 27.1 7.9zm13.8-11.4c-3.7 0-6.7-3-6.7-6.7s3-6.7 6.7-6.7 6.7 3 6.7 6.7-3 6.7-6.7 6.7z"
         />
       </svg>
     ),
@@ -173,11 +194,8 @@ export const MODERN_LOGOS: LogoDefinition[] = [
     category: "Logos & Tech",
     tags: ["openai", "chatgpt", "ai", "llm", "gpt", "model"],
     render: ({ className = "w-full h-full" }) => (
-      <svg viewBox="0 0 100 100" className={className} fill="none">
-        <path
-          d="M87.4 39.5a24.2 24.2 0 0 0-1.8-17.7 24.7 24.7 0 0 0-14.7-11.7 24.4 24.4 0 0 0-21.4 3.7 24.3 24.3 0 0 0-15.3 7.8 24.6 24.6 0 0 0-5.8 17.6 24.3 24.3 0 0 0-14.6 11.8 24.4 24.4 0 0 0 1.8 24.6 24.5 24.5 0 0 0 14.7 11.7 24.4 24.4 0 0 0 21.4-3.7 24.3 24.3 0 0 0 15.3-7.8 24.6 24.6 0 0 0 5.8-17.6 24.3 24.3 0 0 0 14.6-11.8 24.4 24.4 0 0 0-1.8-24.6zm-34.9 50.4a15.4 15.4 0 0 1-10.4-4.2l1.6-2.7 12.6-7.3a4.6 4.6 0 0 0 2.3-4v-16.7l5 2.9v17.8a15.6 15.6 0 0 1-11.1 14.2zm-31-15.3a15.4 15.4 0 0 1-1.6-11.1l2.8.5 14.3 4.2a4.6 4.6 0 0 0 4.5-1.3l14.4-14.5-4.3-2.5-14.7 8.5a15.6 15.6 0 0 1-15.4-3.8zm-8.8-33.5a15.4 15.4 0 0 1 8.8-7l1.2 2.9 1.7 14.5a4.6 4.6 0 0 0 2.3 3.9l14.5 8.4-4.3 2.5-14.7-8.5a15.6 15.6 0 0 1-9.5-16.7zm49.5-15.5l-14.5-8.4 4.3-2.5 14.7 8.5a15.6 15.6 0 0 1 9.5 16.7 15.4 15.4 0 0 1-8.8 7l-1.2-2.9-1.7-14.5a4.6 4.6 0 0 0-2.3-3.9zm24.7 24.7a15.4 15.4 0 0 1 1.6 11.1l-2.8-.5-14.3-4.2a4.6 4.6 0 0 0-4.5 1.3L52.5 72.6l4.3 2.5 14.7-8.5a15.6 15.6 0 0 1 15.4 3.8zm-25.1-4.7l-7.8-4.5 7.8-4.5 7.8 4.5v9l-7.8-4.5z"
-          fill="#10A37F"
-        />
+      <svg viewBox="0 0 24 24" className={className} fill="#10A37F">
+        <path d="M22.28 9.82a5.98 5.98 0 0 0-.51-4.91 6.05 6.05 0 0 0-6.51-2.9A6.06 6.06 0 0 0 4.98 4.18a5.98 5.98 0 0 0-4 2.9 6.05 6.05 0 0 0 .75 7.1 5.98 5.98 0 0 0 .51 4.91 6.05 6.05 0 0 0 6.51 2.9A5.98 5.98 0 0 0 13.26 24a6.05 6.05 0 0 0 5.77-4.2 5.99 5.99 0 0 0 4-2.9 6.05 6.05 0 0 0-.75-7.08zm-9.02 12.61a4.48 4.48 0 0 1-2.88-1.04l.14-.08 4.78-2.76a.8.8 0 0 0 .4-.68v-6.74l2.02 1.17a.07.07 0 0 1 .04.05v5.58a4.5 4.5 0 0 1-4.5 4.5zm-9.66-4.13a4.47 4.47 0 0 1-.54-3.01l.14.08 4.79 2.76a.77.77 0 0 0 .78 0l5.84-3.37v2.33a.08.08 0 0 1-.03.06L9.74 19.95a4.5 4.5 0 0 1-6.14-1.65zM2.34 7.9a4.48 4.48 0 0 1 2.37-1.98v5.68a.77.77 0 0 0 .39.68l5.81 3.35-2.02 1.17a.08.08 0 0 1-.07 0l-4.83-2.79A4.5 4.5 0 0 1 2.34 7.9zm16.1 3.85-5.84-3.37 2.02-1.16a.08.08 0 0 1 .07 0l4.83 2.79a4.5 4.5 0 0 1-.68 8.1v-5.68a.8.8 0 0 0-.4-.68zm2.01-3.02-.14-.09-4.77-2.78a.78.78 0 0 0-.79 0L9.41 9.23V6.9a.07.07 0 0 1 .03-.06l4.83-2.79a4.5 4.5 0 0 1 6.68 4.66zM8.31 12.86l-2.02-1.16a.08.08 0 0 1-.04-.06V6.07a4.5 4.5 0 0 1 7.38-3.45l-.14.08-4.79 2.76a.8.8 0 0 0-.39.68zm1.1-2.36 2.6-1.5 2.6 1.5v3l-2.6 1.5-2.6-1.5z" />
       </svg>
     ),
   },
@@ -303,19 +321,8 @@ export const MODERN_LOGOS: LogoDefinition[] = [
     category: "Logos & Tech",
     tags: ["rust", "rustlang", "systems", "cargo", "wasm"],
     render: ({ className = "w-full h-full" }) => (
-      <svg viewBox="0 0 106 106" className={className} fill="currentColor">
-        <circle cx="53" cy="53" r="46" fill="none" stroke="currentColor" strokeWidth="6" strokeDasharray="9 4" />
-        <text
-          x="50%"
-          y="62%"
-          textAnchor="middle"
-          fontSize="48"
-          fontWeight="900"
-          fontFamily="sans-serif"
-          fill="currentColor"
-        >
-          R
-        </text>
+      <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+        <path d="M12 0C5.373 0 0 5.373 0 12s5.373 12 12 12 12-5.373 12-12S18.627 0 12 0zm0 2.2a9.8 9.8 0 1 1 0 19.6 9.8 9.8 0 0 1 0-19.6zm1.75 15.3h-2.5v-4.5H9.5v4.5H7V6.5h4.25c2.62 0 4.75 1.9 4.75 4.25 0 1.47-.74 2.76-1.87 3.52l2.62 3.23zm-2.5-6.5c1.24 0 2.25-.8 2.25-1.75s-1.01-1.75-2.25-1.75H9.5v3.5h1.75z"/>
       </svg>
     ),
   },
@@ -325,20 +332,9 @@ export const MODERN_LOGOS: LogoDefinition[] = [
     category: "Logos & Tech",
     tags: ["go", "golang", "google", "backend", "concurrency"],
     render: ({ className = "w-full h-full" }) => (
-      <svg viewBox="0 0 120 120" className={className}>
-        <rect width="120" height="120" rx="24" fill="#00ACD7" />
-        <text
-          x="50%"
-          y="64%"
-          textAnchor="middle"
-          fontSize="46"
-          fontWeight="900"
-          fontStyle="italic"
-          fontFamily="system-ui, sans-serif"
-          fill="#FFFFFF"
-        >
-          GO
-        </text>
+      <svg viewBox="0 0 24 24" className={className}>
+        <rect width="24" height="24" rx="5" fill="#00ACD7"/>
+        <path d="M11.6 13.8c-.3.8-.9 1.4-1.7 1.8-.8.4-1.8.6-2.9.6-1.5 0-2.7-.4-3.6-1.3-.9-.9-1.4-2.1-1.4-3.7 0-1.6.5-2.8 1.4-3.7.9-.9 2.1-1.3 3.6-1.3 1.1 0 2 .2 2.8.7.7.5 1.3 1.1 1.6 1.9l-2 .9c-.2-.5-.5-.9-.9-1.1-.4-.3-.9-.4-1.5-.4-.9 0-1.6.3-2.1.9-.5.6-.8 1.5-.8 2.6 0 1.1.3 2 .8 2.6.5.6 1.2.9 2.1.9.6 0 1.1-.1 1.5-.4.4-.3.7-.7.9-1.2h-2.5v-1.8h4.6v2.1zm8.4-.7c0 1-.3 1.9-.8 2.6-.5.7-1.2 1.3-2.1 1.6-.9.4-1.9.5-3 .5s-2.1-.2-3-.6c-.9-.4-1.6-.9-2.1-1.6-.5-.7-.8-1.6-.8-2.6 0-1 .3-1.9.8-2.6.5-.7 1.2-1.3 2.1-1.6.9-.4 1.9-.5 3-.5s2.1.2 3 .6c.9.4 1.6.9 2.1 1.6.5.7.8 1.6.8 2.6zm-2.4 0c0-.7-.2-1.3-.6-1.8-.4-.5-1-.7-1.8-.7s-1.4.2-1.8.7c-.4.5-.6 1.1-.6 1.8s.2 1.3.6 1.8c.4.5 1 .7 1.8.7s1.4-.2 1.8-.7c.4-.5.6-1.1.6-1.8z" fill="#FFFFFF"/>
       </svg>
     ),
   },
@@ -407,19 +403,19 @@ export const MODERN_LOGOS: LogoDefinition[] = [
     category: "Logos & Tech",
     tags: ["vscode", "editor", "code", "microsoft", "ide"],
     render: ({ className = "w-full h-full" }) => (
-      <svg viewBox="0 0 100 100" className={className} fill="none">
+      <svg viewBox="0 0 24 24" className={className} fill="none">
         <path
-          d="M74 92L96 81V19L74 8l-42 34-18-14-8 5v34l8 5 18-14 42 34z"
+          d="M23.15 2.587L18.21.21a1.494 1.494 0 0 0-1.705.29l-9.46 8.63-4.12-3.128a.999.999 0 0 0-1.276.057L.327 7.261A1 1 0 0 0 .326 8.74L3.899 12 .326 15.26a1 1 0 0 0 .001 1.479L1.65 17.94a.999.999 0 0 0 1.276.057l4.12-3.128 9.46 8.63a1.492 1.492 0 0 0 1.704.29l4.94-2.377A1.5 1.5 0 0 0 24 20.06V3.939a1.5 1.5 0 0 0-.85-1.352z"
           fill="#007ACC"
         />
         <path
-          d="M74 92V8l22 11v62L74 92z"
-          fill="#1F9CF0"
+          d="M18.004 6.552V17.448L10.826 12l7.178-5.448z"
+          fill="#0065A9"
+          fillOpacity="0.5"
         />
         <path
-          d="M74 50L32 18 6 34l26 16 42-16z"
-          fill="#0065A9"
-          fillOpacity="0.4"
+          d="M18.004 6.552L24 3.939v16.122l-5.996-2.613V6.552z"
+          fill="#1F9CF0"
         />
       </svg>
     ),
@@ -430,8 +426,8 @@ export const MODERN_LOGOS: LogoDefinition[] = [
     category: "Logos & Tech",
     tags: ["apple", "mac", "ios", "macos", "iphone"],
     render: ({ className = "w-full h-full" }) => (
-      <svg viewBox="0 0 170 170" className={className} fill="currentColor">
-        <path d="M150.37 130.25c-2.45 5.66-5.35 10.87-8.71 15.66-4.58 6.53-8.33 11.05-11.22 13.56-4.48 4.12-9.28 6.23-14.42 6.35-3.69 0-8.14-1.05-13.32-3.18-5.19-2.12-9.97-3.17-14.34-3.17-4.58 0-9.49 1.05-14.75 3.17-5.26 2.13-9.5 3.24-12.74 3.35-4.35.13-9.16-1.9-14.42-6.08-3.69-3.08-7.7-7.94-12.04-14.57-6.5-9.98-11.59-21.46-15.28-34.46-3.68-13-5.52-25.29-5.52-36.87 0-14.73 3.68-26.69 11.04-35.88 7.36-9.18 16.59-13.9 27.69-14.15 4.93 0 10.45 1.34 16.56 4.02 6.11 2.68 10.05 4.07 11.82 4.17 1.45-.1 5.48-1.52 12.08-4.27 6.6-2.74 12.08-4.02 16.45-3.83 11.9.83 21.6 5.17 29.11 13.02-10.42 6.31-15.53 15.03-15.34 26.16.2 9.07 3.59 16.63 10.18 22.68 6.58 6.05 14.44 9.48 23.57 10.3-.9 5.37-2.32 11.05-4.25 17.06zM119.22 33.56c0-7.39 2.65-14.36 7.95-20.91 5.3-6.55 11.95-10.74 19.95-12.56.22 1.35.33 2.58.33 3.69 0 7.27-2.73 14.28-8.19 21.03-5.46 6.75-12.22 10.9-20.27 12.44-.22-1.23-.33-2.46-.33-3.69z" />
+      <svg viewBox="0 0 24 24" className={className} fill="currentColor">
+        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.81-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M15.97 6.37c.62-.75 1.04-1.8 1.01-2.87-.96.04-2.11.64-2.79 1.44-.59.69-1.12 1.77-1.01 2.84 1.08.08 2.18-.58 2.79-1.41z" />
       </svg>
     ),
   },
@@ -586,16 +582,31 @@ export const MODERN_LOGOS: LogoDefinition[] = [
     render: ({ className = "w-full h-full" }) => (
       <svg viewBox="0 0 100 100" className={className}>
         <path
-          d="M50 15c-24 0-38 18-38 38 0 18 16 32 38 32s38-14 38-32c0-20-14-38-38-38z"
-          fill="#FBF0DF"
+          d="M50 14c-5 0-8 4-8 4s-4-2-9 0-15 8-19 17-8 21-4 33 15 25 39 25 35-13 39-25 0-24-4-33-14-15-19-17-7 0-9 0 0-4-9-4z"
+          fill="#FFF6E9"
           stroke="#E5C7A2"
-          strokeWidth="4"
+          strokeWidth="3"
         />
-        <circle cx="38" cy="52" r="4" fill="#332211" />
-        <circle cx="62" cy="52" r="4" fill="#332211" />
-        <path d="M44 62c3 3 9 3 12 0" stroke="#332211" strokeWidth="3" strokeLinecap="round" fill="none" />
-        <ellipse cx="32" cy="58" rx="4" ry="2.5" fill="#F8B4B4" />
-        <ellipse cx="68" cy="58" rx="4" ry="2.5" fill="#F8B4B4" />
+        <path
+          d="M44 14c2-4 5-5 8-3s3 5 0 8M48 13c1 3 0 6-3 8"
+          stroke="#D4B38C"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <circle cx="37" cy="52" r="4.5" fill="#2C1A0E" />
+        <circle cx="38.5" cy="50.5" r="1.5" fill="#FFFFFF" />
+        <circle cx="63" cy="52" r="4.5" fill="#2C1A0E" />
+        <circle cx="64.5" cy="50.5" r="1.5" fill="#FFFFFF" />
+        <path
+          d="M45 61c2.5 3 7.5 3 10 0"
+          stroke="#2C1A0E"
+          strokeWidth="3"
+          strokeLinecap="round"
+          fill="none"
+        />
+        <ellipse cx="28" cy="58" rx="5.5" ry="3.5" fill="#FFAAA6" fillOpacity="0.85" />
+        <ellipse cx="72" cy="58" rx="5.5" ry="3.5" fill="#FFAAA6" fillOpacity="0.85" />
       </svg>
     ),
   },
@@ -605,18 +616,27 @@ export const MODERN_LOGOS: LogoDefinition[] = [
     category: "Logos & Tech",
     tags: ["aws", "amazon", "cloud", "serverless", "devops"],
     render: ({ className = "w-full h-full" }) => (
-      <svg viewBox="0 0 100 65" className={className}>
-        <text x="50%" y="38" textAnchor="middle" fontSize="30" fontWeight="900" fill="currentColor" fontFamily="sans-serif">
-          aws
-        </text>
+      <svg viewBox="0 0 100 65" className={className} fill="none">
         <path
-          d="M18 46c20 12 44 12 64 0"
-          stroke="#FF9900"
-          strokeWidth="5"
-          strokeLinecap="round"
-          fill="none"
+          d="M26.2 31.8c-1.8 0-3.3.4-4.5 1.2-1.2.8-1.8 2-1.8 3.5 0 1.5.5 2.7 1.5 3.5 1 .8 2.4 1.2 4.1 1.2 1.7 0 3.1-.4 4.2-1.2 1.1-.8 1.7-2 1.7-3.5v-1.4c-1.1-1.3-2.8-3.3-5.2-3.3zm3.7-5v2.8c-1.6-1.6-3.8-2.5-6.2-2.5-2.8 0-5.1.9-7 2.8-1.9 1.9-2.9 4.3-2.9 7.2 0 2.9 1 5.3 2.9 7.2 1.9 1.9 4.2 2.8 7 2.8 2.5 0 4.6-.9 6.2-2.5v2.5h4.6V26.8h-4.6z"
+          fill="currentColor"
         />
-        <polygon points="84,43 85,52 76,49" fill="#FF9900" />
+        <path
+          d="M51.5 44.5l4.6-17.7h-4.3l-2.7 12.5-2.8-12.5h-4.1l-2.8 12.5-2.7-12.5h-4.3l4.6 17.7h4.4l2.9-12.4 2.9 12.4h4.3z"
+          fill="currentColor"
+        />
+        <path
+          d="M68.5 40.5c1.6.9 3.5 1.4 5.5 1.4 2.4 0 3.6-.8 3.6-2.4 0-.8-.4-1.5-1.2-2-.8-.5-2.1-1-3.9-1.5-2.8-.8-4.6-1.8-5.7-3-1.1-1.2-1.7-2.8-1.7-4.8 0-2.4 1-4.3 2.8-5.7 1.8-1.4 4.3-2.2 7.3-2.2 2.2 0 4.3.5 5.9 1.5l-1.6 3.4c-1.6-1-3.2-1.4-4.8-1.4-2.2 0-3.3.8-3.3 2.2 0 .8.4 1.4 1 1.8.8.4 2.1 1 4.1 1.5 2.8.8 4.8 1.8 5.9 3 1.1 1.2 1.8 2.8 1.8 5 0 2.6-1 4.5-3 5.9-1.8 1.4-4.5 2.2-7.8 2.2-2.6 0-5.2-.6-7.3-1.8l1.4-3.6z"
+          fill="currentColor"
+        />
+        <path
+          d="M16 49.5c17 10 39 10 57 0 .6-.3.8-.9.2-1.3-.6-.3-1.5-.2-2 .1-16.7 9.2-37.3 9.2-53.5 0-.6-.3-1.3 0-1.7 1.2z"
+          fill="#FF9900"
+        />
+        <path
+          d="M74 45.5c-.6-.8-3.5-.3-5.5 0-.6.1-.6.6 0 .9 1.6.9 4.3 1 4.9.3.7-.6.7-1.1.6-1.2z"
+          fill="#FF9900"
+        />
       </svg>
     ),
   },
@@ -629,7 +649,7 @@ export const MODERN_LOGOS: LogoDefinition[] = [
       <svg viewBox="0 0 100 100" className={className}>
         <rect width="100" height="100" rx="22" fill="#635BFF" />
         <path
-          d="M48 38c0-2.8 2.2-4.2 6.2-4.2 5.5 0 12.3 2.1 16.5 4.6V26.2c-5-2.1-10.7-3.2-16.5-3.2-13.6 0-22.7 7-22.7 18.7 0 18.4 25.2 15.5 25.2 23.4 0 3.3-3 4.5-7.2 4.5-6.3 0-14.2-2.7-19-5.6v12.5c5.6 2.4 12.3 3.5 19 3.5 14 0 23.7-6.9 23.7-18.9 0-19.9-25.2-16.4-25.2-23.1z"
+          d="M46.7 41.5c0-2.8 2.3-3.9 6-3.9 5.3 0 12 1.7 16.3 4V28.2c-4.9-1.9-10.4-2.8-16.3-2.8-13.3 0-22.2 7-22.2 18.7 0 18.3 25.1 15.4 25.1 23.3 0 3.3-2.9 4.4-7 4.4-6.1 0-13.9-2.5-18.8-5.3v13.5c5.4 2.3 11.9 3.3 18.4 3.3 13.8 0 23.5-6.8 23.5-18.7 0-19.8-25-16.4-25-23.1z"
           fill="#FFFFFF"
         />
       </svg>
@@ -657,6 +677,15 @@ function makeLucideIcon(
     ),
   };
 }
+
+export const MODERN_LOGOS: LogoDefinition[] = BUILT_IN_LOGOS.map((logo) => {
+  if (!LOCAL_LOGO_ASSETS[logo.id]) return logo;
+
+  return {
+    ...logo,
+    render: ({ className = "w-full h-full" }) => renderLocalLogo(logo.id, className),
+  };
+});
 
 export const MODERN_ICONS: LogoDefinition[] = [
   makeLucideIcon("terminal", "Terminal", Terminal, ["command", "cli", "bash", "code"], "text-emerald-500"),
