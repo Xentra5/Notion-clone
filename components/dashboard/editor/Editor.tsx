@@ -27,6 +27,9 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import type { ChecklistItem, BlockType, KanbanColumn } from "@/hooks/use-pages";
 import { parseMarkdownToBlocks } from "@/lib/markdown-blocks";
+import { InlineAiSelectionMenu } from "./InlineAiSelectionMenu";
+import { InlineAiGenerator } from "./InlineAiGenerator";
+import { useGhostwriter } from "@/hooks/use-ghostwriter";
 import {
   Plus,
   FileText,
@@ -79,6 +82,36 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
   useEffect(() => {
     setStoreCollaborators(collaborators);
   }, [collaborators, setStoreCollaborators]);
+
+  // Real-time text selection for inline AI floating menu
+  const [selectedText, setSelectedText] = useState("");
+  const [selectionRect, setSelectionRect] = useState<DOMRect | null>(null);
+  const [activeAiGeneratorBlockId, setActiveAiGeneratorBlockId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed || !sel.rangeCount) {
+        return;
+      }
+      const text = sel.toString().trim();
+      if (text.length >= 2) {
+        try {
+          const range = sel.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          if (rect && (rect.width > 0 || rect.height > 0)) {
+            setSelectedText(text);
+            setSelectionRect(rect);
+          }
+        } catch {
+          // ignore selection errors
+        }
+      }
+    };
+
+    document.addEventListener("selectionchange", handleSelectionChange);
+    return () => document.removeEventListener("selectionchange", handleSelectionChange);
+  }, []);
 
   const { scheduleAutosave, immediatelySave, cancelAutosave, retryAutosave, markDirty } = useAutosave({
     pageId,
@@ -552,6 +585,12 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       return;
     }
 
+    if (targetItem?.action === "ai_generate") {
+      setItems((prev) => prev.map((b) => (b.id === bid ? { ...b, text: "" } : b)));
+      setActiveAiGeneratorBlockId(bid);
+      return;
+    }
+
     setItems(prev => {
       const idx = prev.findIndex(b => b.id === bid);
       if (idx < 0) return prev;
@@ -815,6 +854,96 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     }
   }, [items, slash, slashFiltered, slashIdx, applySlash, focusBlock]);
 
+  const focusedBlock = useMemo(() => items.find((b) => b.id === focusedId), [items, focusedId]);
+  const precedingText = useMemo(() => {
+    if (!focusedId) return "";
+    const idx = items.findIndex((b) => b.id === focusedId);
+    if (idx <= 0) return "";
+    return items.slice(Math.max(0, idx - 3), idx).map((b) => b.text).join("\n");
+  }, [items, focusedId]);
+
+  const {
+    ghostText,
+    isEnabled: isGhostwriterEnabled,
+    toggleEnabled: toggleGhostwriter,
+    acceptGhost,
+    dismissGhost,
+  } = useGhostwriter({
+    pageTitle: currentTitle,
+    focusedBlockId: focusedId,
+    focusedBlockText: focusedBlock?.text || "",
+    precedingText,
+    onApplyGhostText: (bid, newText) => {
+      updateText(bid, newText);
+      const el = blockRefs.current.get(bid);
+      if (el) {
+        el.innerText = newText;
+        focusBlock(bid, true);
+      }
+    },
+  });
+
+  const handleReplaceSelection = useCallback((newText: string) => {
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      try {
+        const range = sel.getRangeAt(0);
+        range.deleteContents();
+        const textNode = document.createTextNode(newText);
+        range.insertNode(textNode);
+        range.setStartAfter(textNode);
+        range.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(range);
+      } catch {
+        // fallback
+      }
+    }
+    if (focusedId) {
+      const el = blockRefs.current.get(focusedId);
+      if (el) {
+        updateText(focusedId, el.innerText);
+      }
+    }
+    setSelectionRect(null);
+    setSelectedText("");
+  }, [focusedId, updateText]);
+
+  const handleInsertBelow = useCallback((newText: string) => {
+    const parsed = parseMarkdownToBlocks(newText);
+    const blocksToInsert = parsed.length > 0 ? parsed : [makeBlock("paragraph", newText)];
+    setItems((prev) => {
+      const idx = focusedId ? prev.findIndex((b) => b.id === focusedId) : prev.length - 1;
+      const next = [...prev];
+      if (idx >= 0) {
+        next.splice(idx + 1, 0, ...blocksToInsert);
+      } else {
+        next.push(...blocksToInsert);
+      }
+      return next;
+    });
+    setSelectionRect(null);
+    setSelectedText("");
+  }, [focusedId]);
+
+  const handleTriggerInlineAi = useCallback((blockId: string) => {
+    setActiveAiGeneratorBlockId(blockId);
+  }, []);
+
+  const handleApplyAiGeneratedBlocks = useCallback((targetBlockId: string, newBlocks: ChecklistItem[]) => {
+    setItems((prev) => {
+      const idx = prev.findIndex((b) => b.id === targetBlockId);
+      if (idx < 0) return [...prev, ...newBlocks];
+      const next = [...prev];
+      next.splice(idx, 1, ...newBlocks);
+      return next;
+    });
+    setActiveAiGeneratorBlockId(null);
+    if (newBlocks.length > 0) {
+      setTimeout(() => focusBlock(newBlocks[0].id, true), 50);
+    }
+  }, [focusBlock]);
+
   if (isAiMeetingNote || activeTitle === "AI Meeting Note") {
     return (
       <MeetingNoteView
@@ -825,7 +954,6 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       />
     );
   }
-
 
   return (
     <div
@@ -875,8 +1003,22 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
         onPickerClosed={() => setShowCoverPicker(false)}
       />
 
+      {/* Floating Selection AI Menu */}
+      {selectionRect && selectedText && (
+        <InlineAiSelectionMenu
+          selectedText={selectedText}
+          selectionRect={selectionRect}
+          onReplaceSelection={handleReplaceSelection}
+          onInsertBelow={handleInsertBelow}
+          onClose={() => {
+            setSelectionRect(null);
+            setSelectedText("");
+          }}
+        />
+      )}
+
       <div id="editor-page-container" className="mx-auto max-w-[880px] px-5 pb-60 pt-8 select-text sm:px-10 sm:pt-12 lg:px-16">
-        {/* Editor Header: Cover, Icon, Title */}
+        {/* Editor Header: Cover, Icon, Title, Ghostwriter toggle */}
         <EditorHeader
           pageEmoji={pageEmoji}
           showEmojiPicker={showEmojiPicker}
@@ -905,6 +1047,8 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
           }}
           saveStatus={saveStatus}
           blockCount={items.filter((item) => item.text.trim() || item.type !== "paragraph").length}
+          isGhostwriterEnabled={isGhostwriterEnabled}
+          onToggleGhostwriter={toggleGhostwriter}
         />
 
         {/* Blocks */}
@@ -918,6 +1062,10 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                   item={item}
                   seqNumber={seqNumber}
                   isFocused={focusedId === item.id}
+                  ghostText={focusedId === item.id ? ghostText : undefined}
+                  onAcceptGhost={acceptGhost}
+                  onDismissGhost={dismissGhost}
+                  onTriggerInlineAi={handleTriggerInlineAi}
                   onFocus={setFocusedId}
                   onUpdateText={updateText}
                   onUpdateLanguage={updateLanguage}
@@ -936,6 +1084,17 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                   onSelectSubPage={onSelectSubPage}
                   registerRef={registerRef}
                 />
+
+                {/* Inline AI Generator attached to this block */}
+                {activeAiGeneratorBlockId === item.id && (
+                  <InlineAiGenerator
+                    blockId={item.id}
+                    pageTitle={currentTitle}
+                    pageContext={getPagePlainText()}
+                    onApplyBlocks={handleApplyAiGeneratedBlocks}
+                    onClose={() => setActiveAiGeneratorBlockId(null)}
+                  />
+                )}
 
                 {/* Slash menu attached to this block */}
                 {slash.open && slash.blockId === item.id && (

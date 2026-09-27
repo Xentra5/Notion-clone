@@ -60,6 +60,7 @@ The following table provides a complete, transparent breakdown of what is fully 
 | Feature / System | Status | Implementation Details & Backing Files |
 | :--- | :---: | :--- |
 | **Block Editor Engine** | `✅ Fully Implemented` | Text, H1–H3, To-do, Bullets, Numbers, Toggle, Callout, Quote, Divider, Table, Web Bookmarks, File Upload, Code Blocks, AI Meeting Notes ([components/dashboard/editor/BlockItem.tsx](file:///d:/notion/components/dashboard/editor/BlockItem.tsx), [BlockRenderer.tsx](file:///d:/notion/components/dashboard/editor/BlockRenderer.tsx)). |
+| **Inline AI Copilot & Ghostwriter** | `✅ Fully Implemented` | Floating selection "Ask AI" menu (tone, translate, summarize, rewrite), empty-block Spacebar AI generator, and inline Ghostwriter autocompletion with Tab-to-accept ([InlineAiSelectionMenu.tsx](file:///d:/notion/components/dashboard/editor/InlineAiSelectionMenu.tsx), [InlineAiGenerator.tsx](file:///d:/notion/components/dashboard/editor/InlineAiGenerator.tsx), [use-ghostwriter.ts](file:///d:/notion/hooks/use-ghostwriter.ts), [app/api/ai/inline/route.ts](file:///d:/notion/app/api/ai/inline/route.ts)). |
 | **Icon & Logo Registry Engine** | `✅ Fully Implemented` | 50+ high-fidelity vector brand logos (React, Next.js, Docker, etc.), curated modern Lucide icons, universal PageIcon renderer (`logo:*`, `icon:*`, URLs, emojis), and tabbed EmojiPicker with fuzzy tag search ([icon-registry.tsx](file:///d:/notion/components/dashboard/icon-registry.tsx), [page-icon.tsx](file:///d:/notion/components/dashboard/page-icon.tsx), [EmojiPicker.tsx](file:///d:/notion/components/dashboard/editor/EmojiPicker.tsx)). |
 | **Multi-View Databases** | `✅ Fully Implemented` | Kanban Board with drag-and-drop, Gantt Timeline, and Table Grid with inline cell editing ([KanbanBoard.tsx](file:///d:/notion/components/dashboard/editor/KanbanBoard.tsx), [TimelineView.tsx](file:///d:/notion/components/dashboard/editor/TimelineView.tsx), [TableView.tsx](file:///d:/notion/components/dashboard/editor/TableView.tsx)). |
 | **Autonomous AI Agent** | `✅ Fully Implemented` | 4 Personas, Fast/Think/DeepSearch modes, LangChain tool execution, long-term memory, session history, emotive animated bot logo ([app/dashboard/agent/page.tsx](file:///d:/notion/app/dashboard/agent/page.tsx), [rag_service/main.py](file:///d:/notion/rag_service/main.py)). |
@@ -116,11 +117,27 @@ The following table provides a complete, transparent breakdown of what is fully 
 ### 2. Block Editor & Dynamic Canvas
 - **Modular Block Architecture ([components/dashboard/editor/BlockItem.tsx](file:///d:/notion/components/dashboard/editor/BlockItem.tsx))**: Deconstructed into lightweight, memoized block items to eliminate unnecessary re-renders during rapid editing.
 - **Extensive Block Catalog**: Text, Headings (`H1`, `H2`, `H3`), Checklists/Todos, Bulleted/Numbered Lists, Callouts, Toggle Blocks, Blockquotes, Dividers, Tables, Web Bookmarks, File Uploads, Kanban Databases, Code Blocks, and AI Meeting Notes.
-- **Slash Command Menu ([components/dashboard/editor/SlashCommandMenu.tsx](file:///d:/notion/components/dashboard/editor/SlashCommandMenu.tsx))**: Type `/` to open a categorized quick-insert menu with keyboard navigation.
+- **Slash Command Menu ([components/dashboard/editor/SlashCommandMenu.tsx](file:///d:/notion/components/dashboard/editor/SlashCommandMenu.tsx))**: Type `/` to open a categorized quick-insert menu with keyboard navigation, now featuring direct `/ai` drafting triggers.
 - **Markdown Block Parser ([lib/markdown-blocks.ts](file:///d:/notion/lib/markdown-blocks.ts))**: Paste raw Markdown directly into the editor to automatically convert it into native Notion blocks.
 - **Unsplash Cover Banner Engine ([components/dashboard/editor/PageCoverBanner.tsx](file:///d:/notion/components/dashboard/editor/PageCoverBanner.tsx))**: Full-width page headers with direct Unsplash photo search ([app/api/unsplash/route.ts](file:///d:/notion/app/api/unsplash/route.ts)), curated gradient presets, custom image uploads, and repositioning.
 
-### 3. Centralized Icon Registry & Multi-Format Page Icons
+### 3. Inline AI Copilot & Ghostwriter Engine
+- **Floating Selection AI Menu ([components/dashboard/editor/InlineAiSelectionMenu.tsx](file:///d:/notion/components/dashboard/editor/InlineAiSelectionMenu.tsx))**: Highlighting any text displays an interactive "Ask AI" floating pill:
+  - **Quick Edits**: Improve writing, fix spelling & grammar, make shorter, expand/make longer, summarize.
+  - **Tone Shifter**: Re-voices text across 6 tones (Professional, Casual, Direct, Persuasive, Technical, Friendly).
+  - **Multi-Language Translator**: Fluent translations to 8+ languages (Spanish, French, German, Japanese, Chinese, Hindi, etc.).
+  - **Custom Canvas Prompts**: Natural language transformation field with in-place Replace, Insert Below, or Copy actions.
+- **Empty-Block Spacebar AI Trigger ([components/dashboard/editor/InlineAiGenerator.tsx](file:///d:/notion/components/dashboard/editor/InlineAiGenerator.tsx))**:
+  - Pressing `Space` on an empty line launches an in-place AI generation bar (`Press 'space' for AI, '/' for commands...`).
+  - Pre-built blueprint chips for instant generation: Project Roadmaps, Brainstorms, Launch Checklists, Follow-up Emails, and Pros & Cons Matrices.
+  - Direct synthesis into native, draggable Notion blocks.
+- **Ghostwriter Inline Autocompletion ([hooks/use-ghostwriter.ts](file:///d:/notion/hooks/use-ghostwriter.ts))**:
+  - Predicts and projects the next phrase or sentence in real-time as the user pauses while typing.
+  - Displays faint ghost text with a subtle `Tab to accept` badge.
+  - One-click toggle switch in the editor header with local preference persistence.
+- **Unified Fast AI Gateway ([app/api/ai/inline/route.ts](file:///d:/notion/app/api/ai/inline/route.ts))**: High-speed, rate-limited, and quota-guarded API route utilizing Google Gemini 2.5 Flash.
+
+### 4. Centralized Icon Registry & Multi-Format Page Icons
 - **Vector Brand & Tech Logos ([components/dashboard/icon-registry.tsx](file:///d:/notion/components/dashboard/icon-registry.tsx))**: High-fidelity, optimized SVG logos for major frameworks and tools (React, Next.js, TypeScript, JavaScript, Docker, Tailwind CSS, Vercel, MongoDB, Node.js, Notion, Python, AWS, GraphQL, Redis, Git, Linux, Bun, etc.).
 - **Curated Lucide Modern Icons**: 50+ categorized modern workspace icons (Code, Terminal, Database, Server, Brain, Bot, Rocket, Shield, Globe, Workflow, Key, Layers, Compass, etc.).
 - **Universal PageIcon Renderer ([components/dashboard/page-icon.tsx](file:///d:/notion/components/dashboard/page-icon.tsx))**: Single polymorphic icon component that seamlessly resolves:

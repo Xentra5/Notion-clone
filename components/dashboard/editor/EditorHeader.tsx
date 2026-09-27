@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Check, CircleAlert, Cloud, ImagePlus, Plus, SquarePen } from "lucide-react";
+import { Check, CircleAlert, Cloud, ImagePlus, Plus, Sparkles, SquarePen } from "lucide-react";
 import { EmojiDropdown } from "./EmojiPicker";
 import { PageIcon } from "../page-icon";
 
@@ -21,12 +21,15 @@ export interface EditorHeaderProps {
   onTitleKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   saveStatus: "saved" | "saving" | "idle" | "error";
   blockCount: number;
+  isGhostwriterEnabled?: boolean;
+  onToggleGhostwriter?: () => void;
 }
 
 export function EditorHeader({
   pageEmoji, showEmojiPicker, coverUrl, currentTitle, titleRef,
   onEmojiClick, onEmojiSelect, onEmojiClose, onAddCover, onAddSubPage,
   onTitleChange, onTitleBlur, onTitleKeyDown, saveStatus, blockCount,
+  isGhostwriterEnabled, onToggleGhostwriter,
 }: EditorHeaderProps) {
   const status = saveStatus === "saving"
     ? { label: "Saving changes", icon: <Cloud className="h-3 w-3 animate-pulse" />, className: "text-muted-foreground" }
@@ -64,6 +67,24 @@ export function EditorHeader({
       <span>{blockCount} {blockCount === 1 ? "block" : "blocks"}</span>
       <span className="hidden h-3 w-px bg-border sm:block" />
       <span className="hidden sm:inline">Type <kbd className="rounded border border-border bg-muted px-1 py-0.5 font-mono text-[10px]">/</kbd> for commands</span>
+      {onToggleGhostwriter && (
+        <>
+          <span className="hidden h-3 w-px bg-border sm:block" />
+          <button
+            type="button"
+            onClick={onToggleGhostwriter}
+            className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md font-medium text-[11px] transition cursor-pointer ${
+              isGhostwriterEnabled
+                ? "bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 hover:bg-purple-500/20"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+            title="Toggle Ghostwriter AI autocomplete"
+          >
+            <Sparkles className="h-3 w-3" />
+            <span>Ghostwriter: {isGhostwriterEnabled ? "On" : "Off"}</span>
+          </button>
+        </>
+      )}
     </div>
   </>;
 }

@@ -26,6 +26,10 @@ export interface BlockProps {
   item: ChecklistItem;
   seqNumber?: number;
   isFocused: boolean;
+  ghostText?: string;
+  onAcceptGhost?: () => void;
+  onDismissGhost?: () => void;
+  onTriggerInlineAi?: (blockId: string) => void;
   onFocus: (id: string) => void;
   onUpdateText: (id: string, text: string) => void;
   onUpdateLanguage?: (id: string, language: string) => void;
@@ -48,6 +52,7 @@ export interface BlockProps {
 export function areBlockPropsEqual(prev: BlockProps, next: BlockProps): boolean {
   if (prev.isFocused !== next.isFocused) return false;
   if (prev.seqNumber !== next.seqNumber) return false;
+  if (prev.ghostText !== next.ghostText) return false;
   if (prev.onSelectSubPage !== next.onSelectSubPage) return false;
 
   const p = prev.item;
@@ -75,6 +80,10 @@ export const BlockItem = memo(function BlockItem({
   item,
   seqNumber = 1,
   isFocused,
+  ghostText,
+  onAcceptGhost,
+  onDismissGhost,
+  onTriggerInlineAi,
   onFocus,
   onUpdateText,
   onUpdateLanguage,
@@ -123,7 +132,31 @@ export const BlockItem = memo(function BlockItem({
     onUpdateText(item.id, (e.target as HTMLElement).innerText);
   };
 
-  const handleKD = (e: React.KeyboardEvent<HTMLElement>) => onKeyDown(e, item.id);
+  const handleKD = (e: React.KeyboardEvent<HTMLElement>) => {
+    // If ghostText is present and Tab is pressed, accept the suggestion
+    if (e.key === "Tab" && ghostText) {
+      e.preventDefault();
+      onAcceptGhost?.();
+      return;
+    }
+    // If ghostText is present and Escape is pressed, dismiss it
+    if (e.key === "Escape" && ghostText) {
+      e.preventDefault();
+      onDismissGhost?.();
+      return;
+    }
+    // If space pressed on empty paragraph block, trigger inline AI generator
+    if (
+      e.key === " " &&
+      (!item.text || item.text.trim() === "") &&
+      (item.type === "paragraph" || !item.type)
+    ) {
+      e.preventDefault();
+      onTriggerInlineAi?.(item.id);
+      return;
+    }
+    onKeyDown(e, item.id);
+  };
   const handleFocus = () => onFocus(item.id);
 
   const ce = {
@@ -181,6 +214,16 @@ export const BlockItem = memo(function BlockItem({
         {/* Paragraph */}
         {(item.type === "paragraph" || !item.type) && (
           <div {...ce} ref={setRef} className={textCls} />
+        )}
+
+        {/* Ghostwriter inline completion preview */}
+        {isFocused && ghostText && (
+          <div className="flex items-center gap-2 pt-0.5 pb-1 text-xs text-muted-foreground/60 select-none animate-in fade-in duration-100">
+            <span className="italic font-normal">{ghostText}</span>
+            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 bg-muted/80 text-muted-foreground font-semibold rounded-md font-mono border border-border/50 uppercase not-italic">
+              Tab to accept
+            </span>
+          </div>
         )}
 
         {/* Headings */}

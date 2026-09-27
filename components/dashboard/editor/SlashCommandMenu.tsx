@@ -33,12 +33,13 @@ export interface SlashMenuItem {
   icon: React.ComponentType<{ className?: string }>;
   iconColor: string;
   category: "Basic" | "Media" | "AI";
-  action?: "ai_summary";
+  action?: "ai_summary" | "ai_generate";
   aliases?: string[];
 }
 
 export const SLASH_ITEMS: SlashMenuItem[] = [
-  { type: "paragraph",    label: "AI Summary",    description: "Summarize this page with Notion AI", icon: Sparkles,     iconColor: "text-purple-500", category: "AI", action: "ai_summary", aliases: ["summary", "summery", "summarize", "ai", "sum", "tldr"] },
+  { type: "paragraph",    label: "Ask AI / Draft",description: "Draft, outline, or brainstorm with Notion AI", icon: Sparkles, iconColor: "text-purple-500", category: "AI", action: "ai_generate", aliases: ["ai", "write", "draft", "copilot", "generate", "brainstorm"] },
+  { type: "paragraph",    label: "AI Summary",    description: "Summarize this page with Notion AI", icon: Sparkles,     iconColor: "text-purple-500", category: "AI", action: "ai_summary", aliases: ["summary", "summery", "summarize", "sum", "tldr"] },
   { type: "paragraph",    label: "Text",          description: "Plain paragraph text",         icon: Type,             iconColor: "text-neutral-400",  category: "Basic", aliases: ["p", "paragraph", "plain"] },
   { type: "heading1",     label: "Heading 1",     description: "Large section heading",         icon: Heading1,         iconColor: "text-purple-400",   category: "Basic", aliases: ["h1", "title", "heading"] },
   { type: "heading2",     label: "Heading 2",     description: "Medium section heading",        icon: Heading2,         iconColor: "text-purple-400",   category: "Basic", aliases: ["h2", "subtitle", "heading"] },
@@ -82,7 +83,7 @@ export function getPlaceholder(type: BlockType | undefined): string {
     heading4: "Heading 4", heading: "Heading",
     bullet: "List", numbered: "List", todo: "To-do", toggle: "Toggle",
     quote: "Empty quote", callout: "Callout text", code: "// Write code here",
-    paragraph: "",
+    paragraph: "Press 'space' for AI, '/' for commands...",
   };
   return m[type as BlockType] ?? "";
 }
