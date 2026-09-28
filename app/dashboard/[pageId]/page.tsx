@@ -105,6 +105,7 @@ function toChecklistItem(block: PageBlock): ChecklistItem {
     url: (block.properties as { url?: string })?.url ?? "",
     fileName: (block.properties as { fileName?: string })?.fileName ?? "",
     fileSize: (block.properties as { fileSize?: string })?.fileSize ?? "",
+    mermaidCode: (block.properties as { mermaidCode?: string })?.mermaidCode ?? "",
   };
 }
 

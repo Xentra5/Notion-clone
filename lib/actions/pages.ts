@@ -23,6 +23,7 @@ export interface PageBlock {
     toggleChildren?: string;
     calloutIcon?: string;
     tableData?: string[][];
+    mermaidCode?: string;
   };
   content?: string[];
   parent?: string;

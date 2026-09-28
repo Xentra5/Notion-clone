@@ -24,6 +24,10 @@ import {
   Bookmark,
   Table,
   Link,
+  Pencil,
+  GitBranch,
+  Sigma,
+  Globe,
 } from "lucide-react";
 
 export interface SlashMenuItem {
@@ -61,6 +65,11 @@ export const SLASH_ITEMS: SlashMenuItem[] = [
   { type: "table",        label: "Table",         description: "Simple table",                  icon: Table,            iconColor: "text-cyan-400",     category: "Media", aliases: ["grid", "sheet"] },
   { type: "kanban",       label: "Board view",    description: "Kanban board for task tracking",icon: Table,            iconColor: "text-blue-500",     category: "Media", aliases: ["board", "cards"] },
   { type: "link_to_page", label: "Link to page",  description: "Link to an existing page",      icon: Link,             iconColor: "text-blue-400",     category: "Media", aliases: ["reference"] },
+  // Supercharged blocks
+  { type: "whiteboard",   label: "Whiteboard",    description: "Freehand canvas for drawing & sketching", icon: Pencil, iconColor: "text-orange-400", category: "Media", aliases: ["draw", "sketch", "canvas", "freehand", "paint"] },
+  { type: "mermaid",      label: "Diagram",       description: "Flowcharts, sequences, Gantt & more",     icon: GitBranch, iconColor: "text-violet-400", category: "Media", aliases: ["mermaid", "flow", "chart", "diagram", "sequence", "gantt", "er"] },
+  { type: "math",         label: "Math Equation", description: "LaTeX math rendered beautifully",          icon: Sigma, iconColor: "text-teal-400",   category: "Media", aliases: ["latex", "equation", "formula", "katex", "math"] },
+  { type: "iframe_embed", label: "Smart Embed",   description: "Embed Figma, YouTube, CodePen, Loom…",   icon: Globe, iconColor: "text-sky-400",    category: "Media", aliases: ["embed", "iframe", "figma", "youtube", "codepen", "loom", "google"] },
 ];
 
 export function getDefaultText(type: BlockType): string {
@@ -84,6 +93,8 @@ export function getPlaceholder(type: BlockType | undefined): string {
     bullet: "List", numbered: "List", todo: "To-do", toggle: "Toggle",
     quote: "Empty quote", callout: "Callout text", code: "// Write code here",
     paragraph: "Press 'space' for AI, '/' for commands...",
+    mermaid: "Mermaid diagram", math: "LaTeX equation",
+    iframe_embed: "Embed URL", whiteboard: "",
   };
   return m[type as BlockType] ?? "";
 }

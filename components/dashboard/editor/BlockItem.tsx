@@ -9,6 +9,10 @@ import { CodeBlock } from "./CodeBlock";
 import { DatabaseBlock } from "./DatabaseBlock";
 import { WebBookmarkBlock } from "./WebBookmarkBlock";
 import { FileUploadBlock } from "./FileUploadBlock";
+import { WhiteboardBlock } from "./WhiteboardBlock";
+import { MermaidBlock } from "./MermaidBlock";
+import { MathBlock } from "./MathBlock";
+import { IframeEmbedBlock } from "./IframeEmbedBlock";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 import {
   Check,
@@ -39,6 +43,7 @@ export interface BlockProps {
   onUpdateKanbanColumns?: (id: string, columns: KanbanColumn[]) => void;
   onUpdateFile?: (id: string, url: string, fileName: string, fileSize?: string) => void;
   onUpdateUrl?: (id: string, url: string) => void;
+  onUpdateMermaidCode?: (id: string, code: string) => void;
   onToggleCheck: (id: string) => void;
   onKeyDown: (e: React.KeyboardEvent, id: string) => void;
   onPaste?: (e: React.ClipboardEvent, id: string) => void;
@@ -72,6 +77,7 @@ export function areBlockPropsEqual(prev: BlockProps, next: BlockProps): boolean 
   if (p.calloutIcon !== n.calloutIcon) return false;
   if (p.tableData !== n.tableData) return false;
   if (p.kanbanColumns !== n.kanbanColumns) return false;
+  if (p.mermaidCode !== n.mermaidCode) return false;
 
   return true;
 }
@@ -93,6 +99,7 @@ export const BlockItem = memo(function BlockItem({
   onUpdateKanbanColumns,
   onUpdateFile,
   onUpdateUrl,
+  onUpdateMermaidCode,
   onToggleCheck,
   onKeyDown,
   onPaste,
@@ -580,6 +587,58 @@ export const BlockItem = memo(function BlockItem({
               blockId={item.id}
               columns={item.kanbanColumns}
               onColumnsChange={(id, cols) => onUpdateKanbanColumns?.(id, cols)}
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* ── SUPERCHARGED BLOCKS ───────────────────────────────────────── */}
+
+        {/* Whiteboard */}
+        {item.type === "whiteboard" && (
+          <ErrorBoundary
+            fallbackTitle="Whiteboard Error"
+            fallbackMessage="Could not render the whiteboard."
+          >
+            <WhiteboardBlock />
+          </ErrorBoundary>
+        )}
+
+        {/* Mermaid Diagram */}
+        {item.type === "mermaid" && (
+          <ErrorBoundary
+            fallbackTitle="Diagram Error"
+            fallbackMessage="Could not render the Mermaid diagram."
+          >
+            <MermaidBlock
+              code={item.mermaidCode}
+              onUpdateCode={(code) => onUpdateMermaidCode?.(item.id, code)}
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* Math Equation (KaTeX) */}
+        {item.type === "math" && (
+          <ErrorBoundary
+            fallbackTitle="Math Block Error"
+            fallbackMessage="Could not render the math equation."
+          >
+            <MathBlock
+              code={item.mermaidCode}
+              onUpdateCode={(code) => onUpdateMermaidCode?.(item.id, code)}
+              displayMode={true}
+            />
+          </ErrorBoundary>
+        )}
+
+        {/* Smart Iframe Embed */}
+        {item.type === "iframe_embed" && (
+          <ErrorBoundary
+            fallbackTitle="Embed Error"
+            fallbackMessage="Could not render the embed."
+          >
+            <IframeEmbedBlock
+              url={item.url}
+              onUpdateUrl={(url) => onUpdateUrl?.(item.id, url)}
             />
           </ErrorBoundary>
         )}

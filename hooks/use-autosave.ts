@@ -55,7 +55,7 @@ export function useAutosave({ pageId, onStatusChange, delayMs = 2000 }: UseAutos
                 subPageId: item.subPageId ?? "", kanbanColumns: item.kanbanColumns ?? [], url: item.url ?? "",
                 fileName: item.fileName ?? "", fileSize: item.fileSize ?? "",
                 calloutIcon: item.calloutIcon ?? "💡", toggleChildren: item.toggleChildren ?? "",
-                tableData: item.tableData ?? [],
+                tableData: item.tableData ?? [], mermaidCode: item.mermaidCode ?? "",
               },
             })) as never,
           });

@@ -24,7 +24,12 @@ export type BlockType =
   | "code"
   | "file"
   | "kanban"
-  | "web_bookmark";
+  | "web_bookmark"
+  // Supercharged blocks
+  | "whiteboard"
+  | "mermaid"
+  | "math"
+  | "iframe_embed";
 
 export interface ChecklistItem {
   id: string;
@@ -44,6 +49,8 @@ export interface ChecklistItem {
   fileSize?: string;
   fileName?: string;
   kanbanColumns?: KanbanColumn[];
+  // Supercharged block properties
+  mermaidCode?: string;  // Mermaid diagram source or LaTeX math
 }
 
 export interface KanbanColumn {

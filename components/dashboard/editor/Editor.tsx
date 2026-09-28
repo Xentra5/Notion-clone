@@ -504,6 +504,10 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
     setItems(prev => prev.map(b => b.id === id ? { ...b, url } : b));
   }, []);
 
+  const updateMermaidCode = useCallback((id: string, mermaidCode: string) => {
+    setItems(prev => prev.map(b => b.id === id ? { ...b, mermaidCode } : b));
+  }, []);
+
   const handleAddAfter = useCallback((id: string) => {
     const newBlock = makeBlock("paragraph");
     setItems((p) => {
@@ -607,6 +611,8 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
       setTimeout(() => {
         onSelectSubPage(bid, undefined, "Untitled");
       }, 100);
+    } else if (type === "whiteboard" || type === "mermaid" || type === "math" || type === "iframe_embed" || type === "kanban" || type === "divider") {
+      // Non-text blocks — don't try to focus a contenteditable
     } else {
       setTimeout(() => focusBlock(bid, true), 0);
     }
@@ -1075,6 +1081,7 @@ export function Editor({ activeTitle, pageId, initialBlocks, initialCoverImage, 
                   onUpdateKanbanColumns={updateKanbanColumns}
                   onUpdateFile={updateFile}
                   onUpdateUrl={updateUrl}
+                  onUpdateMermaidCode={updateMermaidCode}
                   onToggleCheck={toggleCheck}
                   onKeyDown={handleKeyDown}
                   onPaste={handlePaste}

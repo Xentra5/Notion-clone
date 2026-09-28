@@ -21,6 +21,7 @@ const BlockSchema = new Schema(
       toggleChildren: { type: String, default: "" },
       calloutIcon: { type: String, default: "" },
       tableData: { type: Schema.Types.Mixed, default: [] },
+      mermaidCode: { type: String, default: "" },
     },
     content: [{ type: String }],
     parent: { type: String, default: "workspace" },
