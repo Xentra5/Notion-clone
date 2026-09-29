@@ -8,11 +8,14 @@
 [![Materialized Path](https://img.shields.io/badge/Tree-Materialized_Path_O(1)-6C5CE7?style=flat-square)](https://www.mongodb.com/)
 [![FastAPI](https://img.shields.io/badge/RAG_Service-FastAPI-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com/)
 [![LangChain](https://img.shields.io/badge/AI-LangChain-1C3C3C?style=flat-square)](https://www.langchain.com/)
+[![Mermaid](https://img.shields.io/badge/Diagrams-Mermaid.js_12-ff3670?style=flat-square)](https://mermaid.js.org/)
+[![KaTeX](https://img.shields.io/badge/Math-KaTeX_0.18-00d1b2?style=flat-square)](https://katex.org/)
+[![Whiteboard](https://img.shields.io/badge/Whiteboard-HTML5_Canvas-f59e0b?style=flat-square)](https://developer.mozilla.org/en-US/docs/Web/API/Canvas_API)
 [![Python WASM](https://img.shields.io/badge/Sandbox-Pyodide_WASM-3776AB?style=flat-square&logo=python)](https://pyodide.org/)
 [![IndexedDB Local First](https://img.shields.io/badge/Storage-Local--First_SWR-orange?style=flat-square)](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub_Actions-2088FF?style=flat-square&logo=githubactions)](https://github.com/Xentra5/Notion/actions)
 
-An enterprise-grade, high-performance collaborative workspace application built with **Next.js 16 (App Router)** and **MongoDB**. Faithfully engineered to deliver the full Notion experience with real-time block editing, autonomous multi-persona AI Agent workspaces, local-first 0ms persistence, dual-tier distributed caching (L1 RAM + L2 Redis), $O(1)$ materialized path tree hierarchy, asynchronous debounced RAG vector indexing, in-browser polyglot code execution, database multi-views (Kanban, Timeline, Table), voice-to-text meeting summaries with WebGL waveform visualizers, version diff rollback, document import/export, geo-redundant database failover, multi-region billing (Stripe & Razorpay), and collaborative multi-cursor presence.
+An enterprise-grade, high-performance collaborative workspace application built with **Next.js 16 (App Router)** and **MongoDB**. Faithfully engineered to deliver the full Notion experience with real-time block editing, autonomous multi-persona AI Agent workspaces, interactive HTML5 whiteboard sketching canvases, Mermaid.js visual diagramming, KaTeX LaTeX mathematical typography, universal responsive smart embeds (Figma, YouTube, Loom, CodePen, etc.), local-first 0ms persistence, dual-tier distributed caching (L1 RAM + L2 Redis), $O(1)$ materialized path tree hierarchy, asynchronous debounced RAG vector indexing, in-browser polyglot code execution, database multi-views (Kanban, Timeline, Table), voice-to-text meeting summaries with WebGL waveform visualizers, version diff rollback, document import/export, geo-redundant database failover, multi-region billing (Stripe & Razorpay), and collaborative multi-cursor presence.
 
 ---
 
@@ -22,22 +25,27 @@ An enterprise-grade, high-performance collaborative workspace application built 
 - [🌟 Key Features & Capabilities](#-key-features--capabilities)
   - [1. Autonomous Multi-Persona AI Agent Workspace](#1-autonomous-multi-persona-ai-agent-workspace)
   - [2. Block Editor & Dynamic Canvas](#2-block-editor--dynamic-canvas)
-  - [3. Centralized Icon Registry & Multi-Format Page Icons](#3-centralized-icon-registry--multi-format-page-icons)
-  - [4. Local-First 0ms Architecture & Multi-Tab Sync](#4-local-first-0ms-architecture--multi-tab-sync)
-  - [5. Dual-Tier Distributed Cache Engine (L1 Memory + L2 Redis)](#5-dual-tier-distributed-cache-engine-l1-memory--l2-redis)
-  - [6. Materialized Path Tree Hierarchy & Cascade Restore](#6-materialized-path-tree-hierarchy--cascade-restore)
-  - [7. Async Debounced RAG Queue & Voice Transcriber](#7-async-debounced-rag-queue--voice-transcriber)
-  - [8. Multi-View Database Boards](#8-multi-view-database-boards)
-  - [9. In-Browser Polyglot Code Runner Sandbox](#9-in-browser-polyglot-code-runner-sandbox)
-  - [10. Real-Time Collaboration, Workspace Sharing & Notifications](#10-real-time-collaboration-workspace-sharing--notifications)
-  - [11. Version History, Revisions & Visual Diff Rollback](#11-version-history-revisions--visual-diff-rollback)
-  - [12. Notion Calendar Workspace](#12-notion-calendar-workspace)
-  - [13. Dedicated Views: Tasks, Templates, Library & Help Center](#13-dedicated-views-tasks-templates-library--help-center)
-  - [14. Document Export & Import Engine](#14-document-export--import-engine)
-  - [15. Global Spotlight Command Palette](#15-global-spotlight-command-palette)
-  - [16. AI Output Sanitization, In-Page Chat & Free Trial Quotas](#16-ai-output-sanitization-in-page-chat--free-trial-quotas)
-  - [17. Multi-Region Billing & Subscriptions](#17-multi-region-billing--subscriptions)
-  - [18. Marketing, Enterprise & Solutions Showcase](#18-marketing-enterprise--solutions-showcase)
+  - [3. Inline AI Copilot & Ghostwriter Engine](#3-inline-ai-copilot--ghostwriter-engine)
+  - [4. Interactive Whiteboard Canvas & Sketching Engine](#4-interactive-whiteboard-canvas--sketching-engine)
+  - [5. Mermaid.js Visual Diagrams & System Architecture](#5-mermaidjs-visual-diagrams--system-architecture)
+  - [6. KaTeX LaTeX Mathematical Equation Renderer](#6-katex-latex-mathematical-equation-renderer)
+  - [7. Universal Smart Embeds (Figma, YouTube, Loom, CodePen)](#7-universal-smart-embeds-figma-youtube-loom-codepen)
+  - [8. Centralized Icon Registry & Multi-Format Page Icons](#8-centralized-icon-registry--multi-format-page-icons)
+  - [9. Local-First 0ms Architecture & Multi-Tab Sync](#9-local-first-0ms-architecture--multi-tab-sync)
+  - [10. Dual-Tier Distributed Cache Engine (L1 Memory + L2 Redis)](#10-dual-tier-distributed-cache-engine-l1-memory--l2-redis)
+  - [11. Materialized Path Tree Hierarchy & Cascade Restore](#11-materialized-path-tree-hierarchy--cascade-restore)
+  - [12. Async Debounced RAG Queue & Voice Transcriber](#12-async-debounced-rag-queue--voice-transcriber)
+  - [13. Multi-View Database Boards](#13-multi-view-database-boards)
+  - [14. In-Browser Polyglot Code Runner Sandbox](#14-in-browser-polyglot-code-runner-sandbox)
+  - [15. Real-Time Collaboration, Workspace Sharing & Notifications](#15-real-time-collaboration-workspace-sharing--notifications)
+  - [16. Version History, Revisions & Visual Diff Rollback](#16-version-history-revisions--visual-diff-rollback)
+  - [17. Notion Calendar Workspace](#17-notion-calendar-workspace)
+  - [18. Dedicated Views: Tasks, Templates, Library & Help Center](#18-dedicated-views-tasks-templates-library--help-center)
+  - [19. Document Export & Import Engine](#19-document-export--import-engine)
+  - [20. Global Spotlight Command Palette](#20-global-spotlight-command-palette)
+  - [21. AI Output Sanitization, In-Page Chat & Free Trial Quotas](#21-ai-output-sanitization-in-page-chat--free-trial-quotas)
+  - [22. Multi-Region Billing & Subscriptions](#22-multi-region-billing--subscriptions)
+  - [23. Marketing, Enterprise & Solutions Showcase](#23-marketing-enterprise--solutions-showcase)
 - [🏗️ System Architecture & Tech Stack](#️-system-architecture--tech-stack)
 - [🔌 API Routes & Services Reference](#-api-routes--services-reference)
 - [📁 Project Directory Structure](#-project-directory-structure)
@@ -59,8 +67,12 @@ The following table provides a complete, transparent breakdown of what is fully 
 
 | Feature / System | Status | Implementation Details & Backing Files |
 | :--- | :---: | :--- |
-| **Block Editor Engine** | `✅ Fully Implemented` | Text, H1–H3, To-do, Bullets, Numbers, Toggle, Callout, Quote, Divider, Table, Web Bookmarks, File Upload, Code Blocks, AI Meeting Notes ([components/dashboard/editor/BlockItem.tsx](file:///d:/notion/components/dashboard/editor/BlockItem.tsx), [BlockRenderer.tsx](file:///d:/notion/components/dashboard/editor/BlockRenderer.tsx)). |
+| **Block Editor Engine** | `✅ Fully Implemented` | Text, H1–H3, To-do, Bullets, Numbers, Toggle, Callout, Quote, Divider, Table, Web Bookmarks, File Upload, Code Blocks, AI Meeting Notes, Whiteboard, Mermaid, Math, Smart Embeds ([components/dashboard/editor/BlockItem.tsx](file:///d:/notion/components/dashboard/editor/BlockItem.tsx), [BlockRenderer.tsx](file:///d:/notion/components/dashboard/editor/BlockRenderer.tsx)). |
 | **Inline AI Copilot & Ghostwriter** | `✅ Fully Implemented` | Floating selection "Ask AI" menu (tone, translate, summarize, rewrite), empty-block Spacebar AI generator, and inline Ghostwriter autocompletion with Tab-to-accept ([InlineAiSelectionMenu.tsx](file:///d:/notion/components/dashboard/editor/InlineAiSelectionMenu.tsx), [InlineAiGenerator.tsx](file:///d:/notion/components/dashboard/editor/InlineAiGenerator.tsx), [use-ghostwriter.ts](file:///d:/notion/hooks/use-ghostwriter.ts), [app/api/ai/inline/route.ts](file:///d:/notion/app/api/ai/inline/route.ts)). |
+| **Interactive Whiteboard Canvas** | `✅ Fully Implemented` | Dual-layer HTML5 canvas with 8 drawing tools (pen, eraser, rectangle, circle, line, arrow, text, pan), 10-color palette, 5 stroke widths, undo/redo history, zoom, and PNG export ([WhiteboardBlock.tsx](file:///d:/notion/components/dashboard/editor/WhiteboardBlock.tsx)). |
+| **Mermaid.js Diagram Studio** | `✅ Fully Implemented` | Live declarative diagramming for Flowcharts, Sequence diagrams, ER diagrams, Gantt charts, Mindmaps, and Pie charts with split-pane code editor, error boundary, and one-click SVG copy ([MermaidBlock.tsx](file:///d:/notion/components/dashboard/editor/MermaidBlock.tsx)). |
+| **KaTeX LaTeX Math Renderer** | `✅ Fully Implemented` | Real-time mathematical typesetting with KaTeX, display formula mode, inline support, dynamic stylesheet injection, curated scientific formula presets, and syntax error alerts ([MathBlock.tsx](file:///d:/notion/components/dashboard/editor/MathBlock.tsx)). |
+| **Smart Embeds & Media Engine** | `✅ Fully Implemented` | Automated URL transformation for 11+ providers (Figma, YouTube, Loom, CodePen, CodeSandbox, Google Docs/Slides/Maps, Airtable, Typeform, Excalidraw, generic iframes) with responsive height controls and fullscreen modal view ([IframeEmbedBlock.tsx](file:///d:/notion/components/dashboard/editor/IframeEmbedBlock.tsx)). |
 | **Icon & Logo Registry Engine** | `✅ Fully Implemented` | 50+ high-fidelity vector brand logos (React, Next.js, Docker, etc.), curated modern Lucide icons, universal PageIcon renderer (`logo:*`, `icon:*`, URLs, emojis), and tabbed EmojiPicker with fuzzy tag search ([icon-registry.tsx](file:///d:/notion/components/dashboard/icon-registry.tsx), [page-icon.tsx](file:///d:/notion/components/dashboard/page-icon.tsx), [EmojiPicker.tsx](file:///d:/notion/components/dashboard/editor/EmojiPicker.tsx)). |
 | **Multi-View Databases** | `✅ Fully Implemented` | Kanban Board with drag-and-drop, Gantt Timeline, and Table Grid with inline cell editing ([KanbanBoard.tsx](file:///d:/notion/components/dashboard/editor/KanbanBoard.tsx), [TimelineView.tsx](file:///d:/notion/components/dashboard/editor/TimelineView.tsx), [TableView.tsx](file:///d:/notion/components/dashboard/editor/TableView.tsx)). |
 | **Autonomous AI Agent** | `✅ Fully Implemented` | 4 Personas, Fast/Think/DeepSearch modes, LangChain tool execution, long-term memory, session history, emotive animated bot logo ([app/dashboard/agent/page.tsx](file:///d:/notion/app/dashboard/agent/page.tsx), [rag_service/main.py](file:///d:/notion/rag_service/main.py)). |
@@ -116,8 +128,8 @@ The following table provides a complete, transparent breakdown of what is fully 
 
 ### 2. Block Editor & Dynamic Canvas
 - **Modular Block Architecture ([components/dashboard/editor/BlockItem.tsx](file:///d:/notion/components/dashboard/editor/BlockItem.tsx))**: Deconstructed into lightweight, memoized block items to eliminate unnecessary re-renders during rapid editing.
-- **Extensive Block Catalog**: Text, Headings (`H1`, `H2`, `H3`), Checklists/Todos, Bulleted/Numbered Lists, Callouts, Toggle Blocks, Blockquotes, Dividers, Tables, Web Bookmarks, File Uploads, Kanban Databases, Code Blocks, and AI Meeting Notes.
-- **Slash Command Menu ([components/dashboard/editor/SlashCommandMenu.tsx](file:///d:/notion/components/dashboard/editor/SlashCommandMenu.tsx))**: Type `/` to open a categorized quick-insert menu with keyboard navigation, now featuring direct `/ai` drafting triggers.
+- **Extensive Block Catalog**: Text, Headings (`H1`, `H2`, `H3`), Checklists/Todos, Bulleted/Numbered Lists, Callouts, Toggle Blocks, Blockquotes, Dividers, Tables, Web Bookmarks, File Uploads, Kanban Databases, Code Blocks, AI Meeting Notes, **Whiteboard Sketching Canvases**, **Mermaid System Diagrams**, **KaTeX Math Equations**, and **Universal Smart Embeds**.
+- **Slash Command Menu ([components/dashboard/editor/SlashCommandMenu.tsx](file:///d:/notion/components/dashboard/editor/SlashCommandMenu.tsx))**: Type `/` to open a categorized quick-insert menu with keyboard navigation, featuring `/ai` drafting triggers, `/whiteboard` for drawing, `/mermaid` for architecture diagrams, `/math` for LaTeX equations, and `/iframe_embed` for smart web embeds.
 - **Markdown Block Parser ([lib/markdown-blocks.ts](file:///d:/notion/lib/markdown-blocks.ts))**: Paste raw Markdown directly into the editor to automatically convert it into native Notion blocks.
 - **Unsplash Cover Banner Engine ([components/dashboard/editor/PageCoverBanner.tsx](file:///d:/notion/components/dashboard/editor/PageCoverBanner.tsx))**: Full-width page headers with direct Unsplash photo search ([app/api/unsplash/route.ts](file:///d:/notion/app/api/unsplash/route.ts)), curated gradient presets, custom image uploads, and repositioning.
 
@@ -137,7 +149,61 @@ The following table provides a complete, transparent breakdown of what is fully 
   - One-click toggle switch in the editor header with local preference persistence.
 - **Unified Fast AI Gateway ([app/api/ai/inline/route.ts](file:///d:/notion/app/api/ai/inline/route.ts))**: High-speed, rate-limited, and quota-guarded API route utilizing Google Gemini 2.5 Flash.
 
-### 4. Centralized Icon Registry & Multi-Format Page Icons
+### 4. Interactive Whiteboard Canvas & Sketching Engine
+- **Dedicated Dual-Canvas Architecture ([components/dashboard/editor/WhiteboardBlock.tsx](file:///d:/notion/components/dashboard/editor/WhiteboardBlock.tsx))**: High-performance drawing engine utilizing a base canvas for committed strokes and an overlay canvas for zero-latency live preview.
+- **8 Versatile Drawing Tools**:
+  - **Pen**: Smooth freehand vector sketching.
+  - **Eraser**: Precise stroke-clearing tool.
+  - **Geometric Shapes**: Rectangles and Circles with clean outlines.
+  - **Connectors**: Straight Lines and directional Arrows for mindmaps and wireframes.
+  - **Text**: In-canvas typography with custom positioning and sizing.
+  - **Pan**: Drag-to-pan viewport for expansive freehand sketches.
+- **Creative Controls & Styling**:
+  - **Curated Palette**: 10 distinct colors (Dark, Red, Orange, Amber, Green, Blue, Purple, Pink, Cyan, White).
+  - **Variable Line Weights**: 5 stroke thicknesses (`1px`, `2px`, `4px`, `8px`, `16px`).
+- **History & Canvas Management**:
+  - Infinite Undo (`Cmd + Z`) and Redo command stack.
+  - Multi-level Zoom In / Zoom Out controls.
+  - Canvas Clear with confirmation and high-resolution PNG export download.
+
+### 5. Mermaid.js Visual Diagrams & System Architecture
+- **Declarative Diagramming ([components/dashboard/editor/MermaidBlock.tsx](file:///d:/notion/components/dashboard/editor/MermaidBlock.tsx))**: Write human-readable Mermaid markdown and render reactive, publication-quality vector diagrams directly on the page canvas.
+- **Pre-Built Diagram Blueprints**:
+  - **Flowcharts (`graph TD` / `graph LR`)**: Decision trees, operational flows, conditional paths.
+  - **Sequence Diagrams**: Client-server lifecycles, API calls, microservice interactions.
+  - **Entity-Relationship (ER) Diagrams**: Database schemas, foreign keys, cardinality mappings.
+  - **Gantt Timelines**: Project phases, task dependencies, milestone planning.
+  - **Pie Charts**: Resource distribution, market share, budget allocations.
+  - **Mindmaps**: Idea brainstorming and hierarchical conceptual outlines.
+- **Developer-Friendly Ergonomics**:
+  - Toggle between Code Editor and Live Rendered Diagram with smooth tab transitions.
+  - Real-time syntax validation with inline error boundary.
+  - One-click SVG and source code copying to clipboard.
+
+### 6. KaTeX LaTeX Mathematical Equation Renderer
+- **Scientific Typesetting ([components/dashboard/editor/MathBlock.tsx](file:///d:/notion/components/dashboard/editor/MathBlock.tsx))**: Native mathematical formula rendering powered by KaTeX with sub-millisecond execution.
+- **Dynamic CSS Injection**: KaTeX styles are loaded on-demand, maintaining a zero bundle footprint for non-math documents.
+- **Rich Formula Examples**:
+  - Quadratic formula, Euler's identity ($e^{i\pi} + 1 = 0$), Maxwell's equations, Schrödinger equation, Normal Gaussian distribution, Fourier transform, Taylor series expansion, and Pythagorean theorem.
+- **Display Modes & Error Guarding**:
+  - Full block display mode for prominent equations.
+  - Real-time LaTeX syntax parsing with user-friendly syntax error feedback.
+  - Instant LaTeX source code copying to clipboard.
+
+### 7. Universal Smart Embeds (Figma, YouTube, Loom, CodePen)
+- **Multi-Provider Auto Detection ([components/dashboard/editor/IframeEmbedBlock.tsx](file:///d:/notion/components/dashboard/editor/IframeEmbedBlock.tsx))**: Automatically recognizes URL patterns and transforms them into optimal embed players:
+  - **Design & Prototyping**: Figma files & prototypes, Excalidraw whiteboards.
+  - **Video & Screen Sharing**: YouTube videos, Loom screen recordings, Vimeo.
+  - **Code & Playgrounds**: CodePen pens, CodeSandbox containers.
+  - **Productivity & Forms**: Google Docs, Google Slides, Google Maps, Airtable databases, Typeform surveys.
+  - **Generic Web**: Sandboxed iframe embedding for any HTTPS URL.
+- **Interactive Embed Controls**:
+  - Automatic URL normalization (e.g. converting YouTube watch links to embed players, Loom sharing links to embed frames).
+  - Responsive height adjustment controls (`360px`, `480px`, `600px`, `720px`).
+  - Fullscreen expansion modal for distraction-free viewing.
+  - External link button to quickly open source assets in a new browser tab.
+
+### 8. Centralized Icon Registry & Multi-Format Page Icons
 - **Vector Brand & Tech Logos ([components/dashboard/icon-registry.tsx](file:///d:/notion/components/dashboard/icon-registry.tsx))**: High-fidelity, optimized SVG logos for major frameworks and tools (React, Next.js, TypeScript, JavaScript, Docker, Tailwind CSS, Vercel, MongoDB, Node.js, Notion, Python, AWS, GraphQL, Redis, Git, Linux, Bun, etc.).
 - **Curated Lucide Modern Icons**: 50+ categorized modern workspace icons (Code, Terminal, Database, Server, Brain, Bot, Rocket, Shield, Globe, Workflow, Key, Layers, Compass, etc.).
 - **Universal PageIcon Renderer ([components/dashboard/page-icon.tsx](file:///d:/notion/components/dashboard/page-icon.tsx))**: Single polymorphic icon component that seamlessly resolves:
@@ -151,24 +217,24 @@ The following table provides a complete, transparent breakdown of what is fully 
   - **Random Shuffle Picker** for quick inspiration and **Remove Icon** action.
 - **System-Wide Integration**: Consistent icon rendering across Sidebar page trees, Favorites, Shared pages, Header bar, Global Command Palette (`Cmd + K`), Full-Text Search modal, and Trash & Restore modal.
 
-### 4. Local-First 0ms Architecture & Multi-Tab Sync
+### 9. Local-First 0ms Architecture & Multi-Tab Sync
 - **Instant IndexedDB Retrieval ([lib/storage/local-store.ts](file:///d:/notion/lib/storage/local-store.ts))**: 0ms local reads for page lists and document bodies using browser IndexedDB.
 - **BroadcastChannel Multi-Tab Sync**: Edits made in one browser tab instantly propagate to other open tabs without requiring network round-trips.
 - **Offline Mutation Queue**: Modifications made while offline are queued and automatically synced with exponential backoff once connectivity is restored.
 
-### 5. Dual-Tier Distributed Cache Engine (L1 Memory + L2 Redis)
+### 10. Dual-Tier Distributed Cache Engine (L1 Memory + L2 Redis)
 - **High-Speed L1 Cache**: In-memory LRU cache in Node.js runtime providing sub-millisecond data access.
 - **Distributed L2 Cache ([lib/cache.ts](file:///d:/notion/lib/cache.ts))**: Optional Upstash Redis integration providing cache consistency across serverless and containerized instances.
 - **Granular Tag Invalidation**: Cache entries are tagged by workspace, page, and user for precise, instant invalidation upon mutations.
 
-### 6. Materialized Path Tree Hierarchy & Cascade Restore
+### 11. Materialized Path Tree Hierarchy & Cascade Restore
 - **Materialized Path Schema ([lib/models/page.ts](file:///d:/notion/lib/models/page.ts))**: Stores an ordered `ancestors` array from root to direct parent, transforming deep tree lookups into single $O(1)$ MongoDB queries.
 - **Circular Dependency Guard ([app/api/pages/[id]/route.ts](file:///d:/notion/app/api/pages/[id]/route.ts))**: Cycle detection ensures pages cannot be set as descendants of themselves.
 - **Cascading Trash & Restore ([app/api/pages/[id]/restore/route.ts](file:///d:/notion/app/api/pages/[id]/restore/route.ts))**: Soft-deleting a page hides all sub-pages; restoring a page automatically cascades through all descendants (`{ ancestors: pageId }`), atomically un-trashes the entire subtree, batches them into the background RAG queue for vector re-indexing, and triggers workspace store refresh.
 - **Dedicated Trash Modal & Recovery Hub ([components/dashboard/modals/trash-modal.tsx](file:///d:/notion/components/dashboard/modals/trash-modal.tsx))**: Fast soft-deleted page inspection via cached `/api/pages/trash` endpoint, showing page hierarchy, deletion date, permanent deletion option, and one-click cascade recovery.
 - **Migration Script ([scripts/backfill-ancestors.mts](file:///d:/notion/scripts/backfill-ancestors.mts))**: CLI script to backfill ancestor arrays on legacy databases.
 
-### 7. Async Debounced RAG Queue & Voice Transcriber
+### 12. Async Debounced RAG Queue & Voice Transcriber
 - **Background Indexing Queue ([lib/rag-queue.ts](file:///d:/notion/lib/rag-queue.ts))**: Decouples document saves from vector embedding generation, eliminating save latency.
 - **LangChain + FastAPI Microservice ([rag_service/main.py](file:///d:/notion/rag_service/main.py))**:
   - `SentenceTransformerEmbeddings` (`all-MiniLM-L6-v2`) with local ChromaDB storage.
@@ -176,19 +242,19 @@ The following table provides a complete, transparent breakdown of what is fully 
   - Streaming responses (`/query-stream`) and standard citations (`/query`).
 - **Live Voice Recording & AI Meeting Notes ([components/dashboard/editor/MeetingNoteView.tsx](file:///d:/notion/components/dashboard/editor/MeetingNoteView.tsx))**: Browser speech-to-text recording with WebGL audio visualizer ([components/dashboard/Strands.tsx](file:///d:/notion/components/dashboard/Strands.tsx)) and one-click AI summarization.
 
-### 8. Multi-View Database Boards
+### 13. Multi-View Database Boards
 - **Dynamic View Switcher ([components/dashboard/editor/DatabaseBlock.tsx](file:///d:/notion/components/dashboard/editor/DatabaseBlock.tsx))**:
   - **Kanban Board ([KanbanBoard.tsx](file:///d:/notion/components/dashboard/editor/KanbanBoard.tsx))**: Drag-and-drop columns, customizable tag colors, priority badges, and quick-add cards.
   - **Timeline / Gantt Chart ([TimelineView.tsx](file:///d:/notion/components/dashboard/editor/TimelineView.tsx))**: Visual Gantt timeline mapping task durations across dates.
   - **Data Table View ([TableView.tsx](file:///d:/notion/components/dashboard/editor/TableView.tsx))**: Grid view with inline editing, schema types, and row management.
 
-### 9. In-Browser Polyglot Code Runner Sandbox
+### 14. In-Browser Polyglot Code Runner Sandbox
 - **Client-Side Execution ([lib/code-runner.ts](file:///d:/notion/lib/code-runner.ts))**:
   - **JavaScript Sandbox**: Isolated `Function` evaluation engine intercepting `console.log` streams.
   - **Python Sandbox**: Authentic Python execution powered by Pyodide WebAssembly (WASM).
 - **Interactive Console Panel ([components/dashboard/editor/CodeBlock.tsx](file:///d:/notion/components/dashboard/editor/CodeBlock.tsx))**: Output drawer displaying execution runtime, standard output, and error tracebacks.
 
-### 10. Real-Time Collaboration, Workspace Sharing & Notifications
+### 15. Real-Time Collaboration, Workspace Sharing & Notifications
 - **Server-Sent Events Stream ([app/api/collaboration/[pageId]/stream/route.ts](file:///d:/notion/app/api/collaboration/[pageId]/stream/route.ts))**: Real-time event hub broadcasting cursor coordinates, active blocks, and edits.
 - **Remote Cursor Flags ([RemoteCursorOverlay.tsx](file:///d:/notion/components/dashboard/editor/RemoteCursorOverlay.tsx))**: Colored mouse pointers with user tags.
 - **Live Presence Bar ([LivePresenceBar.tsx](file:///d:/notion/components/dashboard/editor/LivePresenceBar.tsx))**: Collaborator avatars with online status badges.
@@ -203,42 +269,42 @@ The following table provides a complete, transparent breakdown of what is fully 
   - Sliding discussion drawer for inline team feedback on document canvases.
   - Page-level and block-targeted commenting with author metadata, timestamps, and resolution states ([lib/models/comment.ts](file:///d:/notion/lib/models/comment.ts), [app/api/pages/[id]/comments/route.ts](file:///d:/notion/app/api/pages/[id]/comments/route.ts)).
 
-### 11. Version History, Revisions & Visual Diff Rollback
+### 16. Version History, Revisions & Visual Diff Rollback
 - **Visual Revision Comparator ([components/dashboard/modals/version-diff-modal.tsx](file:///d:/notion/components/dashboard/modals/version-diff-modal.tsx))**: Compare historical snapshots against current document states backed by [app/api/pages/[id]/revisions/route.ts](file:///d:/notion/app/api/pages/[id]/revisions/route.ts) and [lib/models/revision.ts](file:///d:/notion/lib/models/revision.ts).
 - **Unified & Side-by-Side Diffs**: Highlights added blocks in green and removed blocks in red.
 - **One-Click Rollback**: Restore any previous version snapshot directly back into the live canvas.
 
-### 12. Notion Calendar Workspace
+### 17. Notion Calendar Workspace
 - **Interactive Calendar ([app/dashboard/calendar/page.tsx](file:///d:/notion/app/dashboard/calendar/page.tsx))**: Switch between **Month**, **Week**, **Day**, and **Agenda** views.
 - **Event Lifecycle ([lib/models/calendar-event.ts](file:///d:/notion/lib/models/calendar-event.ts))**: Create, reschedule, tag, and assign color-coded metadata to workspace deadlines.
 
-### 13. Dedicated Views: Tasks, Templates, Library & Help Center
+### 18. Dedicated Views: Tasks, Templates, Library & Help Center
 - **My Tasks ([app/dashboard/tasks/page.tsx](file:///d:/notion/app/dashboard/tasks/page.tsx))**: Personal task manager with priority filtering, due dates, and completion status.
 - **Templates Directory ([app/dashboard/templates/page.tsx](file:///d:/notion/app/dashboard/templates/page.tsx))**: Pre-built blueprints (Project Brief, Architecture Decision Record, Meeting Notes, Weekly Review).
 - **Workspace Library ([app/dashboard/library/page.tsx](file:///d:/notion/app/dashboard/library/page.tsx))**: Team knowledge base for SOPs, guides, and policies with official verification stamps.
 - **Help Center ([app/dashboard/help/page.tsx](file:///d:/notion/app/dashboard/help/page.tsx))**: Interactive guide with searchable articles, keyboard shortcut cheat sheets, and floating help trigger ([components/dashboard/floating-help-button.tsx](file:///d:/notion/components/dashboard/floating-help-button.tsx)).
 
-### 14. Document Export & Import Engine
+### 19. Document Export & Import Engine
 - **Export Formats**: One-click export to GitHub-flavored Markdown (`.md`) or printable PDF format with clean typography.
 - **Markdown Importer ([components/dashboard/modals/import-modal.tsx](file:///d:/notion/components/dashboard/modals/import-modal.tsx))**: Parses `.md` files directly into a new structured Notion page.
 
-### 15. Global Spotlight Command Palette
+### 20. Global Spotlight Command Palette
 - **Universal Shortcut (`Cmd + K` / `Ctrl + K`) ([components/dashboard/command-palette.tsx](file:///d:/notion/components/dashboard/command-palette.tsx))**: Global fuzzy search across page titles and block content with full PageIcon support.
 - **Quick Actions**: Jump to recent pages, toggle theme (Light/Dark), launch modals, or trigger Notion AI.
 
-### 16. AI Output Sanitization, In-Page Chat & Free Trial Quotas
+### 21. AI Output Sanitization, In-Page Chat & Free Trial Quotas
 - **AI Text Cleaner & Sanitizer ([lib/clean-ai-text.ts](file:///d:/notion/lib/clean-ai-text.ts))**: Sanitizes model responses across meeting summaries and agent answers, stripping internal delimiter leaks and extraneous markdown artifacts.
 - **In-Page AI Chat Persistence ([app/api/ai/chat/route.ts](file:///d:/notion/app/api/ai/chat/route.ts))**: Persists page-level or workspace-level AI conversation logs with a 3-minute L1 in-memory cache.
 - **User Plan & Free Trial Limits ([app/api/user/plan/route.ts](file:///d:/notion/app/api/user/plan/route.ts))**: Automatically monitors AI usage count on the Free plan, enforcing a 3-query trial threshold before prompting upgrade to Pro or Ultimate.
 - **User Profile & Preference Guard ([app/api/user/profile/route.ts](file:///d:/notion/app/api/user/profile/route.ts))**: Secure preference management with strict prototype pollution key allowlisting.
 
-### 17. Multi-Region Billing & Subscriptions
+### 22. Multi-Region Billing & Subscriptions
 - **Dual Payment Gateways ([app/api/stripe/checkout/route.ts](file:///d:/notion/app/api/stripe/checkout/route.ts) & [app/api/razorpay/create-order/route.ts](file:///d:/notion/app/api/razorpay/create-order/route.ts))**:
   - **Stripe**: International subscriptions (USD / Global currencies) with asynchronous webhook processing ([app/api/stripe/webhook/route.ts](file:///d:/notion/app/api/stripe/webhook/route.ts)).
   - **Razorpay**: Domestic Indian payment methods (UPI, NetBanking, Cards in INR) with cryptographic HMAC-SHA256 signature verification.
 - **Checkout & Pricing Modal ([components/dashboard/pricing-modal.tsx](file:///d:/notion/components/dashboard/pricing-modal.tsx))**: Dynamic tier comparison (`Free`, `Pro`, `Ultimate`) with regional fee breakdowns and webhook verification.
 
-### 18. Marketing, Enterprise & Solutions Showcase
+### 23. Marketing, Enterprise & Solutions Showcase
 - **Enterprise Showcase ([app/(Marketing)/enterprise/page.tsx](file:///d:/notion/app/(Marketing)/enterprise/page.tsx))**: Enterprise features, security governance, audit logs, and compliance.
 - **Interactive Solutions Hub ([app/(Marketing)/solutions/page.tsx](file:///d:/notion/app/(Marketing)/solutions/page.tsx))**: Tailored workflows for Engineering, Product, Design, and Operations teams.
 - **Developer Portal ([app/(Marketing)/developers/page.tsx](file:///d:/notion/app/(Marketing)/developers/page.tsx))**: API documentation, webhook setup, and code snippets.
@@ -260,6 +326,9 @@ graph TD
     subgraph Frontend["Frontend Layer"]
         AgentUI["AI Agent Workspace (/dashboard/agent)"]
         Editor["Block Canvas (BlockItem.tsx & BlockRenderer.tsx)"]
+        WhiteboardCanvas["Interactive Whiteboard (WhiteboardBlock.tsx)"]
+        DiagramsMath["Mermaid Diagrams & KaTeX Math (MermaidBlock.tsx & MathBlock.tsx)"]
+        SmartEmbeds["Smart Embeds Engine (IframeEmbedBlock.tsx)"]
         IconSystem["Icon Registry & Universal PageIcon (components/dashboard/icon-registry.tsx)"]
         Sandbox["Pyodide WASM & JS Sandbox"]
         Views["Kanban / Timeline / Table Multi-Views"]
@@ -317,6 +386,10 @@ graph TD
 | **Database & ODM** | MongoDB + Mongoose 9.x | Document database with materialized path ancestor hierarchy |
 | **Caching Tier** | In-Memory LRU (L1) + Upstash Redis (L2) | Multi-tier sub-millisecond caching and distributed rate limiting |
 | **Iconography & Logos** | Lucide React + Vector SVG Asset Registry | Centralized multi-format icons, tech brand SVGs, and PageIcon renderer |
+| **Diagrams & Visualizations** | Mermaid.js 12.x | Live declarative flowcharts, sequence diagrams, ER diagrams, Gantt charts, mindmaps |
+| **Mathematical Typesetting** | KaTeX 0.18.x | Real-time LaTeX mathematical typography & display formula rendering |
+| **Canvas & Whiteboard** | HTML5 Dual Canvas 2D | Multi-tool sketching, shapes, pan/zoom, undo/redo, and PNG export |
+| **Smart Embeds** | Dynamic Iframe Sandboxing | Responsive embedded players for Figma, YouTube, Loom, CodePen, and Docs |
 | **Transactional Email** | Nodemailer 7.x | Cryptographic workspace invite emails with logging fallback |
 | **AI Agent & RAG** | Python FastAPI + LangChain + ChromaDB | Autonomous agent, multi-persona tool calling, vector search |
 | **LLM Provider** | Google Gemini 1.5 Flash | Fast, high-context AI synthesis and reasoning |
@@ -423,7 +496,7 @@ notion/
 ├── components/                       # Reusable React components
 │   ├── auth/                         # Login and registration form cards
 │   ├── dashboard/                    # Workspace interface components
-│   │   ├── editor/                   # BlockItem, BlockRenderer, CodeBlock, CommentsPanel, Kanban, EmojiPicker
+│   │   ├── editor/                   # BlockItem, BlockRenderer, CodeBlock, WhiteboardBlock, MermaidBlock, MathBlock, IframeEmbedBlock, CommentsPanel, Kanban, EmojiPicker, InlineAiGenerator, InlineAiSelectionMenu
 │   │   ├── help/                     # Help center articles and keyboard shortcut views
 │   │   ├── modals/                   # Diff viewer, share, trash, memory, history, checkout, search, settings
 │   │   ├── animated-bot-logo.tsx     # Emotive bot logo with dynamic states
